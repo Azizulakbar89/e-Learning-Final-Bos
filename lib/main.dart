@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart' show Firebase;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'core/services/background_sync_service.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/firebase_service.dart';
 import 'core/theme/app_theme.dart';
@@ -36,6 +37,7 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     await FcmService.initialize();
+    await BackgroundSyncService.initialize();
   } catch (e) {
     debugPrint('Firebase Core init note: $e');
   }

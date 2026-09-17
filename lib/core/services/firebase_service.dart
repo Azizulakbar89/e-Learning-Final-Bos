@@ -87,11 +87,14 @@ class FirebaseService extends ChangeNotifier {
   static const String _sessionKey = 'auth_session_user_id';
 
   /// Simpan ID pengguna ke penyimpanan lokal agar sesi tidak hilang saat aplikasi ditutup
-  Future<void> _saveUserSession(String userId) async {
+  Future<void> _saveUserSession(String userId, [String? userClass]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_sessionKey, userId);
-      debugPrint('[Session] User session saved: $userId');
+      if (userClass != null && userClass.isNotEmpty) {
+        await prefs.setString('auth_session_user_class', userClass);
+      }
+      debugPrint('[Session] User session saved: $userId (class: $userClass)');
     } catch (e) {
       debugPrint('[Session] Error saving session: $e');
     }
@@ -102,6 +105,7 @@ class FirebaseService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_sessionKey);
+      await prefs.remove('auth_session_user_class');
       debugPrint('[Session] User session cleared');
     } catch (e) {
       debugPrint('[Session] Error clearing session: $e');
@@ -937,7 +941,7 @@ class FirebaseService extends ChangeNotifier {
             });
           }
           _currentUser = updatedUser;
-          unawaited(_saveUserSession(updatedUser.id));
+          unawaited(_saveUserSession(updatedUser.id, updatedUser.className ?? updatedUser.classId));
           unawaited(syncFcmToken(updatedUser.id));
           notifyListeners();
           return updatedUser;
@@ -1096,8 +1100,9 @@ class FirebaseService extends ChangeNotifier {
       debugPrint('[Firestore] Note saving student: $e');
     }
 
+    _currentUser = newStudent;
     notifyListeners();
-    unawaited(_saveUserSession(newStudent.id));
+    unawaited(_saveUserSession(newStudent.id, newStudent.className ?? newStudent.classId));
     unawaited(syncFcmToken(newStudent.id));
     return newStudent;
   }
