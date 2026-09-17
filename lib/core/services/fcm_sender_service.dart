@@ -73,8 +73,7 @@ class FcmSenderService {
           'priority': 'HIGH',
           'notification': {
             'channel_id': 'high_importance_channel',
-            'priority': 'HIGH',
-            'sound': 'default',
+            'notification_priority': 'PRIORITY_HIGH',
             'default_sound': true,
             'default_vibrate_timings': true,
           },
@@ -103,8 +102,7 @@ class FcmSenderService {
           'priority': 'HIGH',
           'notification': {
             'channel_id': 'high_importance_channel',
-            'priority': 'HIGH',
-            'sound': 'default',
+            'notification_priority': 'PRIORITY_HIGH',
             'default_sound': true,
             'default_vibrate_timings': true,
           },
