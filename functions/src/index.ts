@@ -46,6 +46,7 @@ export const explainMaterial = functions.https.onCall(async (data, context) => {
   if (mode === "baby_language") {
     // ELI5 persona prompt
     const explanation = `🧸 Penjelasan Bahasa Bayi untuk "${title}":\n\n` +
+      (content ? `Tentang: ${content.substring(0, 100)}...\n\n` : "") +
       `Bayangkan materi ini seperti mainan mobil-mobilan kecil berwarna merah di atas karpet halus! ` +
       `Ketika kamu dorong mobilnya pelan, mobilnya jalan pelan. Tapi kalau kamu dorong sekuat tenaga, mobilnya meluncur kencang! ` +
       `Intinya materi ini mengajarkan kita tentang bagaimana benda bisa bergerak dan bereaksi jika diberikan dorongan. Sangat seru dan menyenangkan! 🎈🚗`;
@@ -69,7 +70,7 @@ export const parsePdfQuestions = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError("unauthenticated", "Hanya guru yang dapat mengimpor soal.");
   }
 
-  functions.logger.info(`Extracting PDF: ${fileName} for subject: ${subjectId}, CP: ${cpId}`);
+  functions.logger.info(`Extracting PDF: ${fileName} for subject: ${subjectId}, CP: ${cpId}, TP: ${tpId}`);
 
   // Returns extracted questions with detected LaTeX and image reference flags
   return {
