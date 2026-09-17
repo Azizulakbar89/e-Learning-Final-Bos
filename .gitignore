@@ -49,3 +49,6 @@ android/build/
 functions/node_modules/
 functions/lib/
 
+
+assets/service-account.json
+

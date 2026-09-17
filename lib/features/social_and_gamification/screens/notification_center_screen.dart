@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/notification_model.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../../core/services/fcm_service.dart';
+import '../../../core/services/background_sync_service.dart';
 import '../../materials/screens/material_detail_screen.dart';
 import '../../exams/screens/student_exams_screen.dart';
 import 'chat_conversation_screen.dart';
@@ -68,6 +70,167 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     );
   }
 
+  void _showTestNotificationSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.bolt_rounded, color: Color(0xFFD97706), size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Uji Pop-up Notifikasi HP',
+                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                      const Text(
+                        'Verifikasi bunyi dan banner pop-up saat aplikasi ditutup',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Tombol 1: Uji Saat Aplikasi Mati (5 Detik)
+            Material(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  BackgroundSyncService.scheduleTestBackgroundNotification(delaySeconds: 5);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⏱️ Timer 5 detik berjalan! Segera tutup/swipe keluar aplikasi ini sekarang!'),
+                      backgroundColor: Color(0xFF2563EB),
+                      duration: Duration(seconds: 5),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, color: Color(0xFF2563EB), size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Uji Saat Aplikasi Dimatikan (5 Detik)',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E3A8A)),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Klik ini, lalu SEGERA swipe/tutup aplikasi dalam 5 detik untuk melihat pop-up.',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF3B82F6)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF2563EB)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Tombol 2: Uji Pop-up Langsung
+            Material(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  FcmService.showLocalNotification(
+                    title: '🔔 Pop-up Notifikasi Aktif!',
+                    body: 'Saluran suara dan banner prioritas tinggi HP Anda bekerja dengan sempurna!',
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.notifications_active_rounded, color: Color(0xFF475569), size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Uji Bunyi & Pop-up Layar Langsung',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Memverifikasi izin suara dan tampilan banner di status bar.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tips HP Xiaomi / Oppo / Vivo: Buka Pengaturan HP > Aplikasi > e-Learning > izinkan "Mulai Otomatis" & "Notifikasi Mengambang" agar HP tidak mematikan notifikasi saat aplikasi ditutup.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final fb = context.watch<FirebaseService>();
@@ -108,6 +271,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bolt_rounded, color: Color(0xFFFBBF24)),
+            tooltip: 'Uji Pop-up Notifikasi',
+            onPressed: () => _showTestNotificationSheet(context),
+          ),
           if (unreadCount > 0 && user != null)
             TextButton.icon(
               onPressed: () => fb.markAllNotificationsAsRead(user.id),

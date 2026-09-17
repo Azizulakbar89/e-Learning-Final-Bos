@@ -16,6 +16,32 @@ void backgroundSyncCallbackDispatcher() {
       WidgetsFlutterBinding.ensureInitialized();
       await Firebase.initializeApp();
 
+      final localNotif = FlutterLocalNotificationsPlugin();
+      const androidDetails = AndroidNotificationDetails(
+        'high_importance_channel',
+        'Notifikasi E-Learning',
+        channelDescription: 'Saluran notifikasi untuk materi belajar, tugas, kuis, dan pengumuman sekolah',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        showWhen: true,
+        icon: '@mipmap/ic_launcher',
+        styleInformation: BigTextStyleInformation(''),
+      );
+      const notifDetails = NotificationDetails(android: androidDetails);
+
+      // Jika task uji coba
+      if (task.contains('test')) {
+        await localNotif.show(
+          id: 9999,
+          title: '🔔 Pop-up Berhasil Muncul!',
+          body: 'Notifikasi berhasil muncul ke layar HP Anda meskipun aplikasi sedang ditutup!',
+          notificationDetails: notifDetails,
+        );
+        return Future.value(true);
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('auth_session_user_id');
       final userClass = prefs.getString('auth_session_user_class');
@@ -34,22 +60,6 @@ void backgroundSyncCallbackDispatcher() {
         await prefs.setInt('last_bg_notif_sync_ts', nowMs);
         return Future.value(true);
       }
-
-      final localNotif = FlutterLocalNotificationsPlugin();
-      const androidDetails = AndroidNotificationDetails(
-        'high_importance_channel',
-        'Notifikasi E-Learning',
-        channelDescription: 'Saluran notifikasi untuk materi belajar, tugas, kuis, dan pengumuman sekolah',
-        importance: Importance.max,
-        priority: Priority.high,
-        playSound: true,
-        enableVibration: true,
-        showWhen: true,
-        icon: '@mipmap/ic_launcher',
-        styleInformation: BigTextStyleInformation(''),
-      );
-
-      const notifDetails = NotificationDetails(android: androidDetails);
 
       int newestTimestampSeen = lastCheckMs;
 
@@ -139,5 +149,21 @@ class BackgroundSyncService {
         await prefs.setString('auth_session_user_class', userClass);
       }
     } catch (_) {}
+  }
+
+  /// Menjadwalkan notifikasi uji coba native Android untuk memverifikasi pop-up saat aplikasi mati
+  static Future<void> scheduleTestBackgroundNotification({int delaySeconds = 5}) async {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      try {
+        await Workmanager().registerOneOffTask(
+          'test_notif_${DateTime.now().millisecondsSinceEpoch}',
+          'test_notif',
+          initialDelay: Duration(seconds: delaySeconds),
+        );
+        if (kDebugMode) debugPrint('[WorkManager] Scheduled test task in $delaySeconds seconds');
+      } catch (e) {
+        if (kDebugMode) debugPrint('[WorkManager] Error scheduling test: $e');
+      }
+    }
   }
 }

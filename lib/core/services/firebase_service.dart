@@ -25,6 +25,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../utils/security_utils.dart';
 import 'content_filter_service.dart';
 import 'fcm_service.dart';
+import 'fcm_sender_service.dart';
 
 class FirebaseService extends ChangeNotifier {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -1175,8 +1176,41 @@ class FirebaseService extends ChangeNotifier {
     try {
       await db.collection('notifications').doc(notifId).set(notif.toMap());
       debugPrint('[Notification Engine] Notifikasi tersimpan di Firestore (type: $type)');
+
+      // Kirim sinyal push notifikasi langsung lewat Google FCM (Bangunkan HP meski aplikasi dimatikan)
+      if (targetUserIds.isNotEmpty) {
+        for (final uid in targetUserIds) {
+          final userDoc = await db.collection('users').doc(uid).get();
+          final token = userDoc.data()?['fcm_token'] as String?;
+          if (token != null && token.isNotEmpty) {
+            unawaited(FcmSenderService.sendToDevice(
+              fcmToken: token,
+              title: title,
+              body: body,
+              data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+            ));
+          }
+        }
+      } else if (targetClassIds.isNotEmpty) {
+        for (final cid in targetClassIds) {
+          final topic = FcmService.formatClassTopic(cid);
+          unawaited(FcmSenderService.sendToTopic(
+            topic: topic,
+            title: title,
+            body: body,
+            data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+          ));
+        }
+      } else {
+        unawaited(FcmSenderService.sendToTopic(
+          topic: 'class_all',
+          title: title,
+          body: body,
+          data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+        ));
+      }
     } catch (e) {
-      debugPrint('[Notification Engine] Error saving notification: $e');
+      debugPrint('[Notification Engine] Error saving/dispatching notification: $e');
     }
   }
 
