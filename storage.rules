@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      // Allow write with strict size limit (< 20 MB) and safe extensions
+      allow write: if request.resource.size < 20 * 1024 * 1024
+                   && (request.resource.contentType.matches('application/pdf|image/.*|video/.*|text/.*|application/.*'));
+    }
+  }
+}
