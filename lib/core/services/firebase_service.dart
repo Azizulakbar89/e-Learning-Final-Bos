@@ -511,13 +511,13 @@ class FirebaseService extends ChangeNotifier {
     final effectiveServer = (server != null && server.versionCode > 1)
         ? server
         : AppVersionModel(
-            latestVersion: '1.0.1',
-            versionCode: 2,
+            latestVersion: '1.0.2',
+            versionCode: 3,
             minSupportedVersionCode: 1,
-            apkUrl: server?.apkUrl ?? '',
+            apkUrl: server?.apkUrl ?? 'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.2/app-release.apk',
             releaseNotes: server?.releaseNotes.isNotEmpty == true
                 ? server!.releaseNotes
-                : 'Pembaruan aplikasi: perbaikan performa, notifikasi pop-up otomatis, dan in-app installer.',
+                : 'Pembaruan aplikasi e-learning spemdalas v1.0.2: logo baru resmi Spemdalas, perbaikan nama aplikasi, dan optimasi notifikasi.',
             releasedAt: DateTime.now(),
             forceUpdate: false,
           );

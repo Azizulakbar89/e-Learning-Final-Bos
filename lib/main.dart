@@ -63,7 +63,7 @@ class ELearningSuperApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'E-Learning SuperApp',
+      title: 'e-learning spemdalas',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: FcmService.messengerKey,
       theme: AppTheme.lightTheme,
