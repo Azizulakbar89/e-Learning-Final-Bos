@@ -22,16 +22,16 @@ void main() async {
 
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.0.5'},
-      'version_code': {'integerValue': '6'},
+      'latest_version': {'stringValue': '1.0.6'},
+      'version_code': {'integerValue': '7'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.5/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.6/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '1. Perbaikan Streak Pembelajaran: Streak belajar mandiri tersimpan aman dan tidak hilang/mati saat HP dimatikan atau aplikasi dibuka kembali.\n2. Perbaikan Materi Pembelajaran: Materi belajar siswa kini tampil sempurna sesuai kelas siswa.\n3. Perbaikan Menu Pesan: Riwayat chat konsultasi dengan guru dan diskusi kelas kini tampil lengkap.\n4. Peningkatan stabilitas dan optimasi performa.'
+            '1. Perbaikan Kuis & Penilaian Esai Guru: Siswa yang sudah menyelesaikan kuis/ujian dan telah dinilai esainya oleh guru langsung melihat nilai akhir dan tidak dapat mengulang ujian kembali.\n2. Sinkronisasi Sesi Ujian Siswa: Memperbaiki pemfilteran data sesi ujian Firestore agar status selesai langsung sinkron ke akun siswa.\n3. Peningkatan stabilitas dan akurasi skor kuis.'
       },
       'force_update': {'booleanValue': false}
     }

@@ -34,12 +34,7 @@ class _StudentExamsScreenState extends State<StudentExamsScreen> {
     if (!mounted) return;
     final fb = context.read<FirebaseService>();
     final user = fb.currentUser;
-    final classExams = fb.exams.where((e) {
-      if (user?.classId != null && user!.classId!.isNotEmpty) {
-        return e.classIds.contains(user.classId);
-      }
-      return true;
-    }).toList();
+    final classExams = user != null ? fb.getExamsForStudent(user) : fb.exams;
     for (final exam in classExams) {
       fb.loadQuestionsForExam(exam);
     }
@@ -50,13 +45,7 @@ class _StudentExamsScreenState extends State<StudentExamsScreen> {
     final fb = context.watch<FirebaseService>();
     final user = fb.currentUser;
 
-    // All exams assigned to student's class
-    final classExams = fb.exams.where((e) {
-      if (user?.classId != null && user!.classId!.isNotEmpty) {
-        return e.classIds.contains(user.classId);
-      }
-      return true;
-    }).toList();
+    final classExams = user != null ? fb.getExamsForStudent(user) : fb.exams;
 
     // Filter by selected subject
     final filteredExams = classExams.where((e) {

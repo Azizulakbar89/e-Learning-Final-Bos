@@ -138,7 +138,11 @@ class ExamSessionModel {
   });
 
   bool get isLocked => status == 'locked';
-  bool get isCompleted => status == 'completed';
+  bool get isCompleted =>
+      status == 'completed' ||
+      status == 'finished' ||
+      status == 'graded' ||
+      finishedAt != null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -166,35 +170,40 @@ class ExamSessionModel {
 
   factory ExamSessionModel.fromMap(Map<String, dynamic> map, {String? id}) {
     Map<String, double> parsedEssayScores = {};
-    if (map['essay_scores'] != null && map['essay_scores'] is Map) {
-      (map['essay_scores'] as Map).forEach((k, v) {
-        parsedEssayScores[k.toString()] = (v as num).toDouble();
+    final rawEssay = map['essay_scores'] ?? map['essayScores'];
+    if (rawEssay != null && rawEssay is Map) {
+      rawEssay.forEach((k, v) {
+        if (v is num) {
+          parsedEssayScores[k.toString()] = v.toDouble();
+        }
       });
     }
 
     return ExamSessionModel(
-      id: id ?? map['id'] ?? '',
-      examId: map['exam_id'] ?? '',
-      studentId: map['student_id'] ?? '',
-      studentNis: map['student_nis'] ?? '',
-      studentName: map['student_name'] ?? '',
-      studentClass: map['student_class'] ?? '',
-      status: map['status'] ?? 'in_progress',
-      currentQuestionIndex: (map['current_question_index'] as num?)?.toInt() ?? 0,
-      orderedQuestionIds: List<String>.from(map['ordered_question_ids'] ?? []),
+      id: id ?? map['id']?.toString() ?? '',
+      examId: (map['exam_id'] ?? map['examId'])?.toString() ?? '',
+      studentId: (map['student_id'] ?? map['studentId'])?.toString() ?? '',
+      studentNis: (map['student_nis'] ?? map['studentNis'])?.toString() ?? '',
+      studentName: (map['student_name'] ?? map['studentName'])?.toString() ?? '',
+      studentClass: (map['student_class'] ?? map['studentClass'])?.toString() ?? '',
+      status: (map['status'])?.toString() ?? 'in_progress',
+      currentQuestionIndex: (map['current_question_index'] ?? map['currentQuestionIndex'] as num?)?.toInt() ?? 0,
+      orderedQuestionIds: List<String>.from(map['ordered_question_ids'] ?? map['orderedQuestionIds'] ?? []),
       answers: Map<String, dynamic>.from(map['answers'] ?? {}),
       essayScores: parsedEssayScores,
-      violationCount: (map['violation_count'] as num?)?.toInt() ?? 0,
-      lastViolationReason: map['last_violation_reason'],
-      nonEssayScore: (map['non_essay_score'] as num?)?.toDouble(),
-      finalScore: (map['final_score'] as num?)?.toDouble(),
-      antiCheatDisabledForStudent: map['anti_cheat_disabled_for_student'] ?? false,
-      startedAt: map['started_at'] != null
-          ? DateTime.tryParse(map['started_at'].toString()) ?? DateTime.now()
+      violationCount: (map['violation_count'] ?? map['violationCount'] as num?)?.toInt() ?? 0,
+      lastViolationReason: (map['last_violation_reason'] ?? map['lastViolationReason'])?.toString(),
+      nonEssayScore: (map['non_essay_score'] ?? map['nonEssayScore'] as num?)?.toDouble(),
+      finalScore: (map['final_score'] ?? map['finalScore'] as num?)?.toDouble(),
+      antiCheatDisabledForStudent: (map['anti_cheat_disabled_for_student'] ?? map['antiCheatDisabledForStudent']) as bool? ?? false,
+      startedAt: map['started_at'] != null || map['startedAt'] != null
+          ? DateTime.tryParse((map['started_at'] ?? map['startedAt']).toString()) ?? DateTime.now()
           : DateTime.now(),
-      finishedAt: map['finished_at'] != null ? DateTime.tryParse(map['finished_at'].toString()) : null,
-      updatedAt: map['updated_at'] != null
-          ? DateTime.tryParse(map['updated_at'].toString()) ?? DateTime.now()
+      finishedAt: map['finished_at'] != null || map['finishedAt'] != null
+          ? DateTime.tryParse((map['finished_at'] ?? map['finishedAt']).toString())
+          : null,
+      updatedAt: map['updated_at'] != null || map['updatedAt'] != null
+          ? DateTime.tryParse((map['updated_at'] ?? map['updatedAt']).toString()) ?? DateTime.now()
           : DateTime.now(),
     );
   }

@@ -410,12 +410,16 @@ class FirebaseService extends ChangeNotifier {
         // 1. Sesi Ujian Siswa Sendiri
         _userScopedSubscriptions.add(
           db.collection('exam_sessions')
-            .where('studentId', isEqualTo: user.id)
+            .where('student_id', isEqualTo: user.id)
             .snapshots()
             .listen((snap) {
               _examSessions.clear();
               for (final doc in snap.docs) {
-                _examSessions.add(ExamSessionModel.fromMap(doc.data(), id: doc.id));
+                try {
+                  _examSessions.add(ExamSessionModel.fromMap(doc.data(), id: doc.id));
+                } catch (e) {
+                  debugPrint('[Firestore] Note parsing exam session ${doc.id}: $e');
+                }
               }
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student exam sessions note: $e')),
@@ -424,12 +428,14 @@ class FirebaseService extends ChangeNotifier {
         // 2. Pengumpulan Tugas Siswa Sendiri
         _userScopedSubscriptions.add(
           db.collection('assignment_submissions')
-            .where('submitterId', isEqualTo: user.id)
+            .where('submitter_id', isEqualTo: user.id)
             .snapshots()
             .listen((snap) {
               _submissions.clear();
               for (final doc in snap.docs) {
-                _submissions.add(AssignmentSubmissionModel.fromMap(doc.data(), id: doc.id));
+                try {
+                  _submissions.add(AssignmentSubmissionModel.fromMap(doc.data(), id: doc.id));
+                } catch (_) {}
               }
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student submissions note: $e')),
@@ -456,17 +462,17 @@ class FirebaseService extends ChangeNotifier {
         // 4. Progress Materi Belajar Siswa Sendiri
         _userScopedSubscriptions.add(
           db.collection('material_progress')
-            .where('studentId', isEqualTo: user.id)
+            .where('student_id', isEqualTo: user.id)
             .snapshots()
             .listen((snap) {
               _materialProgress.clear();
               for (final doc in snap.docs) {
                 final data = doc.data();
-                final sid = data['studentId']?.toString() ?? '';
-                final mid = data['materialId']?.toString() ?? '';
+                final sid = (data['student_id'] ?? data['studentId'])?.toString() ?? '';
+                final mid = (data['material_id'] ?? data['materialId'])?.toString() ?? '';
                 if (sid.isNotEmpty && mid.isNotEmpty) {
                   final key = '${sid}_$mid';
-                  _materialProgress[key] = (data['progress'] as num?)?.toDouble() ?? 0.0;
+                  _materialProgress[key] = (data['progress_percent'] ?? data['progress'] as num?)?.toDouble() ?? 0.0;
                 }
               }
               notifyListeners();
@@ -476,12 +482,14 @@ class FirebaseService extends ChangeNotifier {
         // 5. Transaksi Poin & Redeem Siswa Sendiri
         _userScopedSubscriptions.add(
           db.collection('point_transactions')
-            .where('studentId', isEqualTo: user.id)
+            .where('student_id', isEqualTo: user.id)
             .snapshots()
             .listen((snap) {
               _pointTransactions.clear();
               for (final doc in snap.docs) {
-                _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
+                try {
+                  _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
+                } catch (_) {}
               }
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student point transactions note: $e')),
@@ -489,12 +497,14 @@ class FirebaseService extends ChangeNotifier {
 
         _userScopedSubscriptions.add(
           db.collection('grade_redeems')
-            .where('studentId', isEqualTo: user.id)
+            .where('student_id', isEqualTo: user.id)
             .snapshots()
             .listen((snap) {
               _gradeRedeems.clear();
               for (final doc in snap.docs) {
-                _gradeRedeems.add(GradeRedeemModel.fromMap(doc.data(), id: doc.id));
+                try {
+                  _gradeRedeems.add(GradeRedeemModel.fromMap(doc.data(), id: doc.id));
+                } catch (_) {}
               }
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student grade redeems note: $e')),
@@ -2551,7 +2561,14 @@ class FirebaseService extends ChangeNotifier {
         .firstOrNull;
 
     if (session != null) {
-      if (session.isCompleted) return true;
+      if (session.isCompleted ||
+          session.finishedAt != null ||
+          session.finalScore != null ||
+          session.status == 'completed' ||
+          session.status == 'finished' ||
+          session.status == 'graded') {
+        return true;
+      }
       if (exam != null) {
         final totalExamSeconds = exam.durationMinutes * 60;
         final elapsedSeconds = DateTime.now().difference(session.startedAt).inSeconds;
@@ -2580,8 +2597,13 @@ class FirebaseService extends ChangeNotifier {
 
     if (existingIndex != -1) {
       final existing = _examSessions[existingIndex];
-      // Jika sesi sudah selesai, langsung kembalikan tanpa mengizinkan modifikasi
-      if (existing.isCompleted) {
+      // Jika sesi sudah selesai atau sudah dinilai guru, langsung kembalikan tanpa mengizinkan ujian ulang
+      if (existing.isCompleted ||
+          existing.finishedAt != null ||
+          existing.finalScore != null ||
+          existing.status == 'completed' ||
+          existing.status == 'finished' ||
+          existing.status == 'graded') {
         return existing;
       }
       // Cek apakah waktu pengerjaan sesi ini sebenarnya sudah habis atau jadwal sudah lewat
@@ -2957,6 +2979,8 @@ class FirebaseService extends ChangeNotifier {
       final updated = session.copyWith(
         essayScores: newEssayScores,
         finalScore: finalScore,
+        status: 'completed',
+        finishedAt: session.finishedAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
       _examSessions[index] = updated;
@@ -2994,7 +3018,8 @@ class FirebaseService extends ChangeNotifier {
       final updated = session.copyWith(
         essayScores: newEssayScores,
         finalScore: finalScore,
-        status: 'finished',
+        status: 'completed',
+        finishedAt: session.finishedAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
       _examSessions[index] = updated;
@@ -4387,10 +4412,44 @@ class FirebaseService extends ChangeNotifier {
 
   /// Get all exams assigned to student
   List<ExamModel> getExamsForStudent(UserModel student) {
-    final studentClass = (student.className ?? student.classId ?? '').trim();
+    final userTokens = <String>{};
+    if (student.classId != null && student.classId!.trim().isNotEmpty) {
+      userTokens.add(student.classId!.trim().toLowerCase());
+    }
+    if (student.className != null && student.className!.trim().isNotEmpty) {
+      userTokens.add(student.className!.trim().toLowerCase());
+    }
+    for (final cid in student.classIds) {
+      if (cid.trim().isNotEmpty) userTokens.add(cid.trim().toLowerCase());
+    }
+
+    for (final sc in _schoolClasses) {
+      final scName = sc.name.trim().toLowerCase();
+      final scId = sc.id.trim().toLowerCase();
+      if (userTokens.contains(scName) || userTokens.contains(scId)) {
+        userTokens.add(scName);
+        userTokens.add(scId);
+      }
+    }
+
+    if (userTokens.isEmpty) {
+      return _exams;
+    }
+
     return _exams.where((e) {
       if (e.classIds.isEmpty) return true;
-      return e.classIds.any((c) => c.trim().toLowerCase() == studentClass.toLowerCase());
+      return e.classIds.any((c) {
+        final cleanC = c.trim().toLowerCase();
+        if (cleanC.isEmpty) return true;
+        if (userTokens.contains(cleanC)) return true;
+        for (final token in userTokens) {
+          if (token.contains(cleanC) || cleanC.contains(token)) return true;
+          final cleanToken = token.replaceAll('kelas', '').replaceAll('kls', '').replaceAll('-', '').replaceAll(' ', '').trim();
+          final cleanTarget = cleanC.replaceAll('kelas', '').replaceAll('kls', '').replaceAll('-', '').replaceAll(' ', '').trim();
+          if (cleanToken.isNotEmpty && cleanToken == cleanTarget) return true;
+        }
+        return false;
+      });
     }).toList();
   }
 
