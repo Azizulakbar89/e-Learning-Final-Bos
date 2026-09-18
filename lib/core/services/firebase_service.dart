@@ -1204,20 +1204,42 @@ class FirebaseService extends ChangeNotifier {
       debugPrint('[Notification Engine] Notifikasi tersimpan di Firestore (type: $type)');
 
       // Kirim sinyal push notifikasi langsung lewat Google FCM (Bangunkan HP meski aplikasi dimatikan)
+      final targetTokens = <String>{};
+
       if (targetUserIds.isNotEmpty) {
         for (final uid in targetUserIds) {
           final userDoc = await db.collection('users').doc(uid).get();
           final token = userDoc.data()?['fcm_token'] as String?;
-          if (token != null && token.isNotEmpty) {
-            unawaited(FcmSenderService.sendToDevice(
-              fcmToken: token,
-              title: title,
-              body: body,
-              data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
-            ));
+          if (token != null && token.isNotEmpty) targetTokens.add(token);
+        }
+      } else {
+        // Ambil token semua siswa di kelas terkait (atau semua pengguna jika broadcast umum)
+        final usersSnap = await db.collection('users').get();
+        for (final uDoc in usersSnap.docs) {
+          if (uDoc.id == _currentUser?.id) continue;
+          final uData = uDoc.data();
+          final uClass = (uData['class_name'] ?? uData['class_id'] ?? '').toString().trim();
+          final uToken = uData['fcm_token'] as String?;
+          if (uToken == null || uToken.isEmpty) continue;
+
+          if (targetClassIds.isEmpty || isClassMatching(uClass, targetClassIds)) {
+            targetTokens.add(uToken);
           }
         }
-      } else if (targetClassIds.isNotEmpty) {
+      }
+
+      // Kirim push instan langsung ke setiap token perangkat target
+      for (final t in targetTokens) {
+        unawaited(FcmSenderService.sendToDevice(
+          fcmToken: t,
+          title: title,
+          body: body,
+          data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+        ));
+      }
+
+      // Kirim juga ke topik FCM sebagai jalur cadangan ganda
+      if (targetClassIds.isNotEmpty) {
         for (final cid in targetClassIds) {
           final topic = FcmService.formatClassTopic(cid);
           unawaited(FcmSenderService.sendToTopic(
@@ -1227,14 +1249,13 @@ class FirebaseService extends ChangeNotifier {
             data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
           ));
         }
-      } else {
-        unawaited(FcmSenderService.sendToTopic(
-          topic: 'class_all',
-          title: title,
-          body: body,
-          data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
-        ));
       }
+      unawaited(FcmSenderService.sendToTopic(
+        topic: 'class_all',
+        title: title,
+        body: body,
+        data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+      ));
     } catch (e) {
       debugPrint('[Notification Engine] Error saving/dispatching notification: $e');
     }

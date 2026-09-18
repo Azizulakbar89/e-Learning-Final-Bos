@@ -12,8 +12,39 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
+    final title = message.notification?.title ?? message.data['title'];
+    final body = message.notification?.body ?? message.data['body'];
+
     if (kDebugMode) {
-      debugPrint('[FCM Background/Killed] Pesan masuk: ${message.notification?.title} - ${message.notification?.body}');
+      debugPrint('[FCM Background/Killed] Pesan masuk: $title - $body');
+    }
+
+    if (title != null && title.isNotEmpty) {
+      final localNotifications = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      await localNotifications.initialize(
+        settings: const InitializationSettings(android: androidInit),
+      );
+
+      const androidDetails = AndroidNotificationDetails(
+        'high_importance_channel',
+        'Notifikasi E-Learning',
+        channelDescription: 'Saluran notifikasi prioritas tinggi e-learning untuk materi, tugas, dan pengumuman',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      if (message.notification == null) {
+        await localNotifications.show(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: title,
+          body: body ?? '',
+          notificationDetails: const NotificationDetails(android: androidDetails),
+        );
+      }
     }
   } catch (e) {
     if (kDebugMode) debugPrint('[FCM Background] Error init: $e');
@@ -99,12 +130,13 @@ class FcmService {
 
       if (isAuthorized) {
         try {
+          await _messaging.subscribeToTopic('class_all');
           _cachedToken = await _messaging.getToken();
           if (kDebugMode && _cachedToken != null && _cachedToken!.length > 8) {
             debugPrint('FCM Token aktif: ${_cachedToken!.substring(0, 4)}...${_cachedToken!.substring(_cachedToken!.length - 4)}');
           }
         } catch (e) {
-          if (kDebugMode) debugPrint('FCM Token generation note: $e');
+          if (kDebugMode) debugPrint('FCM Token generation / topic subscribe note: $e');
         }
 
         // 7. Otomatis kirimkan Pop-Up Notifikasi Selamat Datang (Selamat! Notifikasi Diaktifkan)

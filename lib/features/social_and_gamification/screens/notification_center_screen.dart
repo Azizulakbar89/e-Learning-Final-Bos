@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/notification_model.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/fcm_service.dart';
-import '../../../core/services/background_sync_service.dart';
+import '../../../core/services/fcm_sender_service.dart';
 import '../../materials/screens/material_detail_screen.dart';
 import '../../exams/screens/student_exams_screen.dart';
 import 'chat_conversation_screen.dart';
@@ -120,16 +120,30 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  BackgroundSyncService.scheduleTestBackgroundNotification(delaySeconds: 5);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('⏱️ Timer 5 detik berjalan! Segera tutup/swipe keluar aplikasi ini sekarang!'),
+                      content: Text('🚀 Sinyal FCM dikirim! SEGERA SWIPE / TUTUP aplikasi sekarang!'),
                       backgroundColor: Color(0xFF2563EB),
-                      duration: Duration(seconds: 5),
+                      duration: Duration(seconds: 4),
                       behavior: SnackBarBehavior.floating,
                     ),
+                  );
+
+                  // Kirim Push Notification resmi via Google FCM langsung ke perangkat ini
+                  final token = await FcmService.getToken();
+                  if (token != null && token.isNotEmpty) {
+                    await FcmSenderService.sendToDevice(
+                      fcmToken: token,
+                      title: '🔔 Uji Pop-up Notifikasi Berhasil!',
+                      body: 'Notifikasi FCM Google berhasil membangunkan HP Anda saat aplikasi dimatikan!',
+                    );
+                  }
+                  await FcmSenderService.sendToTopic(
+                    topic: 'class_all',
+                    title: '🔔 Notifikasi E-Learning Aktif',
+                    body: 'Saluran push Google FCM berhasil diterima saat aplikasi mati!',
                   );
                 },
                 child: Padding(
