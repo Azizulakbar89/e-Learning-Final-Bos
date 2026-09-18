@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
@@ -29,14 +38,19 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Extract Version from Tag
+      - name: Extract Version
         id: version
         run: |
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | xargs)
+            TAG="v${VERSION}"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION from tag: $TAG"
+          echo "Building version: $VERSION from tag/ref: $TAG"
 
       - name: Install Dependencies
         run: flutter pub get
