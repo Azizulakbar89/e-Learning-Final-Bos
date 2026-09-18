@@ -52,3 +52,7 @@ functions/lib/
 
 assets/service-account.json
 
+# Markdown documentation & report files (internal notes)
+*.md
+!README.md
+!ios/**/README.md
