@@ -7,12 +7,14 @@ on:
 
 jobs:
   build-and-release:
-    name: Build Flutter APK and Create Release
+    name: Build Flutter APK and Create GitHub Release
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java Development Kit (JDK)
         uses: actions/setup-java@v4
@@ -23,21 +25,55 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.41.6'
           channel: 'stable'
           cache: true
+
+      - name: Extract Version from Tag
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION from tag: $TAG"
 
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Release APK
-        run: flutter build apk --release
+      - name: Run Flutter Analyze
+        run: flutter analyze --no-fatal-infos
 
-      - name: Upload APK to GitHub Release
+      - name: Build Release APK
+        run: |
+          flutter build apk --release \
+            --build-name="${{ steps.version.outputs.version }}" \
+            --build-number="${GITHUB_RUN_NUMBER}"
+
+      - name: Rename APK with version
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "build/app/outputs/flutter-apk/elearning-spemdalas-${{ steps.version.outputs.version }}.apk"
+
+      - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
-          name: "e-learning spemdalas ${{ github.ref_name }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "e-Learning Spemdalas ${{ steps.version.outputs.tag }}"
+          body: |
+            ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
+
+            ### 📥 Cara Install
+            1. Download file APK di bawah ini
+            2. Buka file APK di perangkat Android kamu
+            3. Izinkan instalasi dari sumber tidak dikenal jika diminta
+            4. Selesai! Aplikasi siap digunakan
+
+            ---
+            *Release otomatis dibuat oleh GitHub Actions*
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/elearning-spemdalas-${{ steps.version.outputs.version }}.apk
           generate_release_notes: true
           draft: false
           prerelease: false
