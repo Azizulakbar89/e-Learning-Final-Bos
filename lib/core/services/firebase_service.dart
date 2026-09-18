@@ -1456,10 +1456,16 @@ class FirebaseService extends ChangeNotifier {
       readByUserIds: [],
     );
 
-    // Optimistic insert di awal list
-    _notifications.removeWhere((n) => n.id == notifId);
-    _notifications.insert(0, notif);
-    notifyListeners();
+    // Optimistic insert di awal list: Pengirim tidak perlu melihat notifikasi ini di inbox-nya sendiri jika bukan ditargetkan untuknya
+    final shouldInsertLocally = targetUserIds.isEmpty
+        ? (targetClassIds.isEmpty || (_currentUser?.className != null && isClassMatching(_currentUser!.className!, targetClassIds)))
+        : targetUserIds.contains(_currentUser?.id);
+
+    if (shouldInsertLocally && (_currentUser == null || notif.creatorId != _currentUser?.id)) {
+      _notifications.removeWhere((n) => n.id == notifId);
+      _notifications.insert(0, notif);
+      notifyListeners();
+    }
 
     try {
       await db.collection('notifications').doc(notifId).set(notif.toMap());
@@ -1470,6 +1476,7 @@ class FirebaseService extends ChangeNotifier {
 
       if (targetUserIds.isNotEmpty) {
         for (final uid in targetUserIds) {
+          if (uid == _currentUser?.id) continue; // Jangan kirim ke perangkat pengirim sendiri
           final userDoc = await db.collection('users').doc(uid).get();
           final token = userDoc.data()?['fcm_token'] as String?;
           if (token != null && token.isNotEmpty) targetTokens.add(token);
@@ -1490,34 +1497,45 @@ class FirebaseService extends ChangeNotifier {
         }
       }
 
+      final payloadData = {
+        'type': type,
+        'referenceId': referenceId ?? '',
+        'notifId': notifId,
+        'senderId': _currentUser?.id ?? '',
+      };
+
       // Kirim push instan langsung ke setiap token perangkat target
       for (final t in targetTokens) {
         unawaited(FcmSenderService.sendToDevice(
           fcmToken: t,
           title: title,
           body: body,
-          data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+          data: payloadData,
         ));
       }
 
-      // Kirim juga ke topik FCM sebagai jalur cadangan ganda
-      if (targetClassIds.isNotEmpty) {
-        for (final cid in targetClassIds) {
-          final topic = FcmService.formatClassTopic(cid);
+      // Topik FCM hanya digunakan untuk notifikasi massal / kelas, BUKAN untuk chat privat antar pengguna
+      if (targetUserIds.isEmpty) {
+        if (targetClassIds.isNotEmpty) {
+          for (final cid in targetClassIds) {
+            final topic = FcmService.formatClassTopic(cid);
+            unawaited(FcmSenderService.sendToTopic(
+              topic: topic,
+              title: title,
+              body: body,
+              data: payloadData,
+            ));
+          }
+        } else {
+          // Hanya jika benar-benar broadcast umum untuk seluruh sekolah
           unawaited(FcmSenderService.sendToTopic(
-            topic: topic,
+            topic: 'class_all',
             title: title,
             body: body,
-            data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
+            data: payloadData,
           ));
         }
       }
-      unawaited(FcmSenderService.sendToTopic(
-        topic: 'class_all',
-        title: title,
-        body: body,
-        data: {'type': type, 'referenceId': referenceId ?? '', 'notifId': notifId},
-      ));
     } catch (e) {
       debugPrint('[Notification Engine] Error saving/dispatching notification: $e');
     }
@@ -1529,6 +1547,10 @@ class FirebaseService extends ChangeNotifier {
     final uid = user.id;
 
     return _notifications.where((n) {
+      // 0. Jangan pernah tampilkan notifikasi yang dibuat/dikirim oleh diri sendiri
+      if (n.creatorId != null && n.creatorId == uid) {
+        return false;
+      }
       // 1. Notifikasi pesan masuk / chat spesifik per user
       if (n.targetUserIds.isNotEmpty) {
         return n.targetUserIds.contains(uid);

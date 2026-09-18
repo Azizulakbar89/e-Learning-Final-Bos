@@ -115,7 +115,7 @@ class _EmbeddedMediaViewerState extends State<EmbeddedMediaViewer> {
     }
 
     final embedUrl =
-        'https://www.youtube-nocookie.com/embed/$videoId?autoplay=0&rel=0&modestbranding=1';
+        'https://www.youtube-nocookie.com/embed/$videoId?autoplay=0&rel=0&modestbranding=1&playsinline=1';
     final viewKey = 'yt_$videoId';
 
     return Container(

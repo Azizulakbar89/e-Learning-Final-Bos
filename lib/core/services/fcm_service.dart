@@ -12,6 +12,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
+
+    // Abaikan jika notifikasi berasal dari diri sendiri saat mengirim pesan/aktivitas
+    final senderId = (message.data['senderId'] ?? message.data['sender_id'] ?? '').toString().trim();
+    if (senderId.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = (prefs.getString('auth_session_user_id') ?? '').trim();
+      if (currentUserId.isNotEmpty && currentUserId == senderId) {
+        if (kDebugMode) {
+          debugPrint('[FCM Background] Mengabaikan notifikasi karena berasal dari diri sendiri ($senderId)');
+        }
+        return;
+      }
+    }
+
     final title = message.notification?.title ?? message.data['title'];
     final body = message.notification?.body ?? message.data['body'];
 
@@ -144,10 +158,24 @@ class FcmService {
       }
 
       // 8. Listener saat aplikasi terbuka di depan layar (Foreground) -> Tampilkan Pop-Up Banner & Local Notification
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         if (kDebugMode) {
           debugPrint('FCM Foreground: ${message.notification?.title} - ${message.notification?.body}');
         }
+
+        // Cek jika pesan ini dikirim oleh diri sendiri
+        final senderId = (message.data['senderId'] ?? message.data['sender_id'] ?? '').toString().trim();
+        if (senderId.isNotEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          final currentUserId = (prefs.getString('auth_session_user_id') ?? '').trim();
+          if (currentUserId.isNotEmpty && currentUserId == senderId) {
+            if (kDebugMode) {
+              debugPrint('[FCM Foreground] Mengabaikan banner notifikasi karena dikirim oleh diri sendiri ($senderId)');
+            }
+            return;
+          }
+        }
+
         final notif = message.notification;
         final title = notif?.title ?? message.data['title'] ?? 'Notifikasi Baru';
         final body = notif?.body ?? message.data['body'] ?? '';

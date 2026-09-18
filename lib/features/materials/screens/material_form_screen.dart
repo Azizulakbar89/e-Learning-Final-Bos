@@ -158,19 +158,21 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
       return;
     }
 
+    setState(() => _isUploadingPpt = true);
     final isEdit2 = isEdit; // capture for closure
-    await showLoadingDialog(
-      context,
-      message: isEdit ? 'Memperbarui materi...' : 'Menerbitkan materi baru...',
-      action: () async {
-        // Upload PPT jika ada
-        if (_contentType == 'ppt' && _pptFileBytes != null) {
-          mediaUrl = await fb.uploadPptFile(
-            bytes: _pptFileBytes!,
-            fileName: _pptFileName ?? 'presentation.pptx',
-            materialId: materialId,
-          );
-        }
+    try {
+      await showLoadingDialog(
+        context,
+        message: isEdit ? 'Memperbarui materi...' : 'Menerbitkan materi baru...',
+        action: () async {
+          // Upload PPT jika ada
+          if (_contentType == 'ppt' && _pptFileBytes != null) {
+            mediaUrl = await fb.uploadPptFile(
+              bytes: _pptFileBytes!,
+              fileName: _pptFileName ?? 'presentation.pptx',
+              materialId: materialId,
+            );
+          }
 
         if (mediaUrl.isEmpty) throw Exception('URL media wajib diisi!');
 
@@ -237,6 +239,9 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
       errorMessage: 'Gagal menyimpan materi. Periksa koneksi internet Anda.',
       popOnSuccess: true,
     );
+    } finally {
+      if (mounted) setState(() => _isUploadingPpt = false);
+    }
   }
 
   Future<List<String>> _savePgQuestions(FirebaseService fb, String subjectId) async {

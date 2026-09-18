@@ -22,16 +22,16 @@ void main() async {
 
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.0.6'},
-      'version_code': {'integerValue': '7'},
+      'latest_version': {'stringValue': '1.0.7'},
+      'version_code': {'integerValue': '8'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.6/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.7/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '1. Perbaikan Kuis & Penilaian Esai Guru: Siswa yang sudah menyelesaikan kuis/ujian dan telah dinilai esainya oleh guru langsung melihat nilai akhir dan tidak dapat mengulang ujian kembali.\n2. Sinkronisasi Sesi Ujian Siswa: Memperbaiki pemfilteran data sesi ujian Firestore agar status selesai langsung sinkron ke akun siswa.\n3. Peningkatan stabilitas dan akurasi skor kuis.'
+            '1. Perbaikan Notifikasi Chat: Menghentikan notifikasi dan pop-up banner ke pengirim pesan sendiri saat mengirim chat.\n2. In-App Media Viewer Interaktif: Materi pembelajaran berupa slide PPT/Google Slides, presentasi Canva, dan video YouTube kini langsung tampil dan dapat diinteraksikan di dalam aplikasi tanpa harus dialihkan ke peramban atau browser luar.\n3. Peningkatan performa dan kestabilan WebView materi pembelajaran.'
       },
       'force_update': {'booleanValue': false}
     }
