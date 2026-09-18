@@ -164,6 +164,15 @@ class _AiTutorSheetState extends State<AiTutorSheet> {
               itemBuilder: (context, index) {
                 final msg = _messages[index];
                 final isUser = msg['role'] == 'user';
+                final isOutOfContext = !isUser &&
+                    (msg['text']?.contains('[DI LUAR KONTEKS PEMBELAJARAN]') ?? false);
+
+                final displayText = isOutOfContext
+                    ? (msg['text'] ?? '')
+                        .replaceAll('⚠️ [DI LUAR KONTEKS PEMBELAJARAN]', '')
+                        .replaceAll('[DI LUAR KONTEKS PEMBELAJARAN]', '')
+                        .trim()
+                    : (msg['text'] ?? '');
 
                 return Align(
                   alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -171,18 +180,77 @@ class _AiTutorSheetState extends State<AiTutorSheet> {
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     padding: const EdgeInsets.all(14),
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.8,
+                      maxWidth: MediaQuery.of(context).size.width * 0.85,
                     ),
                     decoration: BoxDecoration(
-                      color: isUser ? AppColors.primary : const Color(0xFFF1F5F9),
+                      color: isUser
+                          ? AppColors.primary
+                          : (isOutOfContext
+                              ? const Color(0xFFFFFBEB)
+                              : const Color(0xFFF1F5F9)),
                       borderRadius: BorderRadius.circular(16),
+                      border: isOutOfContext
+                          ? Border.all(color: const Color(0xFFF59E0B), width: 1.5)
+                          : null,
+                      boxShadow: isOutOfContext
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFF59E0B).withAlpha(30),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ]
+                          : null,
                     ),
-                    child: Text(
-                      msg['text'] ?? '',
-                      style: TextStyle(
-                        color: isUser ? Colors.white : const Color(0xFF1E293B),
-                        height: 1.4,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isOutOfContext) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 15,
+                                  color: Color(0xFFDC2626),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'DI LUAR KONTEKS PEMBELAJARAN',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF991B1B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        SelectableText(
+                          displayText,
+                          style: TextStyle(
+                            color: isUser
+                                ? Colors.white
+                                : (isOutOfContext
+                                    ? const Color(0xFF78350F)
+                                    : const Color(0xFF1E293B)),
+                            height: 1.45,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );

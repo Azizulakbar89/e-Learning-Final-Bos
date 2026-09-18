@@ -370,7 +370,7 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
                 sliver: SliverLayoutBuilder(
                   builder: (context, constraints) {
                     final width = constraints.crossAxisExtent;

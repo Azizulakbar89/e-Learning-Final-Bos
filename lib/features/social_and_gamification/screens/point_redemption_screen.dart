@@ -109,7 +109,7 @@ class _PointRedemptionScreenState extends State<PointRedemptionScreen> {
       body: ResponsiveFormWrapper(
         maxWidth: 800,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 48),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

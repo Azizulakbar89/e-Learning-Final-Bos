@@ -353,7 +353,7 @@ class _DashboardPageState extends State<_DashboardPage> {
                   isWide ? 32 : 16,
                   isWide ? 32 : 16,
                   isWide ? 32 : 16,
-                  120, // Avoid overlap with bottom nav
+                  130, // Avoid overlap with bottom nav
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

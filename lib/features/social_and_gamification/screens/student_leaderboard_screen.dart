@@ -153,7 +153,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                 children: [
                   // Info Banner
                   Container(

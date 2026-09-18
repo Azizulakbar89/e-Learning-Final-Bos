@@ -576,7 +576,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                 children: [
                   // Student Profile Card
                   _buildProfileCard(

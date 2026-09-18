@@ -282,7 +282,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
             child: questions.isEmpty
                 ? const Center(child: Text('Belum ada soal dengan filter ini.'))
                 : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     itemCount: questions.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {

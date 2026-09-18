@@ -30,8 +30,10 @@ class _BabyLanguageDialogState extends State<BabyLanguageDialog> {
     _loadExplanation();
   }
 
-  Future<void> _loadExplanation() async {
-    if (widget.cachedExplanation != null && widget.cachedExplanation!.isNotEmpty) {
+  Future<void> _loadExplanation({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        widget.cachedExplanation != null &&
+        widget.cachedExplanation!.isNotEmpty) {
       setState(() {
         _explanation = widget.cachedExplanation;
         _isLoading = false;
@@ -58,7 +60,7 @@ class _BabyLanguageDialogState extends State<BabyLanguageDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 600),
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
@@ -102,11 +104,23 @@ class _BabyLanguageDialogState extends State<BabyLanguageDialog> {
                             ),
                           ),
                           const Text(
-                            'Penjelasan super mudah seperti cerita anak kecil',
+                            'Elaborasi cerita seru disesuaikan isi modul',
                             style: TextStyle(fontSize: 12, color: Colors.black54),
                           ),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, color: Colors.brown),
+                      tooltip: 'Elaborasi Ulang dengan AI',
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              setState(() {
+                                _isLoading = true;
+                              });
+                              _loadExplanation(forceRefresh: true);
+                            },
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),

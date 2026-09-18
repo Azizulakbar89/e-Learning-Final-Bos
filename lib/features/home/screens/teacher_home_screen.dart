@@ -392,7 +392,7 @@ class _TeacherDashboardPage extends StatelessWidget {
                   isWide ? 32 : 16,
                   isWide ? 20 : 10,
                   isWide ? 32 : 16,
-                  100, // Avoid overlap with floating bottom nav
+                  130, // Avoid overlap with floating bottom nav
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2380,7 +2380,7 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
             // Body List
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 130),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -3119,7 +3119,7 @@ class _TeacherProfilePage extends StatelessWidget {
             // Profile Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 80),
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 130),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

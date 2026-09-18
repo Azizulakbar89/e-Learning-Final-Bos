@@ -9,6 +9,7 @@ import '../../../core/models/material_model.dart';
 import '../../../core/models/school_class_model.dart';
 import '../../../core/models/streak_model.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/ai_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/app_nav_rail.dart';
@@ -432,7 +433,7 @@ class _AdminDashboardOverview extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 90),
+                padding: const EdgeInsets.only(bottom: 130),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(
@@ -886,6 +887,7 @@ class _AdminMasterDataPageState extends State<_AdminMasterDataPage>
             child: classes.isEmpty
                 ? const Center(child: Text('Belum ada kelas terdaftar.'))
                 : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                     itemCount: classes.length,
                     itemBuilder: (ctx, idx) {
                       final c = classes[idx];
@@ -1143,6 +1145,7 @@ class _AdminMasterDataPageState extends State<_AdminMasterDataPage>
             child: filtered.isEmpty
                 ? const Center(child: Text('Tidak ada data siswa yang cocok.'))
                 : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                     itemCount: filtered.length,
                     itemBuilder: (ctx, idx) {
                       final s = filtered[idx];
@@ -1405,6 +1408,7 @@ class _AdminMasterDataPageState extends State<_AdminMasterDataPage>
             child: teachers.isEmpty
                 ? const Center(child: Text('Belum ada guru terdaftar.'))
                 : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                     itemCount: teachers.length,
                     itemBuilder: (ctx, idx) {
                       final t = teachers[idx];
@@ -1807,6 +1811,7 @@ class _AdminMasterDataPageState extends State<_AdminMasterDataPage>
             child: subjects.isEmpty
                 ? const Center(child: Text('Belum ada mata pelajaran terdaftar.'))
                 : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                     itemCount: subjects.length,
                     itemBuilder: (ctx, idx) {
                       final s = subjects[idx];
@@ -2136,7 +2141,7 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 80),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: allForumMessages.length,
       itemBuilder: (ctx, idx) {
         final item = allForumMessages[idx];
@@ -2246,7 +2251,7 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 80),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: streaks.length,
       itemBuilder: (ctx, idx) {
         final st = streaks[idx];
@@ -2533,7 +2538,7 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: students.length,
       itemBuilder: (ctx, idx) {
         final s = students[idx];
@@ -2576,14 +2581,16 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: filtered.length,
       itemBuilder: (ctx, idx) {
         final sess = filtered[idx];
         final exam = exams.where((e) => e.id == sess.examId).firstOrNull;
+        final subject = widget.fb.subjects.where((s) => s.id == exam?.subjectId).firstOrNull;
+        final kkm = subject?.kkm ?? 75.0;
         final student = students.where((s) => s.id == sess.studentId).firstOrNull;
         final finalScoreVal = sess.finalScore ?? sess.nonEssayScore ?? 0.0;
-        final isPassed = finalScoreVal >= 75.0;
+        final isPassed = finalScoreVal >= kkm;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -2624,7 +2631,7 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
                       style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     Text(
-                      '${exam?.title ?? "Ujian"} • Kelas ${student?.className ?? sess.studentClass}',
+                      '${exam?.title ?? "Ujian"} • KKM: ${kkm.toStringAsFixed(0)} • Kelas ${student?.className ?? sess.studentClass}',
                       style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                     ),
                     if (sess.violationCount > 0)
@@ -2687,7 +2694,7 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: filtered.length,
       itemBuilder: (ctx, idx) {
         final sub = filtered[idx];
@@ -2772,7 +2779,7 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 85),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 130),
       itemCount: students.length,
       itemBuilder: (ctx, idx) {
         final s = students[idx];
@@ -3282,7 +3289,7 @@ class _StudentDualBarChart extends StatelessWidget {
                   const SizedBox(width: 8),
                   _legendItem(const Color(0xFF059669), 'Tugas'),
                   const SizedBox(width: 8),
-                  _legendItem(const Color(0xFFEF4444), 'KKM 75', isDashed: true),
+                  _legendItem(const Color(0xFFEF4444), 'KKM Mapel', isDashed: true),
                 ],
               ),
             ],
@@ -3430,6 +3437,14 @@ class _StudentDualBarChart extends StatelessWidget {
                                       color: Color(0xFF334155),
                                     ),
                                   ),
+                                  Text(
+                                    'KKM ${g.subject.kkm.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFEF4444),
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
@@ -3566,11 +3581,11 @@ class _StudentGraphConclusionBox extends StatelessWidget {
     if (hasRemedial) {
       final names = remedialSubjects.map((g) {
         final f = g.finalGrade ?? g.examAverage ?? g.assignmentAverage ?? 0.0;
-        return '${g.subject.name} (${f.toStringAsFixed(1)})';
+        return '${g.subject.name} (Nilai: ${f.toStringAsFixed(1)} • KKM: ${g.subject.kkm.toStringAsFixed(0)})';
       }).join(', ');
-      remedialNarrative = 'Terdapat ${remedialSubjects.length} mata pelajaran belum mencapai ambang batas KKM (75): $names. Siswa memerlukan program remedial atau bimbingan khusus.';
+      remedialNarrative = 'Terdapat ${remedialSubjects.length} mata pelajaran belum mencapai ambang batas KKM: $names. Siswa memerlukan program remedial atau bimbingan khusus.';
     } else {
-      remedialNarrative = 'Seluruh mata pelajaran telah berhasil melampaui batas standar KKM (75) secara tuntas.';
+      remedialNarrative = 'Seluruh mata pelajaran telah berhasil melampaui batas standar KKM masing-masing mata pelajaran secara tuntas.';
     }
 
     // Pedagogical Recommendation
@@ -3748,7 +3763,7 @@ class _AdminProfilePage extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 90),
+                padding: const EdgeInsets.only(bottom: 130),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
@@ -3805,6 +3820,11 @@ class _AdminProfilePage extends StatelessWidget {
                         ],
                       ),
                     ),
+
+                    const SizedBox(height: 16),
+
+                    // Google Gemini AI Configuration
+                    _buildGeminiApiKeyCard(context),
 
                     const SizedBox(height: 16),
 
@@ -4237,6 +4257,274 @@ class _AdminProfilePage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildGeminiApiKeyCard(BuildContext context) {
+    return FutureBuilder<String>(
+      future: AiService.getEffectiveApiKey(),
+      builder: (context, snapshot) {
+        final key = snapshot.data ?? '';
+        final isConfigured = key.isNotEmpty;
+        final maskedKey = isConfigured
+            ? (key.length > 12
+                ? '${key.substring(0, 8)}...${key.substring(key.length - 4)}'
+                : '••••••••••••')
+            : 'Belum terpasang';
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFBAE6FD)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0284C7).withAlpha(12),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0284C7), Color(0xFF6366F1)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Google Gemini AI',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Mesin AI untuk AI Tutor & Mode Bahasa Bayi',
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isConfigured ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isConfigured ? Icons.check_circle_rounded : Icons.warning_rounded,
+                          size: 13,
+                          color: isConfigured ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isConfigured ? 'Aktif' : 'Nonaktif',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isConfigured ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F9FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('API Key Aktif:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+                        Text(
+                          maskedKey,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                            color: Color(0xFF0369A1),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [
+                        Text('Model AI:', style: TextStyle(fontSize: 12, color: Colors.black87)),
+                        Text(
+                          'gemini-2.5-flash',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF4338CA),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0284C7),
+                    side: const BorderSide(color: Color(0xFF38BDF8)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.key_rounded, size: 18),
+                  label: const Text(
+                    'Ubah API Key Gemini',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _showEditApiKeyDialog(context, key),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditApiKeyDialog(BuildContext context, String currentKey) {
+    final controller = TextEditingController(text: currentKey);
+    bool isTesting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Color(0xFF0284C7)),
+                const SizedBox(width: 8),
+                Text(
+                  'Konfigurasi API Key Gemini',
+                  style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Masukkan API Key dari Google AI Studio untuk menghubungkan fitur AI Tutor dan Mode Bahasa Bayi.',
+                  style: TextStyle(fontSize: 12.5, color: Colors.black87),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Gemini API Key',
+                    hintText: 'AQ.Ab8...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                ),
+                if (isTesting) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: const [
+                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Sedang menguji API Key...', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isTesting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Simpan & Uji'),
+                onPressed: isTesting
+                    ? null
+                    : () async {
+                        final newKey = controller.text.trim();
+                        if (newKey.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('API Key tidak boleh kosong')),
+                          );
+                          return;
+                        }
+
+                        final navigator = Navigator.of(dialogCtx);
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                        setDialogState(() => isTesting = true);
+                        final success = await AiService.testApiKey(newKey);
+                        setDialogState(() => isTesting = false);
+
+                        if (!dialogCtx.mounted || !context.mounted) return;
+
+                        if (success) {
+                          await AiService.saveApiKey(newKey);
+                          navigator.pop();
+                          scaffoldMessenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('API Key Gemini berhasil disimpan dan terverifikasi aktif! 🎉'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          scaffoldMessenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('API Key tidak valid atau tidak merespons. Periksa kembali key dari AI Studio.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+              ),
+            ],
+          );
+        },
       ),
     );
   }

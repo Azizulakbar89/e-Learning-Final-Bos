@@ -222,7 +222,7 @@ class _StudentMaterialsScreenState extends State<StudentMaterialsScreen> {
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                       itemCount: filtered.length,
                       itemBuilder: (ctx, idx) => _MaterialCard(
                         mat: filtered[idx],

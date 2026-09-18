@@ -275,6 +275,9 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
         ? currentExam.classIds.where((c) => teacherClassesLower.contains(c.toLowerCase())).toList()
         : currentExam.classIds;
 
+    final examSubject = fb.subjects.where((s) => s.id == currentExam.subjectId).firstOrNull;
+    final kkm = examSubject?.kkm ?? 75.0;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
@@ -419,26 +422,41 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
           // Statistics Header
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                _buildStatBadge(
-                  label: _selectedClassFilter == 'all' ? 'Total Peserta' : 'Peserta ($_selectedClassFilter)',
-                  value: '${displayedSessions.length}',
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 10),
-                _buildStatBadge(
-                  label: 'Terkunci 🚨',
-                  value: '${displayedSessions.where((s) => s.isLocked).length}',
-                  color: AppColors.rose,
-                ),
-                const SizedBox(width: 10),
-                _buildStatBadge(
-                  label: 'Selesai ✅',
-                  value: '${displayedSessions.where((s) => s.isCompleted).length}',
-                  color: AppColors.navy,
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildStatBadge(
+                    label: _selectedClassFilter == 'all' ? 'Total Peserta' : 'Peserta ($_selectedClassFilter)',
+                    value: '${displayedSessions.length}',
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  _buildStatBadge(
+                    label: 'KKM Mapel',
+                    value: kkm.toStringAsFixed(0),
+                    color: AppColors.orange,
+                  ),
+                  const SizedBox(width: 10),
+                  _buildStatBadge(
+                    label: 'Tuntas KKM ✅',
+                    value: '${displayedSessions.where((s) => (s.finalScore ?? s.nonEssayScore ?? 0) >= kkm && s.isCompleted).length}',
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 10),
+                  _buildStatBadge(
+                    label: 'Terkunci 🚨',
+                    value: '${displayedSessions.where((s) => s.isLocked).length}',
+                    color: AppColors.rose,
+                  ),
+                  const SizedBox(width: 10),
+                  _buildStatBadge(
+                    label: 'Selesai 📝',
+                    value: '${displayedSessions.where((s) => s.isCompleted).length}',
+                    color: AppColors.navy,
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -454,7 +472,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 56),
                     itemCount: displayedSessions.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
@@ -536,11 +554,28 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                   ),
                                   const Spacer(),
-                                  if (s.finalScore != null)
-                                    Text(
-                                      'Nilai Akhir: ${s.finalScore!.toStringAsFixed(1)}',
-                                      style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.bold),
-                                    ),
+                                  if (s.finalScore != null) ...[
+                                    Builder(builder: (_) {
+                                      final scoreVal = s.finalScore!;
+                                      final isTuntas = scoreVal >= kkm;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isTuntas ? Colors.green.shade50 : Colors.red.shade50,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: isTuntas ? Colors.green.shade200 : Colors.red.shade200),
+                                        ),
+                                        child: Text(
+                                          'Nilai: ${scoreVal.toStringAsFixed(1)} (KKM: ${kkm.toStringAsFixed(0)} • ${isTuntas ? "Tuntas" : "Remedial"})',
+                                          style: TextStyle(
+                                            color: isTuntas ? Colors.green.shade800 : Colors.red.shade800,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
                                 ],
                               ),
                               const Divider(height: 20),

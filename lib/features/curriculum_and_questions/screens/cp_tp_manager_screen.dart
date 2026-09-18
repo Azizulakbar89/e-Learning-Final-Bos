@@ -236,7 +236,7 @@ class _CpTpManagerScreenState extends State<CpTpManagerScreen> {
                 : cps.isEmpty
                     ? const Center(child: Text('Belum ada CP untuk mata pelajaran ini.'))
                     : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     itemCount: cps.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {

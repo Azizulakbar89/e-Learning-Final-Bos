@@ -160,7 +160,7 @@ class _StudentRosterScreenState extends State<StudentRosterScreen> {
                       ),
                     )
                 : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
                     itemCount: filteredStudents.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {

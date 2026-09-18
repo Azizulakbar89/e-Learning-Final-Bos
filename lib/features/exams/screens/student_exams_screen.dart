@@ -270,7 +270,7 @@ class _StudentExamsScreenState extends State<StudentExamsScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                           itemCount: pending.length,
                           itemBuilder: (ctx, idx) => _ExamCard(
                             exam: pending[idx],
@@ -323,7 +323,7 @@ class _StudentExamsScreenState extends State<StudentExamsScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
                           itemCount: done.length,
                           itemBuilder: (ctx, idx) {
                             final exam = done[idx];
