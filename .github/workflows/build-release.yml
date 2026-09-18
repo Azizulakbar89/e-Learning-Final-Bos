@@ -48,9 +48,11 @@ jobs:
             VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | xargs)
             TAG="v${VERSION}"
           fi
+          BUILD=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f2 | xargs)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build=$BUILD" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION from tag/ref: $TAG"
+          echo "Building version: $VERSION (build code: $BUILD) from tag/ref: $TAG"
 
       - name: Install Dependencies
         run: flutter pub get
@@ -62,7 +64,7 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name="${{ steps.version.outputs.version }}" \
-            --build-number="${GITHUB_RUN_NUMBER}"
+            --build-number="${{ steps.version.outputs.build }}"
 
       - name: Rename APK with version
         run: |

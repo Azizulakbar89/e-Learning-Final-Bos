@@ -22,16 +22,16 @@ void main() async {
 
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.0.8'},
-      'version_code': {'integerValue': '9'},
+      'latest_version': {'stringValue': '1.0.9'},
+      'version_code': {'integerValue': '10'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.8/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.9/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi 1.0.8: Integrasi Google Gemini AI (Mode Bahasa Bayi & AI Tutor dengan RAG Guardrails), perbaikan KKM monitoring dinamis per mata pelajaran, dan perbaikan bottom spacing Android.'
+            '✨ Versi 1.0.9: Pembaruan kunci signature resmi (konsisten update tanpa uninstall), Google Gemini AI, KKM dinamis, dan perbaikan bottom spacing Android.'
       },
       'force_update': {'booleanValue': false}
     }
