@@ -196,7 +196,11 @@ class FirebaseService extends ChangeNotifier {
         db.collection('materials').snapshots().listen((snap) {
           _materials.clear();
           for (final doc in snap.docs) {
-            _materials.add(MaterialModel.fromMap(doc.data(), id: doc.id));
+            try {
+              _materials.add(MaterialModel.fromMap(doc.data(), id: doc.id));
+            } catch (e) {
+              debugPrint('[Firestore] Note parsing material ${doc.id}: $e');
+            }
           }
           notifyListeners();
         }, onError: (e) => debugPrint('[Firestore] Materials stream note: $e')),
@@ -262,7 +266,11 @@ class FirebaseService extends ChangeNotifier {
         db.collection('chat_messages').snapshots().listen((snap) {
           _chatMessages.clear();
           for (final doc in snap.docs) {
-            _chatMessages.add(ChatMessageModel.fromMap(doc.data(), id: doc.id));
+            try {
+              _chatMessages.add(ChatMessageModel.fromMap(doc.data(), id: doc.id));
+            } catch (e) {
+              debugPrint('[Firestore] Note parsing chat message ${doc.id}: $e');
+            }
           }
           notifyListeners();
         }, onError: (e) => debugPrint('[Firestore] Chat messages stream note: $e')),
@@ -427,15 +435,19 @@ class FirebaseService extends ChangeNotifier {
             }, onError: (e) => debugPrint('[Firestore] Student submissions note: $e')),
         );
 
-        // 3. Streak Siswa Sendiri
+        // 3. Streak Siswa Sendiri (Memuat streak belajar mandiri, konsultasi guru, & grup kelas)
         _userScopedSubscriptions.add(
           db.collection('streaks')
-            .where('userId', isEqualTo: user.id)
+            .where('participant_ids', arrayContains: user.id)
             .snapshots()
             .listen((snap) {
               _streaks.clear();
               for (final doc in snap.docs) {
-                _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
+                try {
+                  _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
+                } catch (e) {
+                  debugPrint('[Firestore] Note parsing streak ${doc.id}: $e');
+                }
               }
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student streaks note: $e')),
@@ -493,13 +505,14 @@ class FirebaseService extends ChangeNotifier {
         if (userClass.isNotEmpty) {
           _userScopedSubscriptions.add(
             db.collection('users')
-              .where('role', isEqualTo: 'siswa')
-              .where('className', isEqualTo: userClass)
+              .where('class_name', isEqualTo: userClass)
               .snapshots()
               .listen((snap) {
                 _allStudents.clear();
                 for (final doc in snap.docs) {
-                  _allStudents.add(UserModel.fromMap(doc.data(), id: doc.id));
+                  try {
+                    _allStudents.add(UserModel.fromMap(doc.data(), id: doc.id));
+                  } catch (_) {}
                 }
                 if (!_allStudents.any((s) => s.id == user.id)) {
                   _allStudents.add(user);
@@ -1129,6 +1142,18 @@ class FirebaseService extends ChangeNotifier {
         final stdStreakId = 'streak_study_${user.id}';
         final exists = _streaks.any((s) => s.id == stdStreakId);
         if (!exists) {
+          try {
+            final doc = await db.collection('streaks').doc(stdStreakId).get();
+            if (doc.exists && doc.data() != null) {
+              final existing = StreakModel.fromMap(doc.data()!, id: doc.id);
+              if (!_streaks.any((s) => s.id == existing.id)) {
+                _streaks.add(existing);
+                notifyListeners();
+              }
+              return;
+            }
+          } catch (_) {}
+
           final studyStreak = StreakModel(
             id: stdStreakId,
             type: StreakType.study,
@@ -1552,36 +1577,47 @@ class FirebaseService extends ChangeNotifier {
           .where((m) => m.teacherId == user.id || user.subjectIds.contains(m.subjectId))
           .toList();
     }
-    // For student: filter by their class AND scheduled open time
-    final studentClassId = (user.classId ?? '').trim().toLowerCase();
-    final studentClassName = (user.className ?? '').trim().toLowerCase();
+    // Siswa: kumpulkan seluruh token identifikasi kelas siswa
+    final userTokens = <String>{};
+    if (user.classId != null && user.classId!.trim().isNotEmpty) {
+      userTokens.add(user.classId!.trim().toLowerCase());
+    }
+    if (user.className != null && user.className!.trim().isNotEmpty) {
+      userTokens.add(user.className!.trim().toLowerCase());
+    }
+    for (final cid in user.classIds) {
+      if (cid.trim().isNotEmpty) userTokens.add(cid.trim().toLowerCase());
+    }
 
-    // Matching classes from _schoolClasses
-    final matchingClasses = _schoolClasses.where((c) {
-      final cName = c.name.trim().toLowerCase();
-      final cId = c.id.trim().toLowerCase();
-      return (studentClassId.isNotEmpty && (cName == studentClassId || cId == studentClassId)) ||
-          (studentClassName.isNotEmpty && (cName == studentClassName || cId == studentClassName));
-    }).toList();
+    // Sambungkan dengan daftar kelas di database (_schoolClasses)
+    for (final sc in _schoolClasses) {
+      final scName = sc.name.trim().toLowerCase();
+      final scId = sc.id.trim().toLowerCase();
+      if (userTokens.contains(scName) || userTokens.contains(scId)) {
+        userTokens.add(scName);
+        userTokens.add(scId);
+      }
+    }
 
-    final validClassTokens = <String>{
-      if (studentClassId.isNotEmpty) studentClassId,
-      if (studentClassName.isNotEmpty) studentClassName,
-      for (final mc in matchingClasses) ...[
-        mc.id.trim().toLowerCase(),
-        mc.name.trim().toLowerCase(),
-      ],
-    };
+    // Jika siswa belum memiliki kelas atau belum diplot, tampilkan materi yang terbuka umum
+    // agar siswa tidak mendapati tampilan materi yang kosong sama sekali
+    if (userTokens.isEmpty) {
+      return _materials.where((m) => m.isOpen).toList();
+    }
 
     return _materials.where((m) {
-      if (m.classIds.isEmpty) return true; // Available to all if not restricted
+      if (m.classIds.isEmpty) return true; // Terbuka untuk semua kelas jika tidak dibatasi
       final match = m.classIds.any((cid) {
         final cleanCid = cid.trim().toLowerCase();
-        if (validClassTokens.contains(cleanCid)) return true;
-        // Check if cleanCid matches id of any school class whose name is in validClassTokens
-        final sc = _schoolClasses.where((c) => c.id.trim().toLowerCase() == cleanCid).firstOrNull;
-        if (sc != null && validClassTokens.contains(sc.name.trim().toLowerCase())) {
-          return true;
+        if (cleanCid.isEmpty) return true;
+        if (userTokens.contains(cleanCid)) return true;
+
+        // Toleransi format nama (misal: "Kelas AL-FAZARI" vs "AL-FAZARI")
+        for (final token in userTokens) {
+          if (token.contains(cleanCid) || cleanCid.contains(token)) return true;
+          final cleanToken = token.replaceAll('kelas', '').replaceAll('kls', '').replaceAll('-', '').replaceAll(' ', '').trim();
+          final cleanTarget = cleanCid.replaceAll('kelas', '').replaceAll('kls', '').replaceAll('-', '').replaceAll(' ', '').trim();
+          if (cleanToken.isNotEmpty && cleanToken == cleanTarget) return true;
         }
         return false;
       });

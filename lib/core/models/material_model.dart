@@ -102,24 +102,40 @@ class MaterialModel {
   }
 
   factory MaterialModel.fromMap(Map<String, dynamic> map, {String? id}) {
+    final rawClassIds = map['class_ids'] ?? map['classIds'];
+    List<String> parsedClassIds = [];
+    if (rawClassIds is List) {
+      parsedClassIds = rawClassIds.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    } else if (rawClassIds is String && rawClassIds.trim().isNotEmpty) {
+      parsedClassIds = [rawClassIds.trim()];
+    }
+
+    final rawScheduled = map['scheduled_open_at'] ?? map['scheduledOpenAt'];
+    DateTime? scheduledOpen;
+    if (rawScheduled != null) {
+      scheduledOpen = DateTime.tryParse(rawScheduled.toString());
+    }
+
+    final rawCreatedAt = map['created_at'] ?? map['createdAt'];
+    DateTime createdAt = DateTime.now();
+    if (rawCreatedAt != null) {
+      createdAt = DateTime.tryParse(rawCreatedAt.toString()) ?? DateTime.now();
+    }
+
     return MaterialModel(
-      id: id ?? map['id'] ?? '',
-      subjectId: map['subject_id'] ?? '',
-      teacherId: map['teacher_id'] ?? '',
-      title: map['title'] ?? '',
-      description: map['description'] ?? '',
-      contentType: map['content_type'] ?? 'youtube',
-      mediaUrl: map['media_url'] ?? '',
-      classIds: List<String>.from(map['class_ids'] ?? []),
-      scheduledOpenAt: map['scheduled_open_at'] != null
-          ? DateTime.tryParse(map['scheduled_open_at'].toString())
-          : null,
-      assignmentType: map['assignment_type'],
-      aiContextSummary: map['ai_context_summary'],
-      babyLanguageExplanation: map['baby_language_explanation'],
-      createdAt: map['created_at'] != null
-          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      id: id ?? map['id']?.toString() ?? '',
+      subjectId: (map['subject_id'] ?? map['subjectId'])?.toString() ?? '',
+      teacherId: (map['teacher_id'] ?? map['teacherId'])?.toString() ?? '',
+      title: (map['title'])?.toString() ?? '',
+      description: (map['description'])?.toString() ?? '',
+      contentType: (map['content_type'] ?? map['contentType'])?.toString() ?? 'youtube',
+      mediaUrl: (map['media_url'] ?? map['mediaUrl'])?.toString() ?? '',
+      classIds: parsedClassIds,
+      scheduledOpenAt: scheduledOpen,
+      assignmentType: (map['assignment_type'] ?? map['assignmentType'])?.toString(),
+      aiContextSummary: (map['ai_context_summary'] ?? map['aiContextSummary'])?.toString(),
+      babyLanguageExplanation: (map['baby_language_explanation'] ?? map['babyLanguageExplanation'])?.toString(),
+      createdAt: createdAt,
     );
   }
 }

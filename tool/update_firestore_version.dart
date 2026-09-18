@@ -22,16 +22,16 @@ void main() async {
 
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.0.4'},
-      'version_code': {'integerValue': '5'},
+      'latest_version': {'stringValue': '1.0.5'},
+      'version_code': {'integerValue': '6'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.4/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.5/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '1. Logo dan Ikon Resmi: Menggunakan lambang resmi SMP Muhammadiyah 12 GKB Gresik\n2. Tampilan Profil Siswa Lebih Ringkas & Bersih\n3. Optimasi kuota Firestore untuk 500+ siswa serentak\n4. Peningkatan stabilitas dan kenyamanan pengguna'
+            '1. Perbaikan Streak Pembelajaran: Streak belajar mandiri tersimpan aman dan tidak hilang/mati saat HP dimatikan atau aplikasi dibuka kembali.\n2. Perbaikan Materi Pembelajaran: Materi belajar siswa kini tampil sempurna sesuai kelas siswa.\n3. Perbaikan Menu Pesan: Riwayat chat konsultasi dengan guru dan diskusi kelas kini tampil lengkap.\n4. Peningkatan stabilitas dan optimasi performa.'
       },
       'force_update': {'booleanValue': false}
     }
