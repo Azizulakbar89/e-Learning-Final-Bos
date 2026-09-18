@@ -204,9 +204,11 @@ class _LoginScreenState extends State<LoginScreen>
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              width: 56,
+                              height: 56,
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                gradient: AppColors.primaryGradient,
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
@@ -216,26 +218,25 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                 ],
                               ),
-                              child: const Icon(Icons.auto_stories_rounded,
-                                  size: 32, color: Colors.white),
+                              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
                             ),
                             const SizedBox(width: 14),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'E-Learning',
+                                  'e-learning spemdalas',
                                   style: GoogleFonts.outfit(
-                                    fontSize: 22,
+                                    fontSize: 20,
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
                                   ),
                                 ),
                                 Text(
-                                  'SuperApp',
+                                  'SMP Muhammadiyah 12 GKB',
                                   style: GoogleFonts.outfit(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w300,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
                                     color: AppColors.primaryLight,
                                   ),
                                 ),
@@ -370,34 +371,39 @@ class _LoginScreenState extends State<LoginScreen>
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(22),
+          width: 96,
+          height: 96,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withAlpha(100),
+                color: AppColors.primary.withAlpha(120),
                 blurRadius: 30,
                 spreadRadius: 4,
                 offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: const Icon(Icons.auto_stories_rounded, size: 52, color: Colors.white),
+          child: Image.asset(
+            'assets/images/logo.png',
+            fit: BoxFit.contain,
+          ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         Text(
-          'E-Learning SuperApp',
+          'e-learning spemdalas',
           style: GoogleFonts.outfit(
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: FontWeight.w800,
             color: Colors.white,
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
-          'AI Tutor • Compiler • Anti-Cheat Exam',
+          'SMP Muhammadiyah 12 GKB Gresik',
           style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondaryDark),
           textAlign: TextAlign.center,
         ),

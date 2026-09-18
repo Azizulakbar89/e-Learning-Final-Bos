@@ -196,16 +196,18 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 34,
+                height: 34,
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(Icons.auto_stories_rounded, size: 18, color: Colors.white),
+                child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
               ),
               const SizedBox(width: 10),
               Text(
-                'E-Learning',
+                'e-learning spemdalas',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
