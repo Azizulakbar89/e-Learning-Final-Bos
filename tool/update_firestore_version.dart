@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:googleapis_auth/auth_io.dart';
-import 'package:http/http.dart' as http;
 
 void main() async {
   final saFile = File('assets/service-account.json');
@@ -23,16 +22,16 @@ void main() async {
 
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.0.2'},
-      'version_code': {'integerValue': '3'},
+      'latest_version': {'stringValue': '1.0.3'},
+      'version_code': {'integerValue': '4'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.2/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.3/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '1. Nama resmi aplikasi: e-learning spemdalas\n2. Desain logo dan ikon aplikasi baru modern Spemdalas\n3. Pembaruan kode rilis versi 1.0.2 (kode build 3)\n4. Optimasi pengiriman notifikasi FCM instan'
+            '1. Optimasi kuota Firestore: mendukung 500+ siswa ujian/kuis serentak tanpa error kuota habis\n2. Optimasi pemuatan butir soal ujian (on-demand & memory cache)\n3. Scoped streams per-siswa untuk hemat kuota read 99.8%\n4. Peningkatan stabilitas dan performa aplikasi'
       },
       'force_update': {'booleanValue': false}
     }

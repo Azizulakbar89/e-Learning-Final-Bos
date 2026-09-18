@@ -85,6 +85,7 @@ class FirebaseService extends ChangeNotifier {
 
   bool _initialized = false;
   final List<StreamSubscription> _subscriptions = [];
+  final List<StreamSubscription> _userScopedSubscriptions = [];
   static const String _sessionKey = 'auth_session_user_id';
 
   /// Simpan ID pengguna ke penyimpanan lokal agar sesi tidak hilang saat aplikasi ditutup
@@ -167,8 +168,7 @@ class FirebaseService extends ChangeNotifier {
       }
 
       if (user != null) {
-        _currentUser = user;
-        notifyListeners();
+        _setCurrentUser(user);
         unawaited(syncFcmToken(user.id));
         debugPrint('[Session] Sesi berhasil dipulihkan untuk: ${user.fullName} (${user.role})');
       }
@@ -188,30 +188,10 @@ class FirebaseService extends ChangeNotifier {
     await _restoreUserSession();
   }
 
-  /// Real-time live subscriptions to Cloud Firestore collections
+  /// Real-time live subscriptions to shared Cloud Firestore collections (Materi, Ujian, Mapel, dsb.)
   void _initFirestoreStreams() {
     try {
-      // 1. Users
-      _subscriptions.add(
-        db.collection('users').snapshots().listen((snap) {
-          _allStudents.clear();
-          _allTeachers.clear();
-          for (final doc in snap.docs) {
-            final u = UserModel.fromMap(doc.data(), id: doc.id);
-            if (u.isSiswa) {
-              _allStudents.add(u);
-            } else if (u.isGuru) {
-              _allTeachers.add(u);
-            }
-            if (_currentUser != null && _currentUser!.id == u.id) {
-              _currentUser = u;
-            }
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Users stream note: $e')),
-      );
-
-      // 2. Materials
+      // 1. Materials
       _subscriptions.add(
         db.collection('materials').snapshots().listen((snap) {
           _materials.clear();
@@ -222,7 +202,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Materials stream note: $e')),
       );
 
-      // 3. Exams
+      // 2. Exams
       _subscriptions.add(
         db.collection('exams').snapshots().listen((snap) {
           _exams.clear();
@@ -233,29 +213,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Exams stream note: $e')),
       );
 
-      // 4. Questions
-      _subscriptions.add(
-        db.collection('questions').snapshots().listen((snap) {
-          _questions.clear();
-          for (final doc in snap.docs) {
-            _questions.add(QuestionModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Questions stream note: $e')),
-      );
-
-      // 5. Exam Sessions
-      _subscriptions.add(
-        db.collection('exam_sessions').snapshots().listen((snap) {
-          _examSessions.clear();
-          for (final doc in snap.docs) {
-            _examSessions.add(ExamSessionModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Exam sessions stream note: $e')),
-      );
-
-      // 6. Subjects
+      // 3. Subjects
       _subscriptions.add(
         db.collection('subjects').snapshots().listen((snap) {
           _subjects.clear();
@@ -266,7 +224,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Subjects stream note: $e')),
       );
 
-      // 7. CPs
+      // 4. CPs
       _subscriptions.add(
         db.collection('cps').snapshots().listen((snap) {
           _cps.clear();
@@ -277,7 +235,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] CPs stream note: $e')),
       );
 
-      // 8. TPs
+      // 5. TPs
       _subscriptions.add(
         db.collection('tps').snapshots().listen((snap) {
           _tps.clear();
@@ -288,7 +246,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] TPs stream note: $e')),
       );
 
-      // 9. Assignments
+      // 6. Assignments
       _subscriptions.add(
         db.collection('assignments').snapshots().listen((snap) {
           _assignments.clear();
@@ -299,29 +257,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Assignments stream note: $e')),
       );
 
-      // 10. Submissions
-      _subscriptions.add(
-        db.collection('assignment_submissions').snapshots().listen((snap) {
-          _submissions.clear();
-          for (final doc in snap.docs) {
-            _submissions.add(AssignmentSubmissionModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Submissions stream note: $e')),
-      );
-
-      // 11. Streaks
-      _subscriptions.add(
-        db.collection('streaks').snapshots().listen((snap) {
-          _streaks.clear();
-          for (final doc in snap.docs) {
-            _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Streaks stream note: $e')),
-      );
-
-      // 12. Chat Messages
+      // 7. Chat Messages
       _subscriptions.add(
         db.collection('chat_messages').snapshots().listen((snap) {
           _chatMessages.clear();
@@ -332,7 +268,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Chat messages stream note: $e')),
       );
 
-      // 13. Forum Messages
+      // 8. Forum Messages
       _subscriptions.add(
         db.collection('forum_messages').snapshots().listen((snap) {
           _forumMessages.clear();
@@ -343,29 +279,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Forum messages stream note: $e')),
       );
 
-      // 14. Point Transactions
-      _subscriptions.add(
-        db.collection('point_transactions').snapshots().listen((snap) {
-          _pointTransactions.clear();
-          for (final doc in snap.docs) {
-            _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Point transactions stream note: $e')),
-      );
-
-      // 15. Grade Redeems
-      _subscriptions.add(
-        db.collection('grade_redeems').snapshots().listen((snap) {
-          _gradeRedeems.clear();
-          for (final doc in snap.docs) {
-            _gradeRedeems.add(GradeRedeemModel.fromMap(doc.data(), id: doc.id));
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Grade redeems stream note: $e')),
-      );
-
-      // 16. School Classes (Input by Admin)
+      // 9. School Classes (Input by Admin)
       _subscriptions.add(
         db.collection('classes').snapshots().listen((snap) {
           _schoolClasses.clear();
@@ -376,7 +290,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Classes stream note: $e')),
       );
 
-      // 17. Group Registrations
+      // 10. Group Registrations
       _subscriptions.add(
         db.collection('group_registrations').snapshots().listen((snap) {
           _groupRegistrations.clear();
@@ -387,24 +301,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Group registrations stream note: $e')),
       );
 
-      // 18. Material Learning Progress per Student
-      _subscriptions.add(
-        db.collection('material_progress').snapshots().listen((snap) {
-          _materialProgress.clear();
-          for (final doc in snap.docs) {
-            final data = doc.data();
-            final sid = data['studentId']?.toString() ?? '';
-            final mid = data['materialId']?.toString() ?? '';
-            if (sid.isNotEmpty && mid.isNotEmpty) {
-              final key = '${sid}_$mid';
-              _materialProgress[key] = (data['progress'] as num?)?.toDouble() ?? 0.0;
-            }
-          }
-          notifyListeners();
-        }, onError: (e) => debugPrint('[Firestore] Material progress stream note: $e')),
-      );
-
-      // 19. Class-Targeted Notifications (Materi & Kuis/Ujian)
+      // 11. Class-Targeted Notifications (Materi & Kuis/Ujian)
       _subscriptions.add(
         db.collection('notifications').snapshots().listen((snap) {
           final isInitial = _isFirstNotificationBatch;
@@ -456,7 +353,7 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] Notifications stream note: $e')),
       );
 
-      // 20. App Version & In-App Update Configuration
+      // 12. App Version & In-App Update Configuration
       _subscriptions.add(
         db.collection('system_info').doc('app_version').snapshots().listen((doc) {
           if (!doc.exists || doc.data() == null) {
@@ -480,9 +377,308 @@ class FirebaseService extends ChangeNotifier {
         }, onError: (e) => debugPrint('[Firestore] App version stream note: $e')),
       );
     } catch (e) {
-      debugPrint('[Firestore] Note initializing streams: $e');
+      debugPrint('[Firestore] Note initializing shared streams: $e');
     }
   }
+
+  /// Mengikat (bind) stream data Firestore yang disesuaikan dengan Role Pengguna (Siswa vs Guru/Admin)
+  /// Optimasi Kunci: Memangkas jutaan broadcast reads saat 500+ siswa ujian bersamaan di paket Spark Gratis!
+  void _bindUserScopedStreams(UserModel? user) {
+    for (final sub in _userScopedSubscriptions) {
+      sub.cancel();
+    }
+    _userScopedSubscriptions.clear();
+
+    if (user == null) {
+      notifyListeners();
+      return;
+    }
+
+    try {
+      if (user.isSiswa) {
+        // ======================== OPTIMASI ROLE SISWA ========================
+        // Siswa HANYA mendengarkan dokumen miliknya sendiri. Tidak mendengarkan 499 siswa lainnya!
+        
+        // 1. Sesi Ujian Siswa Sendiri
+        _userScopedSubscriptions.add(
+          db.collection('exam_sessions')
+            .where('studentId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _examSessions.clear();
+              for (final doc in snap.docs) {
+                _examSessions.add(ExamSessionModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student exam sessions note: $e')),
+        );
+
+        // 2. Pengumpulan Tugas Siswa Sendiri
+        _userScopedSubscriptions.add(
+          db.collection('assignment_submissions')
+            .where('submitterId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _submissions.clear();
+              for (final doc in snap.docs) {
+                _submissions.add(AssignmentSubmissionModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student submissions note: $e')),
+        );
+
+        // 3. Streak Siswa Sendiri
+        _userScopedSubscriptions.add(
+          db.collection('streaks')
+            .where('userId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _streaks.clear();
+              for (final doc in snap.docs) {
+                _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student streaks note: $e')),
+        );
+
+        // 4. Progress Materi Belajar Siswa Sendiri
+        _userScopedSubscriptions.add(
+          db.collection('material_progress')
+            .where('studentId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _materialProgress.clear();
+              for (final doc in snap.docs) {
+                final data = doc.data();
+                final sid = data['studentId']?.toString() ?? '';
+                final mid = data['materialId']?.toString() ?? '';
+                if (sid.isNotEmpty && mid.isNotEmpty) {
+                  final key = '${sid}_$mid';
+                  _materialProgress[key] = (data['progress'] as num?)?.toDouble() ?? 0.0;
+                }
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student material progress note: $e')),
+        );
+
+        // 5. Transaksi Poin & Redeem Siswa Sendiri
+        _userScopedSubscriptions.add(
+          db.collection('point_transactions')
+            .where('studentId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _pointTransactions.clear();
+              for (final doc in snap.docs) {
+                _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student point transactions note: $e')),
+        );
+
+        _userScopedSubscriptions.add(
+          db.collection('grade_redeems')
+            .where('studentId', isEqualTo: user.id)
+            .snapshots()
+            .listen((snap) {
+              _gradeRedeems.clear();
+              for (final doc in snap.docs) {
+                _gradeRedeems.add(GradeRedeemModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Student grade redeems note: $e')),
+        );
+
+        // 6. Teman Sekelas (Hanya kelas sendiri ~30 anak, bukan seluruh sekolah)
+        final userClass = user.className ?? user.classId ?? '';
+        if (userClass.isNotEmpty) {
+          _userScopedSubscriptions.add(
+            db.collection('users')
+              .where('role', isEqualTo: 'siswa')
+              .where('className', isEqualTo: userClass)
+              .snapshots()
+              .listen((snap) {
+                _allStudents.clear();
+                for (final doc in snap.docs) {
+                  _allStudents.add(UserModel.fromMap(doc.data(), id: doc.id));
+                }
+                if (!_allStudents.any((s) => s.id == user.id)) {
+                  _allStudents.add(user);
+                }
+                notifyListeners();
+              }, onError: (e) => debugPrint('[Firestore] Classmates stream note: $e')),
+          );
+        } else {
+          _userScopedSubscriptions.add(
+            db.collection('users')
+              .doc(user.id)
+              .snapshots()
+              .listen((doc) {
+                if (doc.exists && doc.data() != null) {
+                  final updated = UserModel.fromMap(doc.data()!, id: doc.id);
+                  _currentUser = updated;
+                  _allStudents.removeWhere((s) => s.id == user.id);
+                  _allStudents.add(updated);
+                  notifyListeners();
+                }
+              }, onError: (e) => debugPrint('[Firestore] Student profile note: $e')),
+          );
+        }
+
+        // 7. Guru (agar siswa bisa melihat info guru & chat)
+        _userScopedSubscriptions.add(
+          db.collection('users')
+            .where('role', isEqualTo: 'guru')
+            .snapshots()
+            .listen((snap) {
+              _allTeachers.clear();
+              for (final doc in snap.docs) {
+                _allTeachers.add(UserModel.fromMap(doc.data(), id: doc.id));
+              }
+              notifyListeners();
+            }, onError: (e) => debugPrint('[Firestore] Teachers stream note: $e')),
+        );
+
+      } else {
+        // ======================== OPTIMASI ROLE GURU & ADMIN ========================
+        // Guru & Admin mendengarkan data secara luas untuk keperluan monitoring live & penilaian
+
+        // 1. Sesi Ujian (untuk live monitoring ujian)
+        _userScopedSubscriptions.add(
+          db.collection('exam_sessions').snapshots().listen((snap) {
+            _examSessions.clear();
+            for (final doc in snap.docs) {
+              _examSessions.add(ExamSessionModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Teacher exam sessions note: $e')),
+        );
+
+        // 2. Pengumpulan Tugas Siswa
+        _userScopedSubscriptions.add(
+          db.collection('assignment_submissions').snapshots().listen((snap) {
+            _submissions.clear();
+            for (final doc in snap.docs) {
+              _submissions.add(AssignmentSubmissionModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Submissions note: $e')),
+        );
+
+        // 3. Seluruh Pengguna (Siswa & Guru)
+        _userScopedSubscriptions.add(
+          db.collection('users').snapshots().listen((snap) {
+            _allStudents.clear();
+            _allTeachers.clear();
+            for (final doc in snap.docs) {
+              final u = UserModel.fromMap(doc.data(), id: doc.id);
+              if (u.isSiswa) {
+                _allStudents.add(u);
+              } else if (u.isGuru) {
+                _allTeachers.add(u);
+              }
+              if (_currentUser != null && _currentUser!.id == u.id) {
+                _currentUser = u;
+              }
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Users note: $e')),
+        );
+
+        // 4. Seluruh Soal Ujian (untuk Bank Soal & Editor Guru)
+        _userScopedSubscriptions.add(
+          db.collection('questions').snapshots().listen((snap) {
+            _questions.clear();
+            for (final doc in snap.docs) {
+              _questions.add(QuestionModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Questions note: $e')),
+        );
+
+        // 5. Streaks, Progress, Points
+        _userScopedSubscriptions.add(
+          db.collection('streaks').snapshots().listen((snap) {
+            _streaks.clear();
+            for (final doc in snap.docs) {
+              _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Streaks note: $e')),
+        );
+
+        _userScopedSubscriptions.add(
+          db.collection('material_progress').snapshots().listen((snap) {
+            _materialProgress.clear();
+            for (final doc in snap.docs) {
+              final data = doc.data();
+              final sid = data['studentId']?.toString() ?? '';
+              final mid = data['materialId']?.toString() ?? '';
+              if (sid.isNotEmpty && mid.isNotEmpty) {
+                final key = '${sid}_$mid';
+                _materialProgress[key] = (data['progress'] as num?)?.toDouble() ?? 0.0;
+              }
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Material progress note: $e')),
+        );
+
+        _userScopedSubscriptions.add(
+          db.collection('point_transactions').snapshots().listen((snap) {
+            _pointTransactions.clear();
+            for (final doc in snap.docs) {
+              _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Point transactions note: $e')),
+        );
+
+        _userScopedSubscriptions.add(
+          db.collection('grade_redeems').snapshots().listen((snap) {
+            _gradeRedeems.clear();
+            for (final doc in snap.docs) {
+              _gradeRedeems.add(GradeRedeemModel.fromMap(doc.data(), id: doc.id));
+            }
+            notifyListeners();
+          }, onError: (e) => debugPrint('[Firestore] Grade redeems note: $e')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Firestore] Error binding user-scoped streams: $e');
+    }
+  }
+
+  /// Helper untuk mengatur User aktif dan mengikat stream khusus role secara otomatis
+  void _setCurrentUser(UserModel? user) {
+    _currentUser = user;
+    _bindUserScopedStreams(user);
+    notifyListeners();
+  }
+
+  /// Mengambil butir soal khusus untuk satu ujian tertentu secara on-demand & caching di memori
+  Future<List<QuestionModel>> loadQuestionsForExam(ExamModel exam) async {
+    final missingIds = exam.questionIds.where((id) => !_questions.any((q) => q.id == id)).toList();
+    if (missingIds.isEmpty) {
+      return _questions.where((q) => exam.questionIds.contains(q.id)).toList();
+    }
+
+    try {
+      final futures = missingIds.map((id) => db.collection('questions').doc(id).get());
+      final docs = await Future.wait(futures);
+      for (final doc in docs) {
+        if (doc.exists && doc.data() != null) {
+          final q = QuestionModel.fromMap(doc.data()!, id: doc.id);
+          if (!_questions.any((existing) => existing.id == q.id)) {
+            _questions.add(q);
+          }
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[Firestore] Error fetching exam questions: $e');
+    }
+    return _questions.where((q) => exam.questionIds.contains(q.id)).toList();
+  }
+
 
   /// Pengecekan otomatis apakah ada versi APK baru yang dirilis
   Future<AppUpdateCheckResult> checkForAppUpdate() async {
@@ -682,7 +878,6 @@ class FirebaseService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[Firestore] Note checking initial wipe: $e');
-      _wipeInMemoryDataExceptAdminAndTeachers();
     }
   }
 
@@ -1011,10 +1206,9 @@ class FirebaseService extends ChangeNotifier {
               debugPrint('[Firestore] Error upgrading password hash: $e');
             });
           }
-          _currentUser = updatedUser;
+          _setCurrentUser(updatedUser);
           unawaited(_saveUserSession(updatedUser.id, updatedUser.className ?? updatedUser.classId));
           unawaited(syncFcmToken(updatedUser.id));
-          notifyListeners();
           return updatedUser;
         } else {
           throw Exception('Password yang Anda masukkan salah.');
@@ -1034,10 +1228,9 @@ class FirebaseService extends ChangeNotifier {
         try {
           await db.collection('users').doc(admin.id).set(admin.toMap());
         } catch (_) {}
-        _currentUser = admin;
+        _setCurrentUser(admin);
         unawaited(_saveUserSession(admin.id));
         unawaited(syncFcmToken(admin.id));
-        notifyListeners();
         return admin;
       }
 
@@ -1055,10 +1248,9 @@ class FirebaseService extends ChangeNotifier {
         try {
           await db.collection('users').doc(guru.id).set(guru.toMap());
         } catch (_) {}
-        _currentUser = guru;
+        _setCurrentUser(guru);
         unawaited(_saveUserSession(guru.id));
         unawaited(syncFcmToken(guru.id));
-        notifyListeners();
         return guru;
       }
 
@@ -1076,8 +1268,7 @@ class FirebaseService extends ChangeNotifier {
           role: 'admin',
           initialPassword: 'admin',
         );
-        _currentUser = admin;
-        notifyListeners();
+        _setCurrentUser(admin);
         return admin;
       }
       if (term == 'guru' || term == 'guru_budi') {
@@ -1090,14 +1281,12 @@ class FirebaseService extends ChangeNotifier {
           subjectIds: [],
           classIds: [],
         );
-        _currentUser = guru;
-        notifyListeners();
+        _setCurrentUser(guru);
         return guru;
       }
       final inMemory = _allStudents.where((u) => u.username == term || u.nis == term).firstOrNull;
       if (inMemory != null) {
-        _currentUser = inMemory;
-        notifyListeners();
+        _setCurrentUser(inMemory);
         return inMemory;
       }
       throw Exception('Username atau NIS "$term" tidak terdaftar.');
@@ -1116,32 +1305,31 @@ class FirebaseService extends ChangeNotifier {
     final cleanName = fullName.trim();
     final cleanPass = password.trim();
 
+    final passwordHash = SecurityUtils.hashPassword(cleanPass, salt: 'student_$cleanNis');
+
+    // Check if student with this NIS already exists
     try {
-      // Check duplicate NIS in Firestore
-      final existing = await db
+      final existingDoc = await db
           .collection('users')
           .where('nis', isEqualTo: cleanNis)
           .limit(1)
           .get();
 
-      if (existing.docs.isNotEmpty) {
-        throw Exception('NIS $cleanNis sudah terdaftar dalam sistem!');
+      if (existingDoc.docs.isNotEmpty) {
+        throw Exception('Siswa dengan NIS $cleanNis sudah terdaftar. Silakan login.');
       }
     } catch (e) {
       if (e.toString().contains('sudah terdaftar')) rethrow;
-      // If Firestore is offline or testing, check local list
+      // Fallback local memory check
       if (_allStudents.any((s) => s.nis == cleanNis)) {
-        throw Exception('NIS $cleanNis sudah terdaftar dalam sistem!');
+        throw Exception('Siswa dengan NIS $cleanNis sudah terdaftar.');
       }
     }
 
-    final studentId = _uuid.v4();
-    final passwordHash = SecurityUtils.hashPassword(cleanPass, salt: studentId);
-
     final newStudent = UserModel(
-      id: studentId,
-      username: cleanNis,
+      id: 'student_$cleanNis',
       nis: cleanNis,
+      username: cleanNis,
       fullName: cleanName,
       role: 'siswa',
       classId: cleanClass,
@@ -1152,7 +1340,7 @@ class FirebaseService extends ChangeNotifier {
     );
 
     _allStudents.add(newStudent);
-    _currentUser = newStudent;
+    _setCurrentUser(newStudent);
 
     // Save to Firestore
     try {
@@ -1171,8 +1359,6 @@ class FirebaseService extends ChangeNotifier {
       debugPrint('[Firestore] Note saving student: $e');
     }
 
-    _currentUser = newStudent;
-    notifyListeners();
     unawaited(_saveUserSession(newStudent.id, newStudent.className ?? newStudent.classId));
     unawaited(syncFcmToken(newStudent.id));
     return newStudent;
@@ -1180,19 +1366,17 @@ class FirebaseService extends ChangeNotifier {
 
   /// Sinkronisasi FCM Device Token ke Firestore agar perangkat dapat menerima notifikasi
   /// push saat aplikasi ditutup total (Killed/Terminated) ataupun di latar belakang (Background).
-  Future<void> syncFcmToken([String? explicitUserId]) async {
-    final uid = explicitUserId ?? _currentUser?.id;
-    if (uid == null || uid.isEmpty) return;
+  Future<void> syncFcmToken(String userId) async {
     try {
       final token = await FcmService.getToken();
       if (token != null && token.isNotEmpty) {
-        await db.collection('users').doc(uid).set({
+        await db.collection('users').doc(userId).set({
           'fcm_token': token,
           'fcm_updated_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        debugPrint('[FCM] Token synced for user: $uid');
+        debugPrint('[FCM] Token synced for user $userId');
       }
-      // Otomatis subscribe siswa ke Topik Kelasnya di FCM
+
       if (_currentUser != null && _currentUser!.isSiswa) {
         final className = _currentUser!.className ?? _currentUser!.classId;
         await FcmService.subscribeToClassTopic(className);
@@ -1207,9 +1391,8 @@ class FirebaseService extends ChangeNotifier {
       final className = _currentUser!.className ?? _currentUser!.classId;
       unawaited(FcmService.unsubscribeFromClassTopic(className));
     }
-    _currentUser = null;
+    _setCurrentUser(null);
     unawaited(_clearUserSession());
-    notifyListeners();
   }
 
   // ==================== NOTIFICATIONS ENGINE (MATERI, KUIS, & CHAT) ====================
@@ -4737,6 +4920,9 @@ class FirebaseService extends ChangeNotifier {
   @override
   void dispose() {
     for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    for (final sub in _userScopedSubscriptions) {
       sub.cancel();
     }
     super.dispose();

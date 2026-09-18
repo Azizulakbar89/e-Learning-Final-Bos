@@ -28,6 +28,7 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
   // Keyed essay controllers — prevent RTL bug from recreating controller on every build
   final Map<String, TextEditingController> _essayControllers = {};
   bool _isInit = false;
+  bool _isLoadingQuestions = true;
 
   // ─── Countdown Timer ───
   Timer? _countdownTimer;
@@ -42,6 +43,12 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
       _session = fb.getOrCreateExamSession(examId: widget.exam.id, student: currentUser);
       _localAnswers.addAll(_session.answers);
       _currentIndex = _session.currentQuestionIndex;
+
+      fb.loadQuestionsForExam(widget.exam).then((_) {
+        if (mounted) {
+          setState(() => _isLoadingQuestions = false);
+        }
+      });
 
       // ─── Init countdown timer with recovery support ───
       final totalExamSeconds = widget.exam.durationMinutes * 60;
@@ -686,6 +693,28 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
     // ================= NORMAL EXAM TAKING INTERFACE =================
     final rawExamQuestions = fb.questions.where((q) => widget.exam.questionIds.contains(q.id)).toList();
     if (rawExamQuestions.isEmpty) {
+      if (_isLoadingQuestions) {
+        return Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          appBar: AppBar(
+            title: Text(widget.exam.title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            elevation: 0,
+          ),
+          body: const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Menyiapkan lembar soal ujian...',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Scaffold(
         appBar: AppBar(title: Text(widget.exam.title)),
         body: const Center(child: Text('Tidak ada butir soal pada ujian ini.')),

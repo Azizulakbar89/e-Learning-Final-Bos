@@ -23,6 +23,29 @@ class _StudentExamsScreenState extends State<StudentExamsScreen> {
   String _selectedSubjectId = 'all';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadClassExamQuestions();
+    });
+  }
+
+  void _preloadClassExamQuestions() {
+    if (!mounted) return;
+    final fb = context.read<FirebaseService>();
+    final user = fb.currentUser;
+    final classExams = fb.exams.where((e) {
+      if (user?.classId != null && user!.classId!.isNotEmpty) {
+        return e.classIds.contains(user.classId);
+      }
+      return true;
+    }).toList();
+    for (final exam in classExams) {
+      fb.loadQuestionsForExam(exam);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final fb = context.watch<FirebaseService>();
     final user = fb.currentUser;
