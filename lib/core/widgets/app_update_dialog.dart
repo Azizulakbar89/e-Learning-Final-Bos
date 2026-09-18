@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../constants/app_colors.dart';
 import '../models/app_version_model.dart';
 import '../services/firebase_service.dart';
@@ -59,7 +61,6 @@ class AppUpdateDialog extends StatefulWidget {
     if (result.hasUpdate) {
       show(context, result);
     } else {
-      // Jika versi sudah sama, tetap sediakan aksi "Uji Pasang Update" agar pengguna bisa mencoba update langsung
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -68,23 +69,16 @@ class AppUpdateDialog extends StatefulWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Aplikasi Anda versi v${result.currentVersion} (Terkini)',
+                  'Aplikasi Anda sudah versi terbaru (v${result.currentVersion})',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          action: SnackBarAction(
-            label: 'Uji Pasang',
-            textColor: Colors.amberAccent,
-            onPressed: () {
-              show(context, result);
-            },
-          ),
           backgroundColor: const Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -447,7 +441,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   width: double.infinity,
                   height: 40,
                   child: TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () async {
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('dismissed_update_version', newVersion);
+                      } catch (_) {}
+                      if (context.mounted) Navigator.pop(context);
+                    },
                     child: const Text(
                       'Nanti Saja',
                       style: TextStyle(

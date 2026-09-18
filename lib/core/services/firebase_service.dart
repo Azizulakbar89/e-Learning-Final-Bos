@@ -522,7 +522,12 @@ class FirebaseService extends ChangeNotifier {
             forceUpdate: false,
           );
 
-    final hasUpdate = effectiveServer.versionCode > currentCode;
+    final isNewerCode = effectiveServer.versionCode > currentCode;
+    final semverDiff = _compareSemver(currentVer, effectiveServer.latestVersion);
+    final isSameOrNewerVersion = semverDiff >= 0;
+
+    // Ada update HANYA jika server memiliki versionCode lebih tinggi DAN string versi server lebih tinggi dari yang terpasang
+    final hasUpdate = isNewerCode && !isSameOrNewerVersion;
     final isForceUpdate = hasUpdate && (effectiveServer.forceUpdate || effectiveServer.minSupportedVersionCode > currentCode);
 
     return AppUpdateCheckResult(
@@ -532,6 +537,27 @@ class FirebaseService extends ChangeNotifier {
       currentVersionCode: currentCode,
       serverVersion: effectiveServer,
     );
+  }
+
+  /// Helper untuk membandingkan format versi semver (misal: 1.0.1 vs 1.0.0)
+  int _compareSemver(String v1, String v2) {
+    try {
+      final p1 = v1.replaceAll(RegExp(r'[^0-9.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final p2 = v2.replaceAll(RegExp(r'[^0-9.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      while (p1.length < 3) {
+        p1.add(0);
+      }
+      while (p2.length < 3) {
+        p2.add(0);
+      }
+      for (int i = 0; i < 3; i++) {
+        if (p1[i] > p2[i]) return 1;
+        if (p1[i] < p2[i]) return -1;
+      }
+      return 0;
+    } catch (_) {
+      return v1 == v2 ? 0 : -1;
+    }
   }
 
   /// Mempublikasikan rilis APK pembaruan aplikasi baru (Khusus Admin)

@@ -2,6 +2,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:firebase_core/firebase_core.dart' show Firebase;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/services/background_sync_service.dart';
 import 'core/services/fcm_service.dart';
@@ -96,6 +97,12 @@ class _AuthGateState extends State<AuthGate> {
       final fbService = context.read<FirebaseService>();
       final result = await fbService.checkForAppUpdate();
       if (result.hasUpdate && mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        final dismissedVersion = prefs.getString('dismissed_update_version');
+        if (!result.isForceUpdate && dismissedVersion == result.serverVersion?.latestVersion) {
+          return;
+        }
+        if (!mounted) return;
         AppUpdateDialog.show(context, result);
       }
     } catch (_) {}
