@@ -508,13 +508,15 @@ class FirebaseService extends ChangeNotifier {
     }
 
     final server = _appVersionConfig;
-    final effectiveServer = (server != null && server.versionCode > 1)
+    AppVersionModel effectiveServer = (server != null && server.versionCode > 1)
         ? server
         : AppVersionModel(
             latestVersion: '1.0.2',
             versionCode: 3,
             minSupportedVersionCode: 1,
-            apkUrl: server?.apkUrl ?? 'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.2/app-release.apk',
+            apkUrl: server?.apkUrl.isNotEmpty == true
+                ? server!.apkUrl
+                : 'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.0.2/app-release.apk',
             releaseNotes: server?.releaseNotes.isNotEmpty == true
                 ? server!.releaseNotes
                 : 'Pembaruan aplikasi e-learning spemdalas v1.0.2: logo baru resmi Spemdalas, perbaikan nama aplikasi, dan optimasi notifikasi.',
@@ -522,12 +524,54 @@ class FirebaseService extends ChangeNotifier {
             forceUpdate: false,
           );
 
-    final isNewerCode = effectiveServer.versionCode > currentCode;
-    final semverDiff = _compareSemver(currentVer, effectiveServer.latestVersion);
-    final isSameOrNewerVersion = semverDiff >= 0;
+    // Cek GitHub Releases secara langsung (real-time dari repository publik GitHub)
+    try {
+      final ghUri = Uri.parse(
+        'https://api.github.com/repos/Azizulakbar89/e-Learning-Final-Bos/releases/latest',
+      );
+      final ghRes = await http.get(ghUri, headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'FlutterApp',
+      }).timeout(const Duration(seconds: 4));
 
-    // Ada update HANYA jika server memiliki versionCode lebih tinggi DAN string versi server lebih tinggi dari yang terpasang
-    final hasUpdate = isNewerCode && !isSameOrNewerVersion;
+      if (ghRes.statusCode == 200) {
+        final ghData = jsonDecode(ghRes.body) as Map<String, dynamic>;
+        final rawTag = (ghData['tag_name'] ?? '').toString();
+        final tagClean = rawTag.replaceAll(RegExp(r'[^0-9.]'), '');
+        final releaseBody = (ghData['body'] ?? '').toString();
+        final assets = ghData['assets'] as List<dynamic>? ?? [];
+
+        String apkDownloadUrl = '';
+        for (final asset in assets) {
+          final assetName = (asset['name'] ?? '').toString().toLowerCase();
+          if (assetName.endsWith('.apk')) {
+            apkDownloadUrl = (asset['browser_download_url'] ?? '').toString();
+            break;
+          }
+        }
+
+        if (tagClean.isNotEmpty && apkDownloadUrl.isNotEmpty) {
+          // Jika versi GitHub lebih tinggi dari atau sama dengan versi server Firestore
+          if (_compareSemver(tagClean, effectiveServer.latestVersion) >= 0) {
+            effectiveServer = AppVersionModel(
+              latestVersion: tagClean,
+              versionCode: effectiveServer.versionCode,
+              minSupportedVersionCode: effectiveServer.minSupportedVersionCode,
+              apkUrl: apkDownloadUrl,
+              releaseNotes: releaseBody.isNotEmpty ? releaseBody : effectiveServer.releaseNotes,
+              releasedAt: DateTime.tryParse(ghData['published_at'] ?? '') ?? DateTime.now(),
+              forceUpdate: effectiveServer.forceUpdate,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[UpdateChecker] Note checking GitHub releases: $e');
+    }
+
+    final semverDiff = _compareSemver(currentVer, effectiveServer.latestVersion);
+    // Ada update HANYA jika versi terpasang (currentVer) lebih rendah dari rilis terbaru (semverDiff < 0)
+    final hasUpdate = semverDiff < 0;
     final isForceUpdate = hasUpdate && (effectiveServer.forceUpdate || effectiveServer.minSupportedVersionCode > currentCode);
 
     return AppUpdateCheckResult(
