@@ -62,6 +62,7 @@ class FirebaseService extends ChangeNotifier {
   final List<AppNotificationModel> _notifications = [];
   bool _isFirstNotificationBatch = true;
   final Map<String, double> _materialProgress = {};
+  final Set<String> _materialPointsAwardedKeys = {};
   final Map<String, List<String>> _studentCodeRuns = {};
 
   List<SubjectModel> get subjects => List.unmodifiable(_subjects);
@@ -341,12 +342,34 @@ class FirebaseService extends ChangeNotifier {
           if (!isInitial && newDocs.isNotEmpty) {
             final userClass = _currentUser?.className ?? _currentUser?.classId;
             final userId = _currentUser?.id;
+            if (userId == null) return;
 
             for (final notif in newDocs) {
+              // 0. Jangan pernah munculkan notifikasi jika dikirim oleh diri sendiri
+              if (notif.creatorId != null && notif.creatorId == userId) {
+                continue;
+              }
+
+              // 1. Khusus notifikasi CHAT: WAJIB ditujukan spesifik untuk userId (baik 1-on-1 maupun group chat)
+              if (notif.type == 'chat') {
+                if (notif.targetUserIds.contains(userId)) {
+                  FcmService.showLocalNotification(
+                    title: notif.title,
+                    body: notif.body,
+                  );
+                  FcmService.showInAppBanner(
+                    title: notif.title,
+                    body: notif.body,
+                  );
+                }
+                continue;
+              }
+
+              // 2. Notifikasi non-chat (materi, tugas, kuis, pengumuman)
               final forClass = notif.targetClassIds.isEmpty ||
-                  (userClass != null && notif.targetClassIds.contains(userClass));
+                  (userClass != null && isClassMatching(userClass, notif.targetClassIds));
               final forUser = notif.targetUserIds.isEmpty ||
-                  (userId != null && notif.targetUserIds.contains(userId));
+                  notif.targetUserIds.contains(userId);
 
               if (forClass && forUser) {
                 FcmService.showLocalNotification(
@@ -464,7 +487,10 @@ class FirebaseService extends ChangeNotifier {
         // 4. Progress Materi Belajar Siswa Sendiri
         _userScopedSubscriptions.add(
           db.collection('material_progress')
-            .where('student_id', isEqualTo: user.id)
+            .where(Filter.or(
+              Filter('student_id', isEqualTo: user.id),
+              Filter('studentId', isEqualTo: user.id),
+            ))
             .snapshots()
             .listen((snap) {
               _materialProgress.clear();
@@ -474,7 +500,13 @@ class FirebaseService extends ChangeNotifier {
                 final mid = (data['material_id'] ?? data['materialId'])?.toString() ?? '';
                 if (sid.isNotEmpty && mid.isNotEmpty) {
                   final key = '${sid}_$mid';
-                  _materialProgress[key] = (data['progress_percent'] ?? data['progress'] as num?)?.toDouble() ?? 0.0;
+                  final p = (data['progress_percent'] ?? data['progress'] as num?)?.toDouble() ?? 0.0;
+                  _materialProgress[key] = p;
+                  if (data['points_awarded'] == true ||
+                      data['pointsAwarded'] == true ||
+                      p >= 100.0) {
+                    _materialPointsAwardedKeys.add(key);
+                  }
                 }
               }
               notifyListeners();
@@ -490,7 +522,15 @@ class FirebaseService extends ChangeNotifier {
               _pointTransactions.clear();
               for (final doc in snap.docs) {
                 try {
-                  _pointTransactions.add(PointTransactionModel.fromMap(doc.data(), id: doc.id));
+                  final tx = PointTransactionModel.fromMap(doc.data(), id: doc.id);
+                  _pointTransactions.add(tx);
+                  if (tx.reason.contains('Selesai Belajar Modul Materi:')) {
+                    for (final m in _materials) {
+                      if (tx.reason.contains(m.id) || tx.reason.contains(m.title)) {
+                        _materialPointsAwardedKeys.add('${tx.studentId}_${m.id}');
+                      }
+                    }
+                  }
                 } catch (_) {}
               }
               notifyListeners();
@@ -636,11 +676,17 @@ class FirebaseService extends ChangeNotifier {
             _materialProgress.clear();
             for (final doc in snap.docs) {
               final data = doc.data();
-              final sid = data['studentId']?.toString() ?? '';
-              final mid = data['materialId']?.toString() ?? '';
+              final sid = (data['student_id'] ?? data['studentId'])?.toString() ?? '';
+              final mid = (data['material_id'] ?? data['materialId'])?.toString() ?? '';
               if (sid.isNotEmpty && mid.isNotEmpty) {
                 final key = '${sid}_$mid';
-                _materialProgress[key] = (data['progress'] as num?)?.toDouble() ?? 0.0;
+                final p = (data['progress_percent'] ?? data['progress'] as num?)?.toDouble() ?? 0.0;
+                _materialProgress[key] = p;
+                if (data['points_awarded'] == true ||
+                    data['pointsAwarded'] == true ||
+                    p >= 100.0) {
+                  _materialPointsAwardedKeys.add(key);
+                }
               }
             }
             notifyListeners();
@@ -1480,17 +1526,19 @@ class FirebaseService extends ChangeNotifier {
         for (final uid in targetUserIds) {
           if (uid == _currentUser?.id) continue; // Jangan kirim ke perangkat pengirim sendiri
           final userDoc = await db.collection('users').doc(uid).get();
-          final token = userDoc.data()?['fcm_token'] as String?;
+          final uData = userDoc.data();
+          final token = (uData?['fcm_token'] ?? uData?['fcmToken']) as String?;
           if (token != null && token.isNotEmpty) targetTokens.add(token);
         }
-      } else {
+      } else if (type != 'chat') {
         // Ambil token semua siswa di kelas terkait (atau semua pengguna jika broadcast umum)
+        // PENTING: Chat tanpa targetUserIds tidak boleh di-broadcast ke siapapun!
         final usersSnap = await db.collection('users').get();
         for (final uDoc in usersSnap.docs) {
           if (uDoc.id == _currentUser?.id) continue;
           final uData = uDoc.data();
           final uClass = (uData['class_name'] ?? uData['class_id'] ?? '').toString().trim();
-          final uToken = uData['fcm_token'] as String?;
+          final uToken = (uData['fcm_token'] ?? uData['fcmToken']) as String?;
           if (uToken == null || uToken.isEmpty) continue;
 
           if (targetClassIds.isEmpty || isClassMatching(uClass, targetClassIds)) {
@@ -1517,7 +1565,7 @@ class FirebaseService extends ChangeNotifier {
       }
 
       // Topik FCM hanya digunakan untuk notifikasi massal / kelas, BUKAN untuk chat privat antar pengguna
-      if (targetUserIds.isEmpty) {
+      if (targetUserIds.isEmpty && type != 'chat') {
         if (targetClassIds.isNotEmpty) {
           for (final cid in targetClassIds) {
             final topic = FcmService.formatClassTopic(cid);
@@ -1553,15 +1601,19 @@ class FirebaseService extends ChangeNotifier {
       if (n.creatorId != null && n.creatorId == uid) {
         return false;
       }
-      // 1. Notifikasi pesan masuk / chat spesifik per user
+      // 1. Khusus Chat: hanya tampilkan jika user terdaftar di targetUserIds
+      if (n.type == 'chat') {
+        return n.targetUserIds.contains(uid);
+      }
+      // 2. Notifikasi bertarget user spesifik lainnya
       if (n.targetUserIds.isNotEmpty) {
         return n.targetUserIds.contains(uid);
       }
-      // 2. Guru & Admin melihat semua notifikasi pengumuman/materi/kuis
+      // 3. Guru & Admin melihat semua notifikasi pengumuman/materi/kuis umum
       if (user.isGuru || user.isAdmin) {
         return true;
       }
-      // 3. Siswa: filter kelas disesuaikan secara ketat dengan data kelas di Firebase
+      // 4. Siswa: filter kelas disesuaikan secara ketat dengan data kelas di Firebase
       final studentClass = (user.className ?? user.classId ?? '').trim();
       if (n.targetClassIds.isEmpty) return true;
       if (studentClass.isEmpty) return true;
@@ -1719,6 +1771,38 @@ class FirebaseService extends ChangeNotifier {
     return _materialProgress['${studentId}_$materialId'] ?? 0.0;
   }
 
+  /// Memeriksa apakah siswa telah menerima reward poin untuk materi tertentu (hanya 1x seumur hidup)
+  bool hasStudentReceivedMaterialPoints(String studentId, String materialId) {
+    if (studentId.isEmpty || materialId.isEmpty) return false;
+    final key = '${studentId}_$materialId';
+    if (_materialPointsAwardedKeys.contains(key)) return true;
+
+    // Cek dari riwayat point_transactions yang sudah termuat
+    final mat = _materials.where((m) => m.id == materialId).firstOrNull;
+    final matTitle = mat?.title;
+
+    final hasTx = _pointTransactions.any((tx) {
+      if (tx.studentId != studentId) return false;
+      if (!tx.reason.contains('Selesai Belajar Modul Materi:')) return false;
+      if (tx.reason.contains(materialId)) return true;
+      if (matTitle != null && matTitle.isNotEmpty && tx.reason.contains(matTitle)) return true;
+      return false;
+    });
+
+    if (hasTx) {
+      _materialPointsAwardedKeys.add(key);
+      return true;
+    }
+
+    // Jika progress saat ini di memori sudah 100%, anggap sudah pernah dapat poin
+    if ((_materialProgress[key] ?? 0.0) >= 100.0) {
+      _materialPointsAwardedKeys.add(key);
+      return true;
+    }
+
+    return false;
+  }
+
   /// Update and persist real-time material progress to Cloud Firestore
   Future<void> updateMaterialProgress(
     String studentId,
@@ -1733,7 +1817,10 @@ class FirebaseService extends ChangeNotifier {
     notifyListeners();
 
     // Reward active learning: +20 points when module reading is completed 100%
-    if (clamped >= 100.0 && oldProgress < 100.0) {
+    // ATURAN KETAT: Hanya diberikan SEKALI seumur hidup. Jika sudah pernah dapat poin atau progres sudah 100%, JANGAN berikan poin lagi!
+    final alreadyAwarded = hasStudentReceivedMaterialPoints(studentId, materialId);
+    if (clamped >= 100.0 && oldProgress < 100.0 && !alreadyAwarded) {
+      _materialPointsAwardedKeys.add(key);
       final mat = _materials.where((m) => m.id == materialId).firstOrNull;
       final matTitle = mat?.title ?? 'Modul Materi';
       await addPoints(
@@ -1753,8 +1840,13 @@ class FirebaseService extends ChangeNotifier {
     try {
       await db.collection('material_progress').doc(key).set({
         'studentId': studentId,
+        'student_id': studentId,
         'materialId': materialId,
+        'material_id': materialId,
         'progress': clamped,
+        'progress_percent': clamped,
+        'points_awarded': alreadyAwarded || clamped >= 100.0,
+        'pointsAwarded': alreadyAwarded || clamped >= 100.0,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
@@ -3208,16 +3300,33 @@ class FirebaseService extends ChangeNotifier {
       await db.collection('chat_messages').doc(newMsg.id).set(newMsg.toMap());
 
       // Otomatis kirim notifikasi pesan baru ke penerima chat
-      final sIdx = _streaks.indexWhere((s) => s.id == streakId);
-      if (sIdx != -1) {
-        final streak = _streaks[sIdx];
-        final recipientIds = streak.participantIds.where((id) => id != _currentUser!.id).toList();
+      StreakModel? streak = _streaks.where((s) => s.id == streakId).firstOrNull;
+      if (streak == null) {
+        try {
+          final sDoc = await db.collection('streaks').doc(streakId).get();
+          if (sDoc.exists && sDoc.data() != null) {
+            streak = StreakModel.fromMap(sDoc.data()!, id: sDoc.id);
+          }
+        } catch (_) {}
+      }
+
+      if (streak != null) {
+        // Ambil target penerima: hanya lawan bicara (1-on-1) atau anggota grup (grup chat), KECUALI pengirim sendiri
+        final recipientIds = streak.participantIds
+            .where((id) => id.isNotEmpty && id != _currentUser!.id)
+            .toSet()
+            .toList();
+
         if (recipientIds.isNotEmpty) {
           final snippet = filteredMessage.length > 50
               ? '${filteredMessage.substring(0, 50)}...'
               : filteredMessage;
+          final notifTitle = streak.type == StreakType.group
+              ? '💬 ${streak.title} • ${_currentUser!.fullName}'
+              : '💬 Pesan dari ${_currentUser!.fullName}';
+
           unawaited(createNotification(
-            title: '💬 Pesan dari ${_currentUser!.fullName}',
+            title: notifTitle,
             body: snippet,
             type: 'chat',
             targetUserIds: recipientIds,

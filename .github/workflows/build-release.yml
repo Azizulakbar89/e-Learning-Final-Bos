@@ -80,12 +80,11 @@ jobs:
             ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
 
             ### ✨ Fitur yang Diperbarui
-            - 🏅 **Popup Share Lencana Baru** — Siswa mendapat popup otomatis saat membuka profil jika ada badge baru. Card lencana bisa dibagikan ke Instagram & WhatsApp. Jika dibatalkan, tidak muncul lagi.
-            - 🔄 **Fix Update In-App** — Download APK langsung dari GitHub (follow redirect otomatis), popup update muncul kembali saat app dibuka dari background, dan reset 24 jam setelah dismiss.
-            - 💬 **Perbaikan Chat** — Nama partner chat sudah benar (bukan nama sendiri), input pesan tidak tertutup navbar HP, hapus grup sinkron di semua tab.
-            - 🔔 **Notifikasi** — Notif saat siswa kumpulkan tugas dan guru berikan nilai.
-            - 🔥 **Streak Share** — Share pencapaian streak per 10 hari ke Instagram/WhatsApp.
-            - 🚀 **CI/CD Auto Release** — Push ke main otomatis build APK, buat GitHub Release, dan update Firestore.
+            - 📖 **Fix Poin Materi (Anti Duplikat)** — Siswa yang telah menyelesaikan materi (progress 100%) tidak akan mendapatkan poin ganda saat membuka kembali materi tersebut.
+            - 🎯 **Routing Notifikasi Chat Tepat Sasaran** — Notifikasi chat 1-on-1 (siswa ke siswa, siswa ke guru, guru ke siswa) hanya dikirimkan ke target lawan bicara. Notifikasi obrolan grup hanya dikirimkan kepada anggota yang tergabung dalam grup tersebut.
+            - 🏅 **Popup Share Lencana Baru** — Siswa mendapat popup otomatis saat membuka profil jika ada badge baru (bisa dishare ke WA & IG).
+            - 🔄 **In-App Update Otomatis** — Download APK langsung dari GitHub dengan popup deteksi pembaruan otomatis.
+            - 💬 **Perbaikan Chat & Streak** — Input pesan bebas tertutup navigasi HP, partner chat akurat, streak 2 arah.
 
             ### 📥 Cara Install / Update
             1. Download file APK di bawah ini

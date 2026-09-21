@@ -119,7 +119,9 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
               activityType: 'materi',
               detail: widget.material.title,
             );
-            _startAutoProgressTimer(fb, sid);
+            if (_progressPercent < 100.0) {
+              _startAutoProgressTimer(fb, sid);
+            }
           }
         });
       }
@@ -135,7 +137,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
     final asgDone = _areAssignmentsCompleted(fb, applicable);
     final maxLimit = (!hasAsg || asgDone) ? 100.0 : 50.0;
 
-    if (_progressPercent >= maxLimit) return;
+    if (_progressPercent >= maxLimit || _progressPercent >= 100.0) return;
 
     // Berikan progres awal membaca jika masih 0%
     if (_progressPercent < 15.0) {
@@ -191,14 +193,22 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
       _progressPercent = clamped;
     });
     final sid = fb.currentUser?.id ?? '';
+    final wasAlreadyAwarded = sid.isNotEmpty && fb.hasStudentReceivedMaterialPoints(sid, widget.material.id);
     if (sid.isNotEmpty) {
       fb.updateMaterialProgress(sid, widget.material.id, clamped);
     }
     if (wasUnder100 && clamped >= 100.0 && mounted) {
-      AppSnackBar.success(
-        context,
-        'Hebat! Progres belajar tersimpan 100% otomatis di Firebase (+20 Poin)!',
-      );
+      if (!wasAlreadyAwarded) {
+        AppSnackBar.success(
+          context,
+          'Hebat! Progres belajar tersimpan 100% otomatis di Firebase (+20 Poin)!',
+        );
+      } else {
+        AppSnackBar.info(
+          context,
+          'Progres belajar tersimpan 100% (Poin materi ini sudah pernah diraih).',
+        );
+      }
     }
   }
 
