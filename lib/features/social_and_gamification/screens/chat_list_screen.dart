@@ -81,67 +81,38 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final fb = context.read<FirebaseService>();
     final currentUser = fb.currentUser;
     final isTeacher = currentUser?.isGuru ?? false;
-    final teacherClasses = isTeacher ? fb.getTeacherClasses(currentUser) : <String>[];
-    final teacherStudents = isTeacher ? fb.getTeacherStudents(currentUser) : <UserModel>[];
-
-    // Jika guru belum diplot sama sekali oleh admin, cegah membuat chat
-    if (isTeacher && teacherClasses.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Akun Belum Diplot'),
-            ],
-          ),
-          content: const Text(
-            'Anda belum diplot untuk mengajar kelas atau siswa manapun oleh Administrator. Silakan hubungi Admin sekolah agar plotting kelas Anda segera diatur.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Tutup'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     // Data siswa dan guru diambil langsung dari FirebaseService
-    final allStudents = isTeacher ? teacherStudents : fb.allStudents;
+    // Untuk Guru: bisa mengakses dan chat dengan seluruh siswa tanpa batasan
+    final allStudents = fb.allStudents;
     final allTeachers = fb.allTeachers;
-    final userClass = (currentUser?.className ?? currentUser?.classId ?? 'X-RPL-1').trim();
+    final userClass = (currentUser?.className ?? currentUser?.classId ?? '').trim();
 
-    // 1. Teman sekelas / Siswa Ajar dari Firebase
+    // 1. Teman sekelas / Siswa dari Firebase
+    // Untuk Guru: daftar semua siswa sekolah agar bebas memilih siapapun
     final List<UserModel> classmates = isTeacher
-        ? teacherStudents
+        ? allStudents.where((s) => s.id != currentUser?.id).toList()
         : allStudents.where((s) {
             if (s.id == currentUser?.id) return false;
             final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
             return sClass == userClass.toLowerCase();
           }).toList();
 
-    // 2. Daftar Jenjang / Kelas dari Firebase
-    final List<String> gradeClasses = isTeacher
-        ? (List<String>.from(teacherClasses)..sort())
-        : () {
-            final Set<String> existingClasses = {};
-            for (final s in allStudents) {
-              final c = (s.className ?? s.classId ?? '').trim();
-              if (c.isNotEmpty) existingClasses.add(c);
-            }
-            for (final sc in fb.schoolClasses) {
-              if (sc.name.trim().isNotEmpty) existingClasses.add(sc.name.trim());
-            }
-            if (existingClasses.isEmpty) {
-              existingClasses.addAll(['Kelas 7', 'Kelas 8', 'Kelas 9']);
-            }
-            return existingClasses.toList()..sort();
-          }();
+    // 2. Daftar Jenjang / Kelas dari Firebase (memuat seluruh kelas)
+    final List<String> gradeClasses = () {
+      final Set<String> existingClasses = {};
+      for (final s in allStudents) {
+        final c = (s.className ?? s.classId ?? '').trim();
+        if (c.isNotEmpty) existingClasses.add(c);
+      }
+      for (final sc in fb.schoolClasses) {
+        if (sc.name.trim().isNotEmpty) existingClasses.add(sc.name.trim());
+      }
+      if (existingClasses.isEmpty) {
+        existingClasses.addAll(['Kelas 7', 'Kelas 8', 'Kelas 9']);
+      }
+      return existingClasses.toList()..sort();
+    }();
 
     // 3. Daftar Guru dari Firebase (jika guru, rekan guru lainnya)
     final List<UserModel> teachers = isTeacher
@@ -234,7 +205,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           _buildModeChip(
                             index: 0,
                             currentIndex: selectedModeIndex,
-                            label: 'Teman Sekelas',
+                            label: isTeacher ? 'Semua Siswa' : 'Teman Sekelas',
                             icon: Icons.school_rounded,
                             onTap: () => setDialogState(() => selectedModeIndex = 0),
                           ),
@@ -242,7 +213,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           _buildModeChip(
                             index: 1,
                             currentIndex: selectedModeIndex,
-                            label: 'Kelas 7 / 8 / 9',
+                            label: isTeacher ? 'Pilih per Kelas' : 'Kelas 7 / 8 / 9',
                             icon: Icons.groups_2_rounded,
                             onTap: () => setDialogState(() => selectedModeIndex = 1),
                           ),
@@ -250,7 +221,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           _buildModeChip(
                             index: 2,
                             currentIndex: selectedModeIndex,
-                            label: 'Guru Pengajar',
+                            label: isTeacher ? 'Rekan Guru' : 'Guru Pengajar',
                             icon: Icons.psychology_alt_rounded,
                             onTap: () => setDialogState(() => selectedModeIndex = 2),
                           ),
@@ -267,7 +238,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ),
                     const SizedBox(height: 18),
 
-                    // ── MODE 0: TEMAN SEKELAS (DARI FIREBASE) ──
+                    // ── MODE 0: TEMAN SEKELAS / SEMUA SISWA ──
                     if (selectedModeIndex == 0) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -281,7 +252,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Kelas Anda di Firebase: $userClass (${classmates.length} teman ditemukan)',
+                                isTeacher
+                                    ? 'Daftar Seluruh Siswa (${classmates.length} siswa siap diajak chat)'
+                                    : 'Kelas Anda di Firebase: $userClass (${classmates.length} teman ditemukan)',
                                 style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.bold),
                               ),
                             ),
@@ -292,16 +265,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       if (classmates.isNotEmpty)
                         DropdownButtonFormField<String>(
                           decoration: InputDecoration(
-                            labelText: 'Pilih Teman Sekelas',
+                            labelText: isTeacher ? 'Pilih Siswa' : 'Pilih Teman Sekelas',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             prefixIcon: const Icon(Icons.person_rounded, color: AppColors.primary),
                           ),
                           initialValue: selectedClassmateId ?? classmates.first.id,
                           items: classmates.map((s) {
+                            final cInfo = (s.className ?? s.classId ?? '').trim();
                             return DropdownMenuItem<String>(
                               value: s.id,
                               child: Text(
-                                '${s.fullName} ${s.nis != null ? "• ${s.nis}" : ""}',
+                                '${s.fullName}${cInfo.isNotEmpty ? " ($cInfo)" : ""}${s.nis != null ? " • ${s.nis}" : ""}',
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                               ),
                             );
@@ -784,47 +758,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final currentUser = fb.currentUser;
     final isTeacher = currentUser?.isGuru ?? false;
     final teacherClasses = isTeacher ? fb.getTeacherClasses(currentUser) : <String>[];
-    final teacherStudents = isTeacher ? fb.getTeacherStudents(currentUser) : <UserModel>[];
-    final teacherStudentIds = teacherStudents.map((s) => s.id).toSet();
 
     // 1. Ambil semua streak dari database yang relevan dengan user ini
     final List<StreakModel> userStreaks = fb.streaks.where((s) {
       if (currentUser == null) return true;
 
-      // Logika khusus Guru: Hanya boleh mengakses data kelas & siswa yang diajar
+      // Logika khusus Guru: Guru bisa chat dengan siswa siapapun tanpa batasan!
       if (isTeacher) {
-        // HANYA tampilkan obrolan jika ada pesan masuk atau kita mengirimkan pesan (tidak spam bot)
-        final hasMessages = fb.chatMessages.any((c) => c.streakId == s.id);
-        if (!hasMessages) return false;
+        // Tampilkan obrolan jika guru termasuk partisipan (1-on-1 dengan siswa/guru manapun)
+        if (s.participantIds.contains(currentUser.id)) return true;
 
-        // Jika guru belum diplot ke kelas manapun, jangan tampilkan obrolan kelas atau siswa
-        if (teacherClasses.isEmpty) {
-          // Hanya obrolan peer langsung sesama guru
-          if (s.participantIds.contains(currentUser.id)) {
-            final otherIds = s.participantIds.where((id) => id != currentUser.id).toList();
-            if (otherIds.isEmpty) return true;
-            return fb.allTeachers.any((t) => t.id == otherIds.first);
-          }
-          return false;
-        }
-
-        // Cek obrolan grup: hanya grup yang secara eksplisit untuk kelas yang diajar
+        // Obrolan grup: tampilkan jika guru termasuk anggota atau grup kelas yang diajar
         if (s.type == StreakType.group) {
+          if (s.participantIds.contains(currentUser.id)) return true;
           for (final cls in teacherClasses) {
             if (s.title.toLowerCase().contains(cls.toLowerCase())) return true;
           }
-          return false;
-        }
-
-        // Cek obrolan bimbingan/konsultasi/peer:
-        if (s.participantIds.contains(currentUser.id)) {
-          final otherIds = s.participantIds.where((id) => id != currentUser.id).toList();
-          if (otherIds.isEmpty) return true;
-          final otherId = otherIds.first;
-          // Boleh jika lawan bicaranya adalah sesama guru
-          if (fb.allTeachers.any((t) => t.id == otherId)) return true;
-          // Boleh jika siswa tersebut adalah siswa di kelas yang diajarnya
-          return teacherStudentIds.contains(otherId);
         }
         return false;
       }

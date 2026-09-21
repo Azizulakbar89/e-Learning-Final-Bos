@@ -2672,6 +2672,15 @@ class FirebaseService extends ChangeNotifier {
   }
 
   Future<void> updateExam(ExamModel exam) async {
+    // Pembatas ketat: Guru yang bisa mengedit HANYA guru yang membuat ujian tersebut
+    final existing = _exams.where((e) => e.id == exam.id).firstOrNull;
+    if (existing != null && _currentUser != null && _currentUser!.isGuru && !_currentUser!.isAdmin) {
+      if (existing.teacherId.isNotEmpty && existing.teacherId != _currentUser!.id) {
+        debugPrint('[Security] Unauthorized updateExam attempt by non-author guru');
+        return;
+      }
+    }
+
     final index = _exams.indexWhere((e) => e.id == exam.id);
     if (index != -1) {
       _exams[index] = exam;
@@ -2687,6 +2696,14 @@ class FirebaseService extends ChangeNotifier {
   }
 
   Future<void> toggleExamAntiCheat(String examId, bool enabled) async {
+    final existing = _exams.where((e) => e.id == examId).firstOrNull;
+    if (existing != null && _currentUser != null && _currentUser!.isGuru && !_currentUser!.isAdmin) {
+      if (existing.teacherId.isNotEmpty && existing.teacherId != _currentUser!.id) {
+        debugPrint('[Security] Unauthorized toggleExamAntiCheat attempt by non-author guru');
+        return;
+      }
+    }
+
     final index = _exams.indexWhere((e) => e.id == examId);
     if (index != -1) {
       _exams[index] = _exams[index].copyWith(antiCheatEnabled: enabled);
@@ -2702,6 +2719,15 @@ class FirebaseService extends ChangeNotifier {
   }
 
   Future<void> deleteExam(String examId) async {
+    // Pembatas ketat: Guru yang bisa menghapus HANYA guru yang membuat ujian tersebut
+    final existing = _exams.where((e) => e.id == examId).firstOrNull;
+    if (existing != null && _currentUser != null && _currentUser!.isGuru && !_currentUser!.isAdmin) {
+      if (existing.teacherId.isNotEmpty && existing.teacherId != _currentUser!.id) {
+        debugPrint('[Security] Unauthorized deleteExam attempt by non-author guru');
+        return;
+      }
+    }
+
     _exams.removeWhere((e) => e.id == examId);
     _examSessions.removeWhere((s) => s.examId == examId);
     notifyListeners();
@@ -4192,40 +4218,16 @@ class FirebaseService extends ChangeNotifier {
     return list;
   }
 
-  /// Get exams specifically taught by this teacher (strictly matching taught subjects & classes)
+  /// Get exams specifically created by this teacher (strictly author-only; other teachers cannot view even for same subject)
   List<ExamModel> getTeacherExams([UserModel? teacher]) {
     final user = teacher ?? _currentUser;
-    if (user == null || !user.isGuru) return exams;
+    if (user == null) return [];
+    if (user.isAdmin) return exams; // Admin sekolah tetap bisa melihat semua ujian
+    if (!user.isGuru) return exams;
 
-    final taughtSubjects = getTeacherSubjects(user);
-    final taughtClasses = getTeacherClasses(user);
-
-    // If teacher is not plotted to any subject AND not plotted to any class, return empty!
-    if (taughtSubjects.isEmpty && taughtClasses.isEmpty) return <ExamModel>[];
-
-    final taughtSubjectIds = taughtSubjects.map((s) => s.id.toLowerCase()).toSet();
-    final taughtClassesLower = taughtClasses.map((c) => c.trim().toLowerCase()).toSet();
-
-    return _exams.where((e) {
-      final isAuthor = e.teacherId == user.id;
-      final subjectMatch = taughtSubjectIds.contains(e.subjectId.toLowerCase());
-      if (!subjectMatch && !isAuthor) return false;
-
-      // Author can always see their own exams
-      if (isAuthor) return true;
-
-      // If teacher teaches this subject
-      if (subjectMatch) {
-        if (e.classIds.isEmpty) return true;
-        if (taughtClassesLower.isNotEmpty) {
-          final match = e.classIds.any((cid) => taughtClassesLower.contains(cid.trim().toLowerCase()));
-          if (match) return true;
-          return true;
-        }
-        return true;
-      }
-      return false;
-    }).toList();
+    // Pembatas ketat: Guru yang bisa melihat HANYA guru yang membuat ujian tersebut
+    // Guru lain TIDAK BISA melihat walaupun sesama mapel yang diajar!
+    return _exams.where((e) => e.teacherId == user.id).toList();
   }
 
   /// Get materials specifically taught by this teacher (strictly matching taught subjects & classes)

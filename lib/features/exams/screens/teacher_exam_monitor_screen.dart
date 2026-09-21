@@ -202,15 +202,10 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     final isTeacher = currentUser?.isGuru ?? false;
     final currentExam = fb.exams.firstWhere((e) => e.id == widget.exam.id, orElse: () => widget.exam);
 
-    final teacherClasses = isTeacher ? fb.getTeacherClasses(currentUser) : fb.getAvailableClasses();
-    final teacherClassesLower = teacherClasses.map((c) => c.toLowerCase()).toSet();
-    final teacherSubjects = isTeacher ? fb.getTeacherSubjects(currentUser) : fb.subjects;
-
+    // Pembatas ketat: Guru yang bisa memonitor HANYA guru yang membuat ujian tersebut
     final isAuthorized = !isTeacher ||
-        currentExam.teacherId == currentUser?.id ||
-        (teacherSubjects.any((s) => s.id == currentExam.subjectId) &&
-            (currentExam.classIds.isEmpty ||
-                currentExam.classIds.any((cid) => teacherClassesLower.contains(cid.toLowerCase()))));
+        (currentUser?.isAdmin ?? false) ||
+        (currentExam.teacherId.isNotEmpty && currentExam.teacherId == currentUser?.id);
 
     if (!isAuthorized) {
       return Scaffold(
@@ -232,12 +227,12 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Akses Ujian Dibatasi',
+                    'Akses Monitoring Dibatasi',
                     style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Anda tidak ditugaskan mengajar mata pelajaran atau kelas pada ujian ini oleh Admin Sekolah.',
+                    'Hanya guru yang membuat ujian ini yang dapat melihat dan memonitor sesi ujian siswa secara langsung.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
@@ -261,7 +256,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     }
 
     final allSessions = fb.examSessions
-        .where((s) => s.examId == widget.exam.id && (!isTeacher || teacherClassesLower.isEmpty || teacherClassesLower.contains(s.studentClass.trim().toLowerCase())))
+        .where((s) => s.examId == widget.exam.id)
         .toList();
 
     // Filter sessions by selected class
@@ -271,9 +266,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
             .where((s) => s.studentClass.trim().toLowerCase() == _selectedClassFilter.trim().toLowerCase())
             .toList();
 
-    final classes = isTeacher
-        ? currentExam.classIds.where((c) => teacherClassesLower.contains(c.toLowerCase())).toList()
-        : currentExam.classIds;
+    final classes = currentExam.classIds;
 
     final examSubject = fb.subjects.where((s) => s.id == currentExam.subjectId).firstOrNull;
     final kkm = examSubject?.kkm ?? 75.0;

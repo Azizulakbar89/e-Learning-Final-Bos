@@ -274,6 +274,65 @@ class _ExamFormScreenState extends State<ExamFormScreen> {
   @override
   Widget build(BuildContext context) {
     final fb = context.watch<FirebaseService>();
+    final currentUser = fb.currentUser;
+    final isTeacher = currentUser?.isGuru ?? false;
+    final isEdit = widget.existingExam != null;
+
+    // Pembatas ketat: Guru yang bisa mengedit HANYA guru yang membuat ujian tersebut
+    if (isEdit && isTeacher && !(currentUser?.isAdmin ?? false)) {
+      if (widget.existingExam!.teacherId.isNotEmpty && widget.existingExam!.teacherId != currentUser?.id) {
+        return Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          appBar: AppBar(
+            title: const Text('Edit Ujian'),
+            backgroundColor: AppColors.surfaceLight,
+            foregroundColor: AppColors.textPrimaryLight,
+          ),
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.lock_rounded, size: 56, color: Color(0xFFDC2626)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Akses Edit Dibatasi',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Hanya guru yang membuat ujian ini yang berhak mengedit jadwal dan soal ujian.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: const Text('Kembali'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     final availableClasses = fb.getTeacherClasses(fb.currentUser);
     final allSubjectQuestions = fb.questions.where((q) => q.subjectId == widget.subjectId).toList();
 
@@ -310,7 +369,6 @@ class _ExamFormScreenState extends State<ExamFormScreen> {
         .where((q) => _selectedQuestionIds.contains(q.id))
         .toList();
 
-    final isEdit = widget.existingExam != null;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

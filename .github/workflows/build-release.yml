@@ -80,11 +80,11 @@ jobs:
             ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
 
             ### ✨ Fitur yang Diperbarui
-            - 📖 **Fix Poin Materi (Anti Duplikat)** — Siswa yang telah menyelesaikan materi (progress 100%) tidak akan mendapatkan poin ganda saat membuka kembali materi tersebut.
-            - 🎯 **Routing Notifikasi Chat Tepat Sasaran** — Notifikasi chat 1-on-1 (siswa ke siswa, siswa ke guru, guru ke siswa) hanya dikirimkan ke target lawan bicara. Notifikasi obrolan grup hanya dikirimkan kepada anggota yang tergabung dalam grup tersebut.
-            - 🏅 **Popup Share Lencana Baru** — Siswa mendapat popup otomatis saat membuka profil jika ada badge baru (bisa dishare ke WA & IG).
-            - 🔄 **In-App Update Otomatis** — Download APK langsung dari GitHub dengan popup deteksi pembaruan otomatis.
-            - 💬 **Perbaikan Chat & Streak** — Input pesan bebas tertutup navigasi HP, partner chat akurat, streak 2 arah.
+            - 👨‍🏫 **Chat Guru Bebas Tanpa Batasan** — Guru kini dapat memilih dan memulai obrolan/chat dengan siswa siapapun dari seluruh kelas tanpa batasan plotting.
+            - 🔒 **Pembatas Ujian Khusus Guru Pembuat** — Hanya guru yang membuat ujian yang dapat melihat, memonitor sesi live, mengedit soal, dan menghapus ujian. Guru lain tidak dapat mengaksesnya meskipun mengajar mata pelajaran yang sama.
+            - 📖 **Fix Poin Materi (Anti Duplikat)** — Siswa tidak akan mendapat poin ganda saat membuka materi yang sudah 100% atau pernah diselesaikan.
+            - 🎯 **Routing Notifikasi Chat Akurat** — Notifikasi chat 1-on-1 hanya masuk ke target lawan bicara, dan chat grup hanya masuk ke anggota grup.
+            - 🏅 **Popup Share Lencana Baru** — Notifikasi lencana baru khusus siswa yang dapat dibagikan ke WhatsApp & Instagram.
 
             ### 📥 Cara Install / Update
             1. Download file APK di bawah ini
