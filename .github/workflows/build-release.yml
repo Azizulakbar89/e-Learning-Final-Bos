@@ -80,6 +80,7 @@ jobs:
             ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
 
             ### ✨ Fitur yang Diperbarui
+            - 💬 **Tampilan Chat Otomatis di Pesan Terakhir** — Saat membuka ruang obrolan, tampilan chat langsung berada di posisi pesan paling bawah/terbaru, sehingga pengguna tidak perlu scroll dari awal ke bawah lagi.
             - 👨‍🏫 **Chat Guru Bebas Tanpa Batasan** — Guru kini dapat memilih dan memulai obrolan/chat dengan siswa siapapun dari seluruh kelas tanpa batasan plotting.
             - 🔒 **Pembatas Ujian Khusus Guru Pembuat** — Hanya guru yang membuat ujian yang dapat melihat, memonitor sesi live, mengedit soal, dan menghapus ujian. Guru lain tidak dapat mengaksesnya meskipun mengajar mata pelajaran yang sama.
             - 📖 **Fix Poin Materi (Anti Duplikat)** — Siswa tidak akan mendapat poin ganda saat membuka materi yang sudah 100% atau pernah diselesaikan.

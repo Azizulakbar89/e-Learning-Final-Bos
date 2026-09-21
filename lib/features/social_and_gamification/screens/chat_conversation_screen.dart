@@ -23,6 +23,7 @@ class ChatConversationScreen extends StatefulWidget {
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _msgController = TextEditingController();
   final _focusNode = FocusNode();
+  final _scrollController = ScrollController();
 
   ChatMessageModel? _replyingTo;
   ChatMessageModel? _editingMessage;
@@ -31,6 +32,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void dispose() {
     _msgController.dispose();
     _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -81,6 +83,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       _replyingTo = null;
     });
     _msgController.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
 
     // Tampilkan peringatan jika ada konten yang disensor
     if (wasFiltered) {
@@ -445,25 +457,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       orElse: () => widget.streak,
     );
 
-    // Guard: ensure teacher only accesses chats for their assigned classes & students
+    // Guard: pastikan guru hanya mengakses obrolan kelas atau yang diikutinya
     if (currentUser?.isGuru == true) {
       final teacherClasses = fb.getTeacherClasses(currentUser);
       final teacherClassesLower = teacherClasses.map((c) => c.toLowerCase()).toSet();
-      final teacherStudents = fb.getTeacherStudents(currentUser);
-      final teacherStudentIds = teacherStudents.map((s) => s.id).toSet();
-      final teacherStudentNames = teacherStudents.map((s) => s.fullName.toLowerCase()).toSet();
 
       bool isAuthorized = false;
-      if (liveStreak.type == StreakType.group) {
+      // Guru berhak mengakses jika guru menjadi partisipan dalam chat (1-on-1 dengan siswa/rekan manapun)
+      if (liveStreak.participantIds.contains(currentUser?.id)) {
+        isAuthorized = true;
+      } else if (liveStreak.type == StreakType.group) {
+        // Atau obrolan grup kelas yang diajarnya
         isAuthorized = teacherClassesLower.isNotEmpty &&
             teacherClassesLower.any((cls) => liveStreak.title.toLowerCase().contains(cls));
-      } else if (liveStreak.type == StreakType.teacher) {
-        final otherIds = liveStreak.participantIds.where((id) => id != currentUser!.id);
-        final otherNames = liveStreak.participantNames.where((n) => n != currentUser!.fullName);
-        isAuthorized = otherIds.any((id) => teacherStudentIds.contains(id)) ||
-            otherNames.any((name) => teacherStudentNames.contains(name.toLowerCase()));
-      } else {
-        isAuthorized = liveStreak.participantIds.contains(currentUser?.id);
       }
 
       if (!isAuthorized) {
@@ -516,7 +522,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
 
     final messages = fb.chatMessages.where((c) => c.streakId == widget.streak.id).toList()
-      ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
 
     final isDead = liveStreak.isDead;
     final hoursLeft = liveStreak.expiresAt.difference(DateTime.now()).inHours;
@@ -700,6 +706,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     ),
                   )
                 : ListView.builder(
+                    controller: _scrollController,
+                    reverse: true,
                     padding: const EdgeInsets.all(16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
