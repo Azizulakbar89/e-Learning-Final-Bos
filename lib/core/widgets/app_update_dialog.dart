@@ -109,17 +109,19 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
     });
 
     try {
-      final uri = Uri.parse(urlString);
+      // Resolve final download URL dengan follow redirect
+      // GitHub asset selalu redirect (302) ke CDN, harus di-resolve dulu
+      final resolvedUrl = await _resolveRedirect(urlString);
+      final finalUri = Uri.parse(resolvedUrl);
 
-      // Jika URL mengarah ke web browser atau drive preview, buka browser eksternal
-      if (!urlString.toLowerCase().endsWith('.apk') && !urlString.contains('download') && !urlString.contains('export=download')) {
-        setState(() => _isDownloading = false);
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
+      if (mounted) {
+        setState(() => _statusText = 'Mengunduh APK dari server...');
       }
 
-      final request = http.Request('GET', uri);
-      final response = await http.Client().send(request);
+      // Stream download dengan progress
+      final request = http.Request('GET', finalUri);
+      final client = http.Client();
+      final response = await client.send(request);
 
       if (response.statusCode >= 400) {
         throw 'Server merespons kode ${response.statusCode}';
@@ -146,7 +148,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               final mbRec = (receivedBytes / (1024 * 1024)).toStringAsFixed(1);
               final mbTot = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
               final pct = (_progress * 100).toInt();
-              _statusText = 'Mengunduh APK: $mbRec MB / $mbTot MB ($pct%)';
+              _statusText = 'Mengunduh: $mbRec MB / $mbTot MB ($pct%)';
             } else {
               final mbRec = (receivedBytes / (1024 * 1024)).toStringAsFixed(1);
               _statusText = 'Mengunduh APK: $mbRec MB...';
@@ -157,11 +159,18 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
 
       await sink.flush();
       await sink.close();
+      client.close();
+
+      // Validasi file: minimal 1 MB untuk APK valid
+      final fileSize = await apkFile.length();
+      if (fileSize < 1024 * 1024) {
+        throw 'File APK tidak valid (ukuran terlalu kecil: $fileSize bytes). Coba lagi.';
+      }
 
       if (mounted) {
         setState(() {
           _progress = 1.0;
-          _statusText = 'Membuka installer paket Android...';
+          _statusText = 'Membuka installer...';
         });
       }
 
@@ -169,17 +178,18 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       const installerChannel = MethodChannel('www.azizul.com/app_installer');
       try {
         await installerChannel.invokeMethod('installApk', {'filePath': apkFile.path});
-      } catch (e) {
-        // Fallback jika installer gagal
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (installErr) {
+        debugPrint('[Update] MethodChannel install failed: $installErr');
+        // Fallback: buka file manager / installer bawaan
+        await launchUrl(
+          Uri.parse('file://${apkFile.path}'),
+          mode: LaunchMode.externalApplication,
+        );
       }
 
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-        });
-      }
+      if (mounted) setState(() => _isDownloading = false);
     } catch (e) {
+      debugPrint('[Update] Download error: $e');
       if (mounted) {
         setState(() {
           _isDownloading = false;
@@ -187,8 +197,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal mengunduh langsung: $e. Membuka di browser...'),
+            content: Text('Gagal mengunduh: $e\nMembuka di browser...'),
             backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
           ),
         );
         try {
@@ -196,6 +207,34 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         } catch (_) {}
       }
     }
+  }
+
+  /// Follow HTTP redirect sampai URL final (maks 5 hop).
+  /// GitHub asset download selalu 302 → CDN, perlu di-resolve manual.
+  Future<String> _resolveRedirect(String url, {int maxHops = 5}) async {
+    String current = url;
+    for (int i = 0; i < maxHops; i++) {
+      try {
+        final req = http.Request('HEAD', Uri.parse(current))
+          ..followRedirects = false;
+        final resp = await http.Client().send(req).timeout(const Duration(seconds: 6));
+        final location = resp.headers['location'];
+        if ((resp.statusCode == 301 ||
+                resp.statusCode == 302 ||
+                resp.statusCode == 307 ||
+                resp.statusCode == 308) &&
+            location != null &&
+            location.isNotEmpty) {
+          // Bisa relative atau absolute URL
+          current = location.startsWith('http') ? location : Uri.parse(current).resolve(location).toString();
+        } else {
+          break; // Sudah sampai tujuan
+        }
+      } catch (_) {
+        break; // Timeout atau error, gunakan URL terakhir
+      }
+    }
+    return current;
   }
 
   void _showUrlInputDialog() {
@@ -445,6 +484,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                       try {
                         final prefs = await SharedPreferences.getInstance();
                         await prefs.setString('dismissed_update_version', newVersion);
+                        // Simpan waktu dismiss agar popup muncul lagi setelah 24 jam
+                        await prefs.setInt('dismissed_update_at', DateTime.now().millisecondsSinceEpoch);
                       } catch (_) {}
                       if (context.mounted) Navigator.pop(context);
                     },

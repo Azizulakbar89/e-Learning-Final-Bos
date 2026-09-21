@@ -81,31 +81,68 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   bool _updateChecked = false;
+  DateTime? _lastUpdateCheck;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAutoUpdate());
+    WidgetsBinding.instance.addObserver(this);
+    // Delay 2 detik agar proses login selesai dulu sebelum popup muncul
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _checkAutoUpdate(force: false);
+    });
   }
 
-  Future<void> _checkAutoUpdate() async {
-    if (_updateChecked) return;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Dipanggil saat app kembali dari background (resume)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Cek update saat resume, tapi max 1x per jam agar tidak spam
+      final now = DateTime.now();
+      final lastCheck = _lastUpdateCheck;
+      if (lastCheck == null || now.difference(lastCheck).inHours >= 1) {
+        _checkAutoUpdate(force: false);
+      }
+    }
+  }
+
+  Future<void> _checkAutoUpdate({bool force = false}) async {
+    // Kalau force = false dan sudah cek dalam sesi ini, skip
+    if (!force && _updateChecked) return;
     _updateChecked = true;
+    _lastUpdateCheck = DateTime.now();
     try {
       final fbService = context.read<FirebaseService>();
       final result = await fbService.checkForAppUpdate();
-      if (result.hasUpdate && mounted) {
+      if (!mounted) return;
+      if (result.hasUpdate) {
         final prefs = await SharedPreferences.getInstance();
         final dismissedVersion = prefs.getString('dismissed_update_version');
-        if (!result.isForceUpdate && dismissedVersion == result.serverVersion?.latestVersion) {
+        final dismissedAt = prefs.getInt('dismissed_update_at') ?? 0;
+        final dismissedTime = DateTime.fromMillisecondsSinceEpoch(dismissedAt);
+        final hoursSinceDismiss = DateTime.now().difference(dismissedTime).inHours;
+
+        // Skip hanya jika versi sama DAN belum 24 jam sejak dismiss
+        // (Force update tidak bisa di-skip)
+        if (!result.isForceUpdate &&
+            dismissedVersion == result.serverVersion?.latestVersion &&
+            hoursSinceDismiss < 24) {
           return;
         }
         if (!mounted) return;
         AppUpdateDialog.show(context, result);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[AutoUpdate] Check error: $e');
+    }
   }
 
   @override
