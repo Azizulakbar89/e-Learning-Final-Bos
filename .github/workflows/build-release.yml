@@ -95,3 +95,21 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy & Sync Version to Firestore
+        run: |
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "Menulis service account Firebase dari GitHub Secrets..."
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > assets/service-account.json
+            dart tool/update_firestore_version.dart
+          else
+            echo "Catatan: FIREBASE_SERVICE_ACCOUNT belum diset di GitHub Secrets repository."
+          fi
+
+      - name: Deploy Firebase Rules (Optional if FIREBASE_TOKEN set)
+        if: env.FIREBASE_TOKEN != ''
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only firestore:rules,storage:rules --token "$FIREBASE_TOKEN" || true

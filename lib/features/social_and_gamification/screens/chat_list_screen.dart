@@ -40,6 +40,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
   }
 
+  void _confirmDeleteGroupFromList(BuildContext context, FirebaseService fb, StreakModel s) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_forever_rounded, color: AppColors.rose),
+            const SizedBox(width: 8),
+            Text('Hapus Grup Chat?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 17)),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus grup "${s.title}"?\nGrup dan riwayat pesan akan dihapus secara permanen dari tab Semua maupun Grup Kelas.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.rose),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await fb.deleteStreak(s.id);
+              if (context.mounted) {
+                AppSnackBar.success(context, 'Grup "${s.title}" berhasil dihapus.');
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showNewStreakDialog(BuildContext context) {
     final fb = context.read<FirebaseService>();
     final currentUser = fb.currentUser;
@@ -809,20 +846,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (!isTeacher && currentUser != null) {
       final userClass = (currentUser.className ?? currentUser.classId ?? '').trim();
       if (userClass.isNotEmpty) {
+        final classGroupId = 'streak_class_${userClass.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
         final hasMyClassGroup = userStreaks.any((s) =>
             s.type == StreakType.group &&
             s.title.toLowerCase().contains(userClass.toLowerCase()));
 
-        if (!hasMyClassGroup) {
+        if (!hasMyClassGroup && !fb.deletedStreakIds.contains(classGroupId)) {
           // Cari grup kelas dari Firebase (sudah dibuat oleh guru)
           final existingInFirebase = fb.streaks.where((s) =>
               s.type == StreakType.group &&
+              !fb.deletedStreakIds.contains(s.id) &&
               s.title.toLowerCase().contains(userClass.toLowerCase())).firstOrNull;
 
           if (existingInFirebase != null) {
             userStreaks.insert(0, existingInFirebase);
           } else {
-            // Buat placeholder grup kelas untuk siswa ini
+            // Buat placeholder grup kelas untuk siswa ini jika belum dihapus
             final classmatesAll = fb.allStudents.where((s) {
               final c = (s.className ?? s.classId ?? '').trim().toLowerCase();
               return c == userClass.toLowerCase();
@@ -846,7 +885,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             userStreaks.insert(
               0,
               StreakModel(
-                id: 'streak_class_${userClass.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
+                id: classGroupId,
                 type: StreakType.group,
                 title: 'Diskusi Kelas $userClass',
                 participantIds: pIds,
@@ -860,6 +899,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
       }
     }
+
+    // Pastikan grup/obrolan yang telah dihapus dihilangkan dari semua tampilan tab
+    userStreaks.removeWhere((s) => fb.deletedStreakIds.contains(s.id));
 
     // 3. Filter berdasarkan tab (Streak non-chat ditampilkan di banner khusus)
     final List<StreakModel> displayStreaks = userStreaks.where((s) {
@@ -906,17 +948,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ],
                   ),
                 ),
-                FilledButton.icon(
-                  onPressed: () => _showNewStreakDialog(context),
-                  icon: const Text('🔥', style: TextStyle(fontSize: 13)),
-                  label: const Text('Mulai Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF5722),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
               ],
             ),
           )
@@ -925,19 +956,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
             showBackButton: widget.showBackButton,
             title: 'Pesan & Streaks Belajar',
             subtitle: '${userStreaks.length} Obrolan Aktif • Ruang Konsultasi & Diskusi 🔥',
-            actions: [
-              FilledButton.icon(
-                onPressed: () => _showNewStreakDialog(context),
-                icon: const Text('🔥', style: TextStyle(fontSize: 13)),
-                label: const Text('Mulai Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFF97316),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
           ),
 
             // ── SHORTCUT CHAT SISWA & KELAS (JIKA GURU) ──
@@ -1104,6 +1122,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             : 'Belum ada pesan obrolan.';
 
                         final isGroup = s.type == StreakType.group;
+                        final chatTitle = s.getDisplayName(
+                          currentUserId: currentUser?.id,
+                          currentUserName: currentUser?.fullName,
+                        );
                         final avatarColor = isGroup ? AppColors.primary : const Color(0xFF059669);
 
                         return Card(
@@ -1118,6 +1140,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            onLongPress: isGroup ? () => _confirmDeleteGroupFromList(context, fb, s) : null,
                             leading: Stack(
                               children: [
                                 CircleAvatar(
@@ -1126,7 +1149,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                   child: isGroup
                                       ? Icon(Icons.groups_rounded, color: avatarColor, size: 22)
                                       : Text(
-                                          s.title.isNotEmpty ? s.title[0].toUpperCase() : 'S',
+                                          chatTitle.isNotEmpty ? chatTitle[0].toUpperCase() : 'S',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.w800,
                                             color: avatarColor,
@@ -1150,7 +1173,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    s.title,
+                                    chatTitle,
                                     style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1202,8 +1225,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 ),
                               ],
                             ),
-                            trailing: s.streakCount > 0
-                                ? Container(
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (s.streakCount > 0)
+                                  Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       gradient: AppColors.flameGradient,
@@ -1232,16 +1258,45 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                       ],
                                     ),
                                   )
-                                : (lastMsg.isNotEmpty
-                                    ? Text(
-                                        AppDateFormatter.formatShortDateTime(lastMsg.last.sentAt),
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 11,
-                                          color: const Color(0xFF94A3B8),
-                                          fontWeight: FontWeight.w500,
+                                else if (lastMsg.isNotEmpty)
+                                  Text(
+                                    AppDateFormatter.formatShortDateTime(lastMsg.last.sentAt),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      color: const Color(0xFF94A3B8),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                if (isGroup) ...[
+                                  const SizedBox(width: 4),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert_rounded, size: 20, color: Colors.black45),
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    onSelected: (value) {
+                                      if (value == 'delete') {
+                                        _confirmDeleteGroupFromList(context, fb, s);
+                                      }
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete_outline_rounded, color: AppColors.rose, size: 18),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Hapus Grup',
+                                              style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.w600, fontSize: 13),
+                                            ),
+                                          ],
                                         ),
-                                      )
-                                    : const SizedBox.shrink()),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
                             onTap: () async {
                               // Ensure streak is in Firestore
                               if (!fb.streaks.any((item) => item.id == s.id)) {

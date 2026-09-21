@@ -20,18 +20,36 @@ void main() async {
     'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/system_info/app_version',
   );
 
+  String version = '1.1.0';
+  int versionCode = 11;
+  final pubspecFile = File('pubspec.yaml');
+  if (pubspecFile.existsSync()) {
+    final lines = await pubspecFile.readAsLines();
+    for (final line in lines) {
+      if (line.startsWith('version:')) {
+        final raw = line.replaceFirst('version:', '').trim();
+        final parts = raw.split('+');
+        version = parts[0].trim();
+        if (parts.length > 1) {
+          versionCode = int.tryParse(parts[1].trim()) ?? versionCode;
+        }
+        break;
+      }
+    }
+  }
+
   final payload = {
     'fields': {
-      'latest_version': {'stringValue': '1.1.0'},
-      'version_code': {'integerValue': '11'},
+      'latest_version': {'stringValue': version},
+      'version_code': {'integerValue': '$versionCode'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.1.0/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v$version/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi 1.1.0: Perbaikan tampilan teks chat & spacing, edit anggota & hapus grup chat, filter pesan sendiri, notifikasi pengumpulan & penilaian tugas, dan fitur TikTok-style bagikan streak belajar ke WhatsApp & Instagram Story.'
+            '✨ Versi $version: Perbaikan tampilan teks chat & spacing, edit anggota & hapus grup chat, filter pesan sendiri, notifikasi pengumpulan & penilaian tugas, dan fitur TikTok-style bagikan streak belajar ke WhatsApp & Instagram Story.'
       },
       'force_update': {'booleanValue': false}
     }

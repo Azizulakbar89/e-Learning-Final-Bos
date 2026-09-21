@@ -78,6 +78,50 @@ class StreakModel {
   bool get isDead => DateTime.now().isAfter(expiresAt);
   bool get isExpired => isDead;
 
+  /// Mendapatkan nama tampilan obrolan yang tepat (nama lawan bicara untuk 1-on-1, nama grup untuk grup)
+  String getDisplayName({
+    String? currentUserId,
+    String? currentUserName,
+  }) {
+    if (type == StreakType.group) {
+      return title;
+    }
+
+    // Untuk chat 1-on-1: cari ID peserta selain pengguna saat ini
+    if (currentUserId != null && currentUserId.isNotEmpty && participantIds.isNotEmpty) {
+      final otherIndex = participantIds.indexWhere((id) => id != currentUserId && id.isNotEmpty);
+      if (otherIndex != -1 && otherIndex < participantNames.length) {
+        final partnerName = participantNames[otherIndex].trim();
+        if (partnerName.isNotEmpty &&
+            (currentUserName == null || partnerName.toLowerCase() != currentUserName.toLowerCase())) {
+          return partnerName;
+        }
+      }
+    }
+
+    // Cek participantNames yang berbeda dari nama user saat ini
+    if (currentUserName != null && currentUserName.isNotEmpty && participantNames.isNotEmpty) {
+      for (final name in participantNames) {
+        final clean = name.trim();
+        if (clean.isNotEmpty && clean.toLowerCase() != currentUserName.toLowerCase()) {
+          return clean;
+        }
+      }
+
+      // Jika judul saat ini adalah nama sendiri, cari nama lain di daftar peserta
+      if (title.toLowerCase().contains(currentUserName.toLowerCase())) {
+        for (final name in participantNames) {
+          final clean = name.trim();
+          if (clean.isNotEmpty && !clean.toLowerCase().contains(currentUserName.toLowerCase())) {
+            return clean;
+          }
+        }
+      }
+    }
+
+    return title;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

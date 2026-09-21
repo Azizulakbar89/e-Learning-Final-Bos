@@ -370,7 +370,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     newParticipantNames: newNames,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) AppSnackBar.success(context, 'Anggota grup berhasil diperbarui! ✅');
+                  if (context.mounted) AppSnackBar.success(context, 'Anggota grup berhasil diperbarui! ✅');
                 },
                 icon: const Icon(Icons.save_rounded),
                 label: const Text('Simpan Perubahan'),
@@ -520,15 +520,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     final isDead = liveStreak.isDead;
     final hoursLeft = liveStreak.expiresAt.difference(DateTime.now()).inHours;
+    final chatTitle = liveStreak.getDisplayName(
+      currentUserId: currentUser?.id,
+      currentUserName: currentUser?.fullName,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             CurvedHeaderCard(
-              title: liveStreak.title,
+              title: chatTitle,
               subtitle: liveStreak.type.label,
               actions: [
                 // Tombol pengaturan grup (hanya untuk tipe group)
@@ -910,43 +915,78 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
 
           // Message Input Field
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    focusNode: _focusNode,
-                    decoration: InputDecoration(
-                      hintText: _editingMessage != null
-                          ? 'Perbarui pesan...'
-                          : (_replyingTo != null ? 'Tulis balasan pesan...' : 'Kirim pesan & rawat api streak 🔥...'),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+          Builder(
+            builder: (ctx) {
+              final systemBottomPadding = MediaQuery.of(ctx).viewPadding.bottom;
+              final keyboardInset = MediaQuery.of(ctx).viewInsets.bottom;
+              // Jika keyboard tertutup, beri padding ekstra agar tombol navigasi bawaan hp (Home, Back, Recent) tidak menutupi input text
+              final extraBottom = keyboardInset > 0 ? 8.0 : (systemBottomPadding > 0 ? systemBottomPadding + 8.0 : 16.0);
+
+              return Container(
+                padding: EdgeInsets.fromLTRB(12, 8, 12, extraBottom),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(8),
+                      blurRadius: 6,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _msgController,
+                        focusNode: _focusNode,
+                        textInputAction: TextInputAction.send,
+                        keyboardType: TextInputType.multiline,
+                        maxLines: 4,
+                        minLines: 1,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14.5,
+                          height: 1.4,
+                          color: const Color(0xFF1E293B),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _editingMessage != null
+                              ? 'Perbarui pesan...'
+                              : (_replyingTo != null ? 'Tulis balasan pesan...' : 'Kirim pesan obrolan...'),
+                          hintStyle: GoogleFonts.outfit(fontSize: 13.5, color: Colors.grey.shade500),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          ),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: _sendMessage,
+                      icon: Icon(_editingMessage != null ? Icons.check_rounded : Icons.send_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: _editingMessage != null ? const Color(0xFF059669) : AppColors.primary,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _sendMessage,
-                  icon: Icon(_editingMessage != null ? Icons.check_rounded : Icons.send_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: _editingMessage != null ? const Color(0xFF059669) : AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),

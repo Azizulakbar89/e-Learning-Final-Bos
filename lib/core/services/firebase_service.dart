@@ -51,6 +51,8 @@ class FirebaseService extends ChangeNotifier {
   final List<ExamModel> _exams = [];
   final List<ExamSessionModel> _examSessions = [];
   final List<StreakModel> _streaks = [];
+  final Set<String> _deletedStreakIds = {};
+  Set<String> get deletedStreakIds => _deletedStreakIds;
   final List<ChatMessageModel> _chatMessages = [];
   final List<UserModel> _allStudents = [];
   final List<UserModel> _allTeachers = [];
@@ -3120,6 +3122,8 @@ class FirebaseService extends ChangeNotifier {
 
   /// Hapus grup streak beserta semua pesan chat-nya
   Future<void> deleteStreak(String streakId) async {
+    // Tandai sebagai terhapus agar tidak diregenerate
+    _deletedStreakIds.add(streakId);
     // Hapus dari lokal state dulu (optimistic)
     _streaks.removeWhere((s) => s.id == streakId);
     _chatMessages.removeWhere((m) => m.streakId == streakId);
@@ -3238,19 +3242,31 @@ class FirebaseService extends ChangeNotifier {
       );
       final diffDays = today.difference(lastDate).inDays;
 
+      // Aturan Streak: Api streak chat HANYA menyala/bertambah jika ada balasan dari kedua belah pihak (minimal 2 pengirim berbeda di obrolan)
+      final allStreakMessages = _chatMessages.where((c) => c.streakId == streakId).toList();
+      final distinctSenders = allStreakMessages.map((m) => m.senderId).toSet()
+        ..add(_currentUser?.id ?? '');
+      distinctSenders.removeWhere((id) => id.isEmpty);
+
+      final bool hasMutualParticipation = distinctSenders.length >= 2;
+
       int newStreak = s.streakCount;
       bool isNewDay = false;
 
-      if (s.isDead || diffDays > 1) {
-        // Jika streak padam (> 24 jam / lewat lebih dari 1 hari kalender), pulih mulai dari 1
+      if (!hasMutualParticipation) {
+        // Belum ada balasan dari pihak kedua (hanya 1 orang yang chat): streak tetap padam (0)
+        newStreak = 0;
+        isNewDay = false;
+      } else if (s.isDead || diffDays > 1 || s.streakCount == 0) {
+        // Jika kedua pihak telah membalas dan sebelumnya belum menyala/padam, nyalakan api hari 1
         newStreak = 1;
         isNewDay = true;
       } else if (diffDays == 1) {
-        // Beda tepat 1 hari kalender: tambah 1
-        newStreak = (s.streakCount > 0 ? s.streakCount : 0) + 1;
+        // Beda tepat 1 hari kalender & ada interaksi 2 arah: tambah 1 hari
+        newStreak = s.streakCount + 1;
         isNewDay = true;
       } else {
-        // diffDays <= 0 (hari yang sama): streak count TIDAK bertambah (1 hari 1 doang!)
+        // Hari yang sama: tetap aktif di angka saat ini (minimal 1)
         newStreak = s.streakCount > 0 ? s.streakCount : 1;
         isNewDay = false;
       }
