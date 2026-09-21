@@ -440,6 +440,12 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> {
     final mediaBadge = _getMediaBadge(material.contentType);
     final assignBadge = _getAssignmentBadge(material.assignmentType);
 
+    // Tombol Edit & Hapus hanya untuk guru pembuat (author) atau admin
+    final currentUser = fb.currentUser;
+    final isAuthor = material.teacherId == currentUser?.id;
+    final isAdmin = currentUser?.isAdmin ?? false;
+    final canManage = isAuthor || isAdmin;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
@@ -543,29 +549,30 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> {
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Edit Materi',
-                      icon: const Icon(Icons.edit_outlined, color: Color(0xFF3B82F6), size: 20),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MaterialFormScreen(
-                            subjectId: material.subjectId,
-                            existingMaterial: material,
+                if (canManage)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Edit Materi',
+                        icon: const Icon(Icons.edit_outlined, color: Color(0xFF3B82F6), size: 20),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MaterialFormScreen(
+                              subjectId: material.subjectId,
+                              existingMaterial: material,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Hapus Materi',
-                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                      onPressed: () => _confirmDeleteMaterial(context, fb, material),
-                    ),
-                  ],
-                ),
+                      IconButton(
+                        tooltip: 'Hapus Materi',
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                        onPressed: () => _confirmDeleteMaterial(context, fb, material),
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 12),

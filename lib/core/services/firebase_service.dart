@@ -1818,6 +1818,15 @@ class FirebaseService extends ChangeNotifier {
   }
 
   Future<void> updateMaterial(MaterialModel material) async {
+    // Pembatas ketat: Guru yang bisa mengedit HANYA guru yang membuat materi tersebut
+    final existing = _materials.where((m) => m.id == material.id).firstOrNull;
+    if (existing != null && _currentUser != null && _currentUser!.isGuru && !_currentUser!.isAdmin) {
+      if (existing.teacherId.isNotEmpty && existing.teacherId != _currentUser!.id) {
+        debugPrint('[Security] Unauthorized updateMaterial attempt by non-author guru');
+        return;
+      }
+    }
+
     final idx = _materials.indexWhere((m) => m.id == material.id);
     if (idx != -1) {
       _materials[idx] = material;
@@ -1831,6 +1840,15 @@ class FirebaseService extends ChangeNotifier {
   }
 
   Future<void> deleteMaterial(String materialId) async {
+    // Pembatas ketat: Guru yang bisa menghapus HANYA guru yang membuat materi tersebut
+    final existing = _materials.where((m) => m.id == materialId).firstOrNull;
+    if (existing != null && _currentUser != null && _currentUser!.isGuru && !_currentUser!.isAdmin) {
+      if (existing.teacherId.isNotEmpty && existing.teacherId != _currentUser!.id) {
+        debugPrint('[Security] Unauthorized deleteMaterial attempt by non-author guru');
+        return;
+      }
+    }
+
     _materials.removeWhere((m) => m.id == materialId);
     final relatedAssignmentIds = _assignments
         .where((a) => a.materialId == materialId)
@@ -4315,39 +4333,16 @@ class FirebaseService extends ChangeNotifier {
   }
 
   /// Get materials specifically taught by this teacher (strictly matching taught subjects & classes)
+  /// Get materials specifically created by this teacher (strictly author-only)
+  /// Guru lain TIDAK BISA melihat walaupun sesama mapel yang diajar!
   List<MaterialModel> getTeacherMaterials([UserModel? teacher]) {
     final user = teacher ?? _currentUser;
-    if (user == null || !user.isGuru) return materials;
+    if (user == null) return [];
+    if (user.isAdmin) return materials; // Admin sekolah tetap bisa melihat semua materi
+    if (!user.isGuru) return materials;
 
-    final taughtSubjects = getTeacherSubjects(user);
-    final taughtClasses = getTeacherClasses(user);
-
-    // If teacher is not plotted to any subject AND not plotted to any class, return empty!
-    if (taughtSubjects.isEmpty && taughtClasses.isEmpty) return <MaterialModel>[];
-
-    final taughtSubjectIds = taughtSubjects.map((s) => s.id.toLowerCase()).toSet();
-    final taughtClassesLower = taughtClasses.map((c) => c.trim().toLowerCase()).toSet();
-
-    return _materials.where((m) {
-      final isAuthor = m.teacherId == user.id;
-      final subjectMatch = taughtSubjectIds.contains(m.subjectId.toLowerCase());
-      if (!subjectMatch && !isAuthor) return false;
-
-      // Author can always see their own materials
-      if (isAuthor) return true;
-
-      // If teacher teaches this subject
-      if (subjectMatch) {
-        if (m.classIds.isEmpty) return true;
-        if (taughtClassesLower.isNotEmpty) {
-          final match = m.classIds.any((cid) => taughtClassesLower.contains(cid.trim().toLowerCase()));
-          if (match) return true;
-          return true;
-        }
-        return true;
-      }
-      return false;
-    }).toList();
+    // Pembatas ketat: Guru yang bisa melihat HANYA guru yang membuat materi tersebut
+    return _materials.where((m) => m.teacherId == user.id).toList();
   }
 
   /// Get question bank filtered for teacher's taught subjects

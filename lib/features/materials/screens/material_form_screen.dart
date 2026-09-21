@@ -271,6 +271,66 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
   @override
   Widget build(BuildContext context) {
     final fb = context.watch<FirebaseService>();
+    final currentUser = fb.currentUser;
+    final isTeacher = currentUser?.isGuru ?? false;
+    final isEdit = widget.existingMaterial != null;
+
+    // Pembatas ketat: Guru yang bisa mengedit HANYA guru yang membuat materi tersebut
+    if (isEdit && isTeacher && !(currentUser?.isAdmin ?? false)) {
+      if (widget.existingMaterial!.teacherId.isNotEmpty &&
+          widget.existingMaterial!.teacherId != currentUser?.id) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          appBar: AppBar(
+            title: const Text('Edit Materi'),
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF1E293B),
+          ),
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.lock_rounded, size: 56, color: Color(0xFFDC2626)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Akses Edit Dibatasi',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Hanya guru yang membuat materi ini yang berhak mengeditnya.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: const Text('Kembali'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     final availableClasses = fb.getTeacherClasses(fb.currentUser);
     final availableSubjects = fb.getTeacherSubjects(fb.currentUser);
 
