@@ -792,48 +792,106 @@ class FirebaseService extends ChangeNotifier {
           );
 
     // Cek GitHub Releases secara langsung (real-time dari repository publik GitHub)
+    // Strategi: Cari rilis dengan SEMVER TERTINGGI secara global (langsung lompat ke versi paling mutakhir)
     try {
       final ghUri = Uri.parse(
-        'https://api.github.com/repos/Azizulakbar89/e-Learning-Final-Bos/releases/latest',
+        'https://api.github.com/repos/Azizulakbar89/e-Learning-Final-Bos/releases?per_page=15',
       );
       final ghRes = await http.get(ghUri, headers: {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'FlutterApp',
-      }).timeout(const Duration(seconds: 4));
+      }).timeout(const Duration(seconds: 8));
 
       if (ghRes.statusCode == 200) {
-        final ghData = jsonDecode(ghRes.body) as Map<String, dynamic>;
-        final rawTag = (ghData['tag_name'] ?? '').toString();
-        final tagClean = rawTag.replaceAll(RegExp(r'[^0-9.]'), '');
-        final releaseBody = (ghData['body'] ?? '').toString();
-        final assets = ghData['assets'] as List<dynamic>? ?? [];
+        final releases = jsonDecode(ghRes.body) as List<dynamic>;
+        String bestTagClean = '';
+        String bestApkUrl = '';
+        String bestNotes = '';
+        DateTime? bestDate;
 
-        String apkDownloadUrl = '';
-        for (final asset in assets) {
-          final assetName = (asset['name'] ?? '').toString().toLowerCase();
-          if (assetName.endsWith('.apk')) {
-            apkDownloadUrl = (asset['browser_download_url'] ?? '').toString();
-            break;
+        for (final item in releases) {
+          if (item is! Map<String, dynamic>) continue;
+          if (item['draft'] == true) continue;
+          final rawTag = (item['tag_name'] ?? '').toString();
+          final tagClean = rawTag.replaceAll(RegExp(r'[^0-9.]'), '');
+          if (tagClean.isEmpty) continue;
+
+          // Cari file APK dalam asset rilis
+          final assets = item['assets'] as List<dynamic>? ?? [];
+          String apkUrl = '';
+          for (final asset in assets) {
+            final assetName = (asset['name'] ?? '').toString().toLowerCase();
+            if (assetName.endsWith('.apk')) {
+              apkUrl = (asset['browser_download_url'] ?? '').toString();
+              break;
+            }
+          }
+          if (apkUrl.isEmpty) continue;
+
+          // Pilih versi yang PALING TINGGI (global maximum)
+          if (bestTagClean.isEmpty || _compareSemver(tagClean, bestTagClean) > 0) {
+            bestTagClean = tagClean;
+            bestApkUrl = apkUrl;
+            bestNotes = (item['body'] ?? '').toString();
+            bestDate = DateTime.tryParse(item['published_at'] ?? '');
           }
         }
 
-        if (tagClean.isNotEmpty && apkDownloadUrl.isNotEmpty) {
-          // Jika versi GitHub lebih tinggi dari atau sama dengan versi server Firestore
-          if (_compareSemver(tagClean, effectiveServer.latestVersion) >= 0) {
+        if (bestTagClean.isNotEmpty && bestApkUrl.isNotEmpty) {
+          if (_compareSemver(bestTagClean, effectiveServer.latestVersion) >= 0) {
             effectiveServer = AppVersionModel(
-              latestVersion: tagClean,
+              latestVersion: bestTagClean,
               versionCode: effectiveServer.versionCode,
               minSupportedVersionCode: effectiveServer.minSupportedVersionCode,
-              apkUrl: apkDownloadUrl,
-              releaseNotes: releaseBody.isNotEmpty ? releaseBody : effectiveServer.releaseNotes,
-              releasedAt: DateTime.tryParse(ghData['published_at'] ?? '') ?? DateTime.now(),
+              apkUrl: bestApkUrl,
+              releaseNotes: bestNotes.isNotEmpty ? bestNotes : effectiveServer.releaseNotes,
+              releasedAt: bestDate ?? DateTime.now(),
               forceUpdate: effectiveServer.forceUpdate,
             );
           }
         }
+      } else {
+        // Fallback jika API rate limit (403) atau non-200: resolve direct 302 redirect
+        await _resolveDirectGithubLatest((latestVer, apkUrl) {
+          if (_compareSemver(latestVer, effectiveServer.latestVersion) >= 0) {
+            effectiveServer = AppVersionModel(
+              latestVersion: latestVer,
+              versionCode: effectiveServer.versionCode,
+              minSupportedVersionCode: effectiveServer.minSupportedVersionCode,
+              apkUrl: apkUrl,
+              releaseNotes: effectiveServer.releaseNotes,
+              releasedAt: DateTime.now(),
+              forceUpdate: effectiveServer.forceUpdate,
+            );
+          }
+        });
       }
     } catch (e) {
-      debugPrint('[UpdateChecker] Note checking GitHub releases: $e');
+      debugPrint('[UpdateChecker] Note checking GitHub releases API: $e. Fallback to direct redirect.');
+      try {
+        await _resolveDirectGithubLatest((latestVer, apkUrl) {
+          if (_compareSemver(latestVer, effectiveServer.latestVersion) >= 0) {
+            effectiveServer = AppVersionModel(
+              latestVersion: latestVer,
+              versionCode: effectiveServer.versionCode,
+              minSupportedVersionCode: effectiveServer.minSupportedVersionCode,
+              apkUrl: apkUrl,
+              releaseNotes: effectiveServer.releaseNotes,
+              releasedAt: DateTime.now(),
+              forceUpdate: effectiveServer.forceUpdate,
+            );
+          }
+        });
+      } catch (err2) {
+        debugPrint('[UpdateChecker] Direct redirect fallback error: $err2');
+      }
+    }
+
+    // Otomatis sinkronisasi dokumen app_version Firestore jika versi ditemukan lebih baru
+    if (server == null || _compareSemver(effectiveServer.latestVersion, server.latestVersion) > 0) {
+      try {
+        db.collection('system_info').doc('app_version').set(effectiveServer.toMap());
+      } catch (_) {}
     }
 
     final semverDiff = _compareSemver(currentVer, effectiveServer.latestVersion);
@@ -868,6 +926,32 @@ class FirebaseService extends ChangeNotifier {
       return 0;
     } catch (_) {
       return v1 == v2 ? 0 : -1;
+    }
+  }
+
+  /// Fallback langsung via HTTP redirect (bebas limit GitHub API)
+  Future<void> _resolveDirectGithubLatest(void Function(String latestVer, String apkUrl) onFound) async {
+    try {
+      final client = http.Client();
+      final req = http.Request(
+        'HEAD',
+        Uri.parse('https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/latest/download/app-release.apk'),
+      )..followRedirects = false;
+      final resp = await client.send(req).timeout(const Duration(seconds: 6));
+      final location = resp.headers['location'] ?? '';
+      if (location.isNotEmpty) {
+        final tagMatch = RegExp(r'/releases/download/(v?[0-9.]+)/').firstMatch(location);
+        if (tagMatch != null) {
+          final rawTag = tagMatch.group(1) ?? '';
+          final tagClean = rawTag.replaceAll(RegExp(r'[^0-9.]'), '');
+          if (tagClean.isNotEmpty) {
+            onFound(tagClean, location);
+          }
+        }
+      }
+      client.close();
+    } catch (e) {
+      debugPrint('[UpdateChecker] Direct redirect check note: $e');
     }
   }
 

@@ -80,6 +80,7 @@ jobs:
             ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
 
             ### ✨ Fitur yang Diperbarui
+            - 🚀 **Update Langsung ke Versi Paling Akhir (1x Download)** — Jika versi aplikasi Anda tertinggal lebih dari satu tingkat, sistem otomatis mengarahkan langsung ke rilis tertinggi/paling akhir tanpa perlu unduh bertahap satu per satu.
             - 💬 **Tampilan Chat Otomatis di Pesan Terakhir** — Saat membuka ruang obrolan, tampilan chat langsung berada di posisi pesan paling bawah/terbaru, sehingga pengguna tidak perlu scroll dari awal ke bawah lagi.
             - 👨‍🏫 **Chat Guru Bebas Tanpa Batasan** — Guru kini dapat memilih dan memulai obrolan/chat dengan siswa siapapun dari seluruh kelas tanpa batasan plotting.
             - 🔒 **Pembatas Ujian Khusus Guru Pembuat** — Hanya guru yang membuat ujian yang dapat melihat, memonitor sesi live, mengedit soal, dan menghapus ujian. Guru lain tidak dapat mengaksesnya meskipun mengajar mata pelajaran yang sama.
@@ -99,6 +100,7 @@ jobs:
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/elearning-spemdalas-${{ steps.version.outputs.version }}.apk
           generate_release_notes: true
+          make_latest: true
           draft: false
           prerelease: false
         env:
