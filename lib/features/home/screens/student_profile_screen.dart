@@ -10,6 +10,7 @@ import '../../../core/services/fcm_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/app_update_dialog.dart';
 import '../../../core/widgets/universal_app_header.dart';
+import '../widgets/badge_share_dialog.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   final VoidCallback? onOpenLeaderboard;
@@ -22,6 +23,32 @@ class StudentProfileScreen extends StatefulWidget {
 
 class _StudentProfileScreenState extends State<StudentProfileScreen> {
   String _badgeFilter = 'all'; // all | earned | locked
+  bool _badgeCheckDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cek badge baru setelah frame pertama selesai render
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkNewBadges());
+  }
+
+  Future<void> _checkNewBadges() async {
+    if (_badgeCheckDone) return;
+    _badgeCheckDone = true;
+    if (!mounted) return;
+    final fb = context.read<FirebaseService>();
+    final currentUser = fb.currentUser;
+    if (currentUser == null || !currentUser.isSiswa) return;
+    // Delay 600ms agar UI profil selesai render dulu sebelum popup muncul
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    final badges = fb.getStudentBadges(currentUser);
+    await BadgeShareDialog.checkAndShowNewBadges(
+      context: context,
+      badges: badges,
+      student: currentUser,
+    );
+  }
 
   void _showEditProfileDialog(BuildContext context, UserModel currentUser, FirebaseService fb) {
     final availableClasses = fb.getAvailableClasses();
