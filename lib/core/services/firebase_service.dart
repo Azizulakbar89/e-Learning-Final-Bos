@@ -1865,6 +1865,37 @@ class FirebaseService extends ChangeNotifier {
       debugPrint('[Firestore] Error submitting assignment: $e');
     }
 
+    // 🔔 Kirim notifikasi ke guru yang mengajar kelas siswa ini
+    try {
+      final asg = _assignments.where((a) => a.id == submission.assignmentId).firstOrNull;
+      if (asg != null) {
+        final submitterStudent = _allStudents.where((s) => s.id == submission.submitterId).firstOrNull ?? _currentUser;
+        final submitterClass = submitterStudent?.className ?? submitterStudent?.classId ?? '';
+        final teacherIds = _allTeachers
+            .where((t) {
+              final tClasses = getTeacherClasses(t);
+              return tClasses.any((c) => c.trim().toLowerCase() == submitterClass.trim().toLowerCase());
+            })
+            .map((t) => t.id)
+            .toList();
+        if (teacherIds.isNotEmpty) {
+          final submitterName = submitterStudent?.fullName ?? 'Siswa';
+          final isGroup = submission.memberStudentIds.isNotEmpty;
+          unawaited(createNotification(
+            title: '📥 Tugas Dikumpulkan',
+            body: isGroup
+                ? '$submitterName (${submission.groupName ?? "Kelompok"}) telah mengumpulkan "${asg.title}"'
+                : '$submitterName telah mengumpulkan "${asg.title}"',
+            type: 'assignment_submit',
+            targetUserIds: teacherIds,
+            referenceId: asg.id,
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] Error sending submit notification: $e');
+    }
+
     // Award gamification points & streak to all group members (or individual)
     final allMembers = {submission.submitterId, ...submission.memberStudentIds};
     for (final memberId in allMembers) {
@@ -1973,6 +2004,28 @@ class FirebaseService extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('[Firestore] Error grading assignment: $e');
+      }
+
+      // 🔔 Kirim notifikasi ke siswa yang tugasnya dinilai
+      try {
+        final asg = _assignments.where((a) => a.id == sub.assignmentId).firstOrNull;
+        final assignmentTitle = asg?.title ?? 'Tugas';
+        final allRecipients = <String>{
+          sub.submitterId,
+          ...sub.memberStudentIds,
+        }.toList();
+        if (allRecipients.isNotEmpty) {
+          final scoreDisplay = score % 1 == 0 ? score.toInt().toString() : score.toStringAsFixed(1);
+          unawaited(createNotification(
+            title: '✅ Tugasmu Sudah Dinilai!',
+            body: 'Guru telah memberikan nilai $scoreDisplay untuk "$assignmentTitle"${feedback != null && feedback.isNotEmpty ? ' — $feedback' : ''}',
+            type: 'assignment_grade',
+            targetUserIds: allRecipients,
+            referenceId: sub.assignmentId,
+          ));
+        }
+      } catch (e) {
+        debugPrint('[FirebaseService] Error sending grade notification: $e');
       }
     }
   }
@@ -3062,6 +3115,57 @@ class FirebaseService extends ChangeNotifier {
       await db.collection('streaks').doc(streak.id).set(streak.toMap());
     } catch (e) {
       debugPrint('[Firestore] Error creating streak: $e');
+    }
+  }
+
+  /// Hapus grup streak beserta semua pesan chat-nya
+  Future<void> deleteStreak(String streakId) async {
+    // Hapus dari lokal state dulu (optimistic)
+    _streaks.removeWhere((s) => s.id == streakId);
+    _chatMessages.removeWhere((m) => m.streakId == streakId);
+    notifyListeners();
+
+    try {
+      // Hapus semua pesan chat grup
+      final msgQuery = await db
+          .collection('chat_messages')
+          .where('streak_id', isEqualTo: streakId)
+          .get();
+      for (final doc in msgQuery.docs) {
+        await doc.reference.delete();
+      }
+      // Hapus dokumen streak
+      await db.collection('streaks').doc(streakId).delete();
+      debugPrint('[Firestore] Streak $streakId and its messages deleted.');
+    } catch (e) {
+      debugPrint('[Firestore] Error deleting streak: $e');
+    }
+  }
+
+  /// Update anggota grup chat (tambah/hapus member)
+  Future<void> updateGroupMembers({
+    required String streakId,
+    required List<String> newParticipantIds,
+    required List<String> newParticipantNames,
+  }) async {
+    final idx = _streaks.indexWhere((s) => s.id == streakId);
+    if (idx == -1) return;
+
+    final updated = _streaks[idx].copyWith(
+      participantIds: newParticipantIds,
+      participantNames: newParticipantNames,
+    );
+    _streaks[idx] = updated;
+    notifyListeners();
+
+    try {
+      await db.collection('streaks').doc(streakId).update({
+        'participant_ids': newParticipantIds,
+        'participant_names': newParticipantNames,
+      });
+      debugPrint('[Firestore] Group members updated for streak $streakId');
+    } catch (e) {
+      debugPrint('[Firestore] Error updating group members: $e');
     }
   }
 

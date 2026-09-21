@@ -9,6 +9,7 @@ import '../../../core/services/content_filter_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/curved_header_card.dart';
+import '../widgets/streak_milestone_dialog.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final StreakModel streak;
@@ -88,6 +89,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'Pesan terkirim. Beberapa kata tidak pantas telah disensor otomatis. 🚫',
       );
     }
+
+    // Cek milestone streak setiap kelipatan 10 (post-frame agar streak ter-update dulu)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final updatedStreak = fb.streaks.firstWhere(
+        (s) => s.id == widget.streak.id,
+        orElse: () => widget.streak,
+      );
+      final currentUser = fb.currentUser;
+      if (currentUser != null && currentUser.isSiswa) {
+        StreakMilestoneDialog.showIfMilestone(
+          context: context,
+          streakCount: updatedStreak.streakCount,
+          userName: currentUser.fullName,
+          userClass: currentUser.className ?? currentUser.classId ?? '',
+        );
+      }
+    });
   }
 
   void _startReply(ChatMessageModel msg) {
@@ -211,6 +230,212 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  /// Tampilkan bottom sheet pengaturan grup (edit anggota + hapus grup)
+  void _showGroupSettings(BuildContext context, FirebaseService fb, StreakModel streak) {
+    final allStudents = fb.allStudents;
+    final allTeachers = fb.allTeachers;
+    final currentUser = fb.currentUser;
+
+    // Set anggota saat ini (exclude creator / current user)
+    final Set<String> selectedIds = Set<String>.from(streak.participantIds);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.group_rounded, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pengaturan Grup',
+                      style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pilih anggota grup:',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              // Scrollable member list
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ...allStudents
+                          .where((s) => s.id != currentUser?.id)
+                          .map((s) {
+                        final isSelected = selectedIds.contains(s.id);
+                        return FilterChip(
+                          label: Text(s.fullName, style: const TextStyle(fontSize: 11.5)),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary.withAlpha(25),
+                          checkmarkColor: AppColors.primary,
+                          avatar: isSelected
+                              ? null
+                              : CircleAvatar(
+                                  backgroundColor: Colors.grey.shade200,
+                                  child: Text(s.fullName[0], style: const TextStyle(fontSize: 10)),
+                                ),
+                          onSelected: (val) => setSheet(() {
+                            if (val) {
+                              selectedIds.add(s.id);
+                            } else {
+                              selectedIds.remove(s.id);
+                            }
+                          }),
+                        );
+                      }),
+                      ...allTeachers
+                          .where((t) => t.id != currentUser?.id)
+                          .map((t) {
+                        final isSelected = selectedIds.contains(t.id);
+                        return FilterChip(
+                          label: Text('👨‍🏫 ${t.fullName}', style: const TextStyle(fontSize: 11.5)),
+                          selected: isSelected,
+                          selectedColor: Colors.purple.withAlpha(25),
+                          checkmarkColor: Colors.purple,
+                          onSelected: (val) => setSheet(() {
+                            if (val) {
+                              selectedIds.add(t.id);
+                            } else {
+                              selectedIds.remove(t.id);
+                            }
+                          }),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Simpan anggota
+              FilledButton.icon(
+                onPressed: () async {
+                  // Selalu sertakan diri sendiri
+                  if (currentUser != null) selectedIds.add(currentUser.id);
+                  final allCandidates = [...allStudents, ...allTeachers];
+                  final newIds = selectedIds.toList();
+                  final newNames = newIds.map((id) {
+                    if (id == currentUser?.id) return currentUser!.fullName;
+                    return allCandidates
+                        .firstWhere((c) => c.id == id,
+                            orElse: () => allCandidates.first)
+                        .fullName;
+                  }).toList();
+                  await fb.updateGroupMembers(
+                    streakId: streak.id,
+                    newParticipantIds: newIds,
+                    newParticipantNames: newNames,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) AppSnackBar.success(context, 'Anggota grup berhasil diperbarui! ✅');
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('Simpan Perubahan'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Hapus grup
+              OutlinedButton.icon(
+                onPressed: () => _deleteGroup(ctx, fb, streak.id),
+                icon: const Icon(Icons.delete_forever_rounded, color: AppColors.rose),
+                label: const Text('Hapus Grup', style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.rose),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _deleteGroup(BuildContext sheetCtx, FirebaseService fb, String streakId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.rose),
+            const SizedBox(width: 8),
+            Text('Hapus Grup?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Grup dan semua pesan di dalamnya akan dihapus secara permanen. Tindakan ini tidak bisa dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.rose),
+            onPressed: () async {
+              Navigator.pop(ctx); // tutup dialog konfirmasi
+              if (sheetCtx.mounted) Navigator.pop(sheetCtx); // tutup bottom sheet
+              await fb.deleteStreak(streakId);
+              if (!mounted) return;
+              Navigator.pop(context); // kembali ke chat list
+              AppSnackBar.success(context, 'Grup berhasil dihapus.');
+            },
+            child: const Text('Hapus Permanen'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final fb = context.watch<FirebaseService>();
@@ -306,6 +531,28 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               title: liveStreak.title,
               subtitle: liveStreak.type.label,
               actions: [
+                // Tombol pengaturan grup (hanya untuk tipe group)
+                if (liveStreak.type == StreakType.group)
+                  GestureDetector(
+                    onTap: () => _showGroupSettings(context, fb, liveStreak),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(30),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withAlpha(60)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.settings_rounded, size: 14, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text('Kelola', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 6),
                 GestureDetector(
                   onTap: isDead ? () => _restoreStreak(fb, liveStreak.id) : null,
                   child: Container(
@@ -462,22 +709,22 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           onLongPress: () => _showMessageOptions(context, msg, isMe),
                           onDoubleTap: () => _startReply(msg),
                           child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                            margin: const EdgeInsets.symmetric(vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.80),
                             decoration: BoxDecoration(
                               color: isMe ? const Color(0xFF3B82F6) : Colors.white,
                               borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(16),
-                                topRight: const Radius.circular(16),
-                                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                bottomRight: Radius.circular(isMe ? 4 : 16),
+                                topLeft: const Radius.circular(18),
+                                topRight: const Radius.circular(18),
+                                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 18),
                               ),
                               border: isMe ? null : Border.all(color: const Color(0xFFE2E8F0)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withAlpha(isMe ? 25 : 10),
-                                  blurRadius: 6,
+                                  color: Colors.black.withAlpha(isMe ? 20 : 8),
+                                  blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -485,27 +732,28 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Sender name if other person
+                                // Sender name (hanya untuk pesan orang lain)
                                 if (!isMe) ...[
                                   Text(
                                     msg.senderName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11.5,
-                                      color: Color(0xFF047857),
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: const Color(0xFF059669),
+                                      letterSpacing: 0.1,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                 ],
 
                                 // WhatsApp-style Quoted Reply Preview Box
                                 if (msg.hasReply)
                                   Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: isMe ? Colors.blue.shade800.withAlpha(120) : Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(10),
                                       border: Border(
                                         left: BorderSide(
                                           color: isMe ? Colors.white : const Color(0xFF0284C7),
@@ -518,19 +766,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                       children: [
                                         Text(
                                           msg.replyToSenderName ?? 'Pesan',
-                                          style: TextStyle(
+                                          style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 10.5,
+                                            fontSize: 11,
                                             color: isMe ? Colors.white : const Color(0xFF0284C7),
                                           ),
                                         ),
-                                        const SizedBox(height: 1),
+                                        const SizedBox(height: 2),
                                         Text(
                                           msg.replyToText ?? '',
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 11.5,
+                                            height: 1.4,
                                             color: isMe ? Colors.white70 : Colors.black87,
                                           ),
                                         ),
@@ -541,34 +790,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                 // Main Message Text
                                 Text(
                                   msg.message,
-                                  style: TextStyle(
+                                  style: GoogleFonts.outfit(
                                     color: isMe ? Colors.white : const Color(0xFF1E293B),
-                                    fontSize: 14,
-                                    height: 1.35,
+                                    fontSize: 14.5,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w400,
                                   ),
                                 ),
 
-                                const SizedBox(height: 3),
+                                const SizedBox(height: 4),
 
-                                // Time and "(diedit)" indicator (WhatsApp style)
+                                // Timestamp + edited indicator — pojok kanan bawah ala WhatsApp
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    if (msg.isEdited) ...[
+                                    const Spacer(),
+                                    if (msg.isEdited)
                                       Text(
-                                        '(diedit) ',
-                                        style: TextStyle(
+                                        'diedit · ',
+                                        style: GoogleFonts.outfit(
                                           fontStyle: FontStyle.italic,
                                           fontSize: 10,
-                                          color: isMe ? Colors.white70 : Colors.grey.shade600,
+                                          color: isMe ? Colors.white60 : Colors.grey.shade500,
                                         ),
                                       ),
-                                    ],
                                     Text(
                                       timeStr,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: isMe ? Colors.white70 : Colors.grey.shade500,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10.5,
+                                        color: isMe ? Colors.white60 : Colors.grey.shade500,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ],

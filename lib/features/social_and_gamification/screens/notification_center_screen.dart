@@ -59,6 +59,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         );
         return;
       }
+    } else if ((notif.type == 'assignment_submit' || notif.type == 'assignment_grade') &&
+        notif.referenceId != null) {
+      // Navigate ke layar daftar tugas (siswa/guru)
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentExamsScreen()),
+      );
+      return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -255,6 +263,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       if (_filter == 'material') return n.type == 'material';
       if (_filter == 'exam') return n.type == 'exam';
       if (_filter == 'chat') return n.type == 'chat';
+      if (_filter == 'assignment') return n.type == 'assignment_submit' || n.type == 'assignment_grade';
       return true;
     }).toList();
 
@@ -331,6 +340,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     '💬 Chat (${allNotifs.where((n) => n.type == "chat").length})',
                     'chat',
                   ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    '📋 Tugas (${allNotifs.where((n) => n.type == "assignment_submit" || n.type == "assignment_grade").length})',
+                    'assignment',
+                  ),
                 ],
               ),
             ),
@@ -379,6 +393,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                       final isUnread = user != null && !notif.readByUserIds.contains(user.id);
                       final isExam = notif.type == 'exam';
                       final isChat = notif.type == 'chat';
+                      final isAssignmentSubmit = notif.type == 'assignment_submit';
+                      final isAssignmentGrade = notif.type == 'assignment_grade';
 
                       return InkWell(
                         borderRadius: BorderRadius.circular(16),
@@ -395,7 +411,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       ? const Color(0xFFFED7AA)
                                       : isChat
                                           ? const Color(0xFFA7F3D0)
-                                          : const Color(0xFFBAE6FD))
+                                          : isAssignmentSubmit
+                                              ? const Color(0xFFFDE68A)
+                                              : isAssignmentGrade
+                                                  ? const Color(0xFFBBF7D0)
+                                                  : const Color(0xFFBAE6FD))
                                   : const Color(0xFFE2E8F0),
                               width: isUnread ? 1.5 : 1.0,
                             ),
@@ -406,7 +426,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           ? const Color(0xFFEA580C)
                                           : isChat
                                               ? const Color(0xFF10B981)
-                                              : const Color(0xFF0284C7))
+                                              : isAssignmentSubmit || isAssignmentGrade
+                                                  ? const Color(0xFFF59E0B)
+                                                  : const Color(0xFF0284C7))
                                       .withAlpha(20),
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
@@ -425,7 +447,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       ? const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)])
                                       : isChat
                                           ? const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)])
-                                          : const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF0D2B6E)]),
+                                          : isAssignmentSubmit
+                                              ? const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)])
+                                              : isAssignmentGrade
+                                                  ? const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)])
+                                                  : const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF0D2B6E)]),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -433,7 +459,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       ? Icons.quiz_rounded
                                       : isChat
                                           ? Icons.chat_bubble_rounded
-                                          : Icons.menu_book_rounded,
+                                          : isAssignmentSubmit
+                                              ? Icons.upload_file_rounded
+                                              : isAssignmentGrade
+                                                  ? Icons.grade_rounded
+                                                  : Icons.menu_book_rounded,
                                   color: Colors.white,
                                   size: 22,
                                 ),

@@ -425,8 +425,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          ...allStudents.take(8).map((s) => s),
-                          ...teachers.take(3).map((t) => t),
+                          ...allStudents.where((s) => s.id != currentUser?.id).take(8).map((s) => s),
+                          ...teachers.where((t) => t.id != currentUser?.id).take(3).map((t) => t),
                         ].map((person) {
                           final isChecked = groupMemberIds.contains(person.id);
                           return FilterChip(
