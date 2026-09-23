@@ -272,8 +272,145 @@ class SidikmuService {
     return {};
   }
 
+  /// Helper JavaScript untuk mendeteksi elemen form SidikMu & tabel nilai siswa
+  static const String _kSidikmuHelpersJs = r'''
+    function findSelectByKeyword(keywords, fallbackIndex) {
+      var selects = Array.from(document.querySelectorAll('select'));
+      if (selects.length === 0) return null;
+
+      for (var i = 0; i < selects.length; i++) {
+        var s = selects[i];
+        if (s.id) {
+          var lbl = document.querySelector('label[for="' + s.id + '"]');
+          if (lbl) {
+            var txt = (lbl.innerText || '').toLowerCase();
+            if (keywords.some(function(k) { return txt.includes(k); })) return s;
+          }
+        }
+        var parent = s.closest('.form-group, .col, .col-md-6, .col-sm-6, .mb-3, div, tr');
+        if (parent) {
+          var lbl = parent.querySelector('label, th');
+          if (lbl) {
+            var txt = (lbl.innerText || '').toLowerCase();
+            if (keywords.some(function(k) { return txt.includes(k); })) return s;
+          }
+        }
+        var nameId = ((s.getAttribute('name') || '') + ' ' + (s.getAttribute('id') || '')).toLowerCase();
+        if (keywords.some(function(k) { return nameId.includes(k); })) return s;
+      }
+
+      if (fallbackIndex !== undefined && fallbackIndex < selects.length) {
+        return selects[fallbackIndex];
+      }
+      return null;
+    }
+
+    // Aturan pengguna: "untuk kelas, CP, TP itu buat jika ada kesamaan, mengandung yang ada di aplikasi e-learning saja!!!"
+    function matchOptionContains(selectEl, targetText) {
+      if (!selectEl || !selectEl.options || selectEl.options.length <= 1) return null;
+      var target = (targetText || '').toLowerCase().trim();
+      if (!target) return selectEl.options.length > 1 ? selectEl.options[1] : null;
+
+      var opts = Array.from(selectEl.options);
+
+      // 1. Prioritas utama: Opsi SidikMu yang mengandung teks e-Learning persis (case-insensitive)
+      // Contoh: "VIII HELIUM" mengandung "HELIUM"
+      // Contoh: "CP 1 - ..." mengandung "CP 1"
+      // Contoh: "1.1 - menerapkan..." mengandung "1.1"
+      var opt = opts.find(function(o) {
+        var t = (o.text || '').toLowerCase().trim();
+        if (!t || t.startsWith('--') || t.includes('pilih')) return false;
+        return t.includes(target);
+      });
+      if (opt) return opt;
+
+      // 2. Token match: jika target memiliki token (misal target "CP 1" -> cari token "cp" dan "1")
+      var cleanTarget = target.replace(/[^a-z0-9.]/gi, ' ').trim();
+      var tokens = cleanTarget.split(/\s+/).filter(function(x) { return x.length >= 1; });
+      if (tokens.length > 0) {
+        opt = opts.find(function(o) {
+          var t = (o.text || '').toLowerCase().trim();
+          if (!t || t.startsWith('--') || t.includes('pilih')) return false;
+          return tokens.every(function(tok) { return t.includes(tok); });
+        });
+        if (opt) return opt;
+
+        // Cek jika ada token angka/kode utama (misal "1.1" atau "1")
+        var firstTok = tokens[0];
+        opt = opts.find(function(o) {
+          var t = (o.text || '').toLowerCase().trim();
+          if (!t || t.startsWith('--') || t.includes('pilih')) return false;
+          return t.includes(firstTok);
+        });
+        if (opt) return opt;
+      }
+
+      // 3. Fallback jika tidak ditemukan: ambil opsi pertama yang valid (bukan placeholder)
+      for (var i = 1; i < opts.length; i++) {
+        var t = (opts[i].text || '').toLowerCase().trim();
+        if (opts[i].value && !t.startsWith('--') && !t.includes('pilih')) {
+          return opts[i];
+        }
+      }
+      return opts.length > 1 ? opts[1] : null;
+    }
+
+    function selectAndTriggerChange(selectEl, opt) {
+      if (!selectEl || !opt) return false;
+      selectEl.value = opt.value;
+      selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      selectEl.dispatchEvent(new Event('blur', { bubbles: true }));
+
+      var $ = window.jQuery || window.$;
+      if ($) {
+        try {
+          $(selectEl).val(opt.value).trigger('input').trigger('change').trigger('change.select2');
+        } catch(e) {}
+      }
+      return true;
+    }
+
+    function findAndClickSubmitButton() {
+      var allButtons = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, .btn'));
+      var targetKeywords = ['proses selanjutnya', 'proses', 'tampilkan', 'filter', 'cari', 'lihat', 'lanjutkan', 'submit'];
+
+      var btn = null;
+      for (var k = 0; k < targetKeywords.length; k++) {
+        var kw = targetKeywords[k];
+        btn = allButtons.find(function(b) {
+          var txt = (b.innerText || b.value || '').toLowerCase().trim();
+          return txt === kw || txt.includes(kw);
+        });
+        if (btn) break;
+      }
+
+      if (!btn) {
+        var formOrCard = document.querySelector('form, .card-body, .card, .box-body, .box');
+        if (formOrCard) {
+          btn = formOrCard.querySelector('button[type="submit"], input[type="submit"], button.btn-primary, button.btn-info, button.btn-success, .btn-primary, .btn-info');
+        }
+      }
+
+      if (btn) {
+        btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+        btn.focus();
+        btn.click();
+        var $ = window.jQuery || window.$;
+        if ($) {
+          try { $(btn).trigger('click'); } catch(e) {}
+        }
+        var form = btn.closest('form');
+        if (form) {
+          try { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); } catch(e) {}
+        }
+        return { success: true, text: btn.innerText || btn.value || 'button' };
+      }
+      return { success: false };
+    }
+  ''';
+
   /// Helper JavaScript untuk mendeteksi tabel nilai siswa yang sebenarnya
-  /// (Membedakan secara pasti antara tabel formulir filter 4 baris vs tabel nilai 29 siswa)
   static const String _kFindStudentGradeTableJs = r'''
     function findStudentGradeTable() {
       var tables = Array.from(document.querySelectorAll('table'));
@@ -282,22 +419,15 @@ class SidikmuService {
         // Abaikan tabel formulir filter yang memiliki dropdown select
         if (tbl.querySelectorAll('select').length >= 2) continue;
 
-        var text = (tbl.innerText || '').toLowerCase();
-        var hasNis = text.includes('nis');
-        var hasNama = text.includes('nama');
-        var hasNilai = text.includes('nilai');
-
         var rows = Array.from(tbl.querySelectorAll('tbody tr, tr')).filter(function(r) {
           if (r.querySelector('th')) return false;
           var cells = r.querySelectorAll('td');
-          if (cells.length < 3) return false;
+          if (cells.length < 2) return false;
           var inps = r.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="radio"])');
-          if (inps.length === 0) return false;
-          var rowStr = (r.innerText || '').replace(/\s+/g, ' ');
-          return /\d{3,}/.test(rowStr);
+          return inps.length > 0;
         });
 
-        if (rows.length >= 5 || ((hasNis || hasNama) && hasNilai && rows.length >= 1)) {
+        if (rows.length >= 1) {
           return { table: tbl, rows: rows, count: rows.length };
         }
       }
@@ -540,38 +670,28 @@ class SidikmuService {
       if (!isTableDirectlyReady) {
         // 3.1: Pilih Tahun Ajaran
         emit(0.33, 'Memilih Tahun Ajaran ($academicYear)...', 3, totalSteps);
-        await controller.runJavaScriptReturningResult('''
+        final yearRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var selects = Array.from(document.querySelectorAll('select'));
-            var selYear = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('tahun') || Array.from(s.options).some(function(o) { return (o.text || '').includes('202'); });
-            }) || selects[0];
+            $_kSidikmuHelpersJs
+            var selYear = findSelectByKeyword(['tahun', 'thn', 'ajaran'], 0);
             if (selYear) {
-              var target = ${jsonEncode(academicYear)};
-              var opt = Array.from(selYear.options).find(function(o) { return (o.text || '').includes(target); }) || (selYear.options.length > 1 ? selYear.options[1] : null);
-              if (opt && opt.value) {
-                selYear.value = opt.value;
-                selYear.dispatchEvent(new Event('input', { bubbles: true }));
-                selYear.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) window.jQuery(selYear).val(opt.value).trigger('input').trigger('change');
-                return JSON.stringify({ success: true, val: opt.value });
+              var opt = matchOptionContains(selYear, ${jsonEncode(academicYear)});
+              if (opt && selectAndTriggerChange(selYear, opt)) {
+                return JSON.stringify({ success: true, val: opt.value, text: opt.text });
               }
             }
             return JSON.stringify({ success: false });
           })();
         ''');
+        debugPrint('[Sidikmu] Select Tahun Ajaran result: $yearRes');
 
         // Polling tunggu sampai dropdown Semester aktif / memiliki opsi > 1
         int semWaitMs = 0;
         while (semWaitMs < 10000) {
           final checkSemRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selSem = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('semester');
-              }) || (selects.length > 1 ? selects[1] : null);
+              $_kSidikmuHelpersJs
+              var selSem = findSelectByKeyword(['semester', 'smt'], 1);
               if (!selSem) return JSON.stringify({ ready: false });
               var optText = Array.from(selSem.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
               var isReady = selSem.options.length > 1 && !optText.includes('pilih tahun dulu');
@@ -586,38 +706,28 @@ class SidikmuService {
 
         // 3.2: Pilih Semester
         emit(0.36, 'Memilih Semester ($semester)...', 3, totalSteps);
-        await controller.runJavaScriptReturningResult('''
+        final semRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var selects = Array.from(document.querySelectorAll('select'));
-            var selSem = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('semester');
-            }) || (selects.length > 1 ? selects[1] : null);
+            $_kSidikmuHelpersJs
+            var selSem = findSelectByKeyword(['semester', 'smt'], 1);
             if (selSem) {
-              var target = ${jsonEncode(semester.toLowerCase())};
-              var opt = Array.from(selSem.options).find(function(o) { return (o.text || '').toLowerCase().includes(target); }) || (selSem.options.length > 1 ? selSem.options[1] : null);
-              if (opt && opt.value) {
-                selSem.value = opt.value;
-                selSem.dispatchEvent(new Event('input', { bubbles: true }));
-                selSem.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) window.jQuery(selSem).val(opt.value).trigger('input').trigger('change');
-                return JSON.stringify({ success: true, val: opt.value });
+              var opt = matchOptionContains(selSem, ${jsonEncode(semester)});
+              if (opt && selectAndTriggerChange(selSem, opt)) {
+                return JSON.stringify({ success: true, val: opt.value, text: opt.text });
               }
             }
             return JSON.stringify({ success: false });
           })();
         ''');
+        debugPrint('[Sidikmu] Select Semester result: $semRes');
 
         // Polling tunggu sampai dropdown Kelas aktif / memiliki opsi > 1
         int kelasWaitMs = 0;
         while (kelasWaitMs < 10000) {
           final checkKelasRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selKelas = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('kelas');
-              }) || (selects.length > 2 ? selects[2] : null);
+              $_kSidikmuHelpersJs
+              var selKelas = findSelectByKeyword(['kelas', 'rombel', 'kls'], 2);
               if (!selKelas) return JSON.stringify({ ready: false });
               var optText = Array.from(selKelas.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
               var isReady = selKelas.options.length > 1 && !optText.includes('pilih semester dulu');
@@ -630,44 +740,30 @@ class SidikmuService {
           kelasWaitMs += 300;
         }
 
-        // 3.3: Pilih Kelas
+        // 3.3: Pilih Kelas (Mencocokkan opsi SidikMu yang MENGANDUNG nama kelas di e-Learning, misal 'HELIUM' -> 'VIII HELIUM')
         emit(0.40, 'Memilih Kelas ($targetClassName)...', 3, totalSteps);
-        await controller.runJavaScriptReturningResult('''
+        final kelasRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var selects = Array.from(document.querySelectorAll('select'));
-            var selKelas = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('kelas');
-            }) || (selects.length > 2 ? selects[2] : null);
+            $_kSidikmuHelpersJs
+            var selKelas = findSelectByKeyword(['kelas', 'rombel', 'kls'], 2);
             if (selKelas) {
-              var target = ${jsonEncode(targetClassName.toLowerCase().trim())};
-              var tokens = target.split(/\\s+/).filter(function(t) { return t.length >= 3; });
-              var opt = Array.from(selKelas.options).find(function(o) {
-                var t = (o.text || '').toLowerCase();
-                return t.includes(target) || (tokens.length > 0 && tokens.some(function(tok) { return t.includes(tok); }));
-              }) || (selKelas.options.length > 1 ? selKelas.options[1] : null);
-              if (opt && opt.value) {
-                selKelas.value = opt.value;
-                selKelas.dispatchEvent(new Event('input', { bubbles: true }));
-                selKelas.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) window.jQuery(selKelas).val(opt.value).trigger('input').trigger('change');
+              var opt = matchOptionContains(selKelas, ${jsonEncode(targetClassName)});
+              if (opt && selectAndTriggerChange(selKelas, opt)) {
                 return JSON.stringify({ success: true, val: opt.value, text: opt.text });
               }
             }
             return JSON.stringify({ success: false });
           })();
         ''');
+        debugPrint('[Sidikmu] Select Kelas result: $kelasRes');
 
         // Polling tunggu sampai dropdown Mapel aktif / memiliki opsi > 1
         int mapelWaitMs = 0;
         while (mapelWaitMs < 10000) {
           final checkMapelRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selMapel = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('mapel') || label.includes('pelajaran');
-              }) || (selects.length > 3 ? selects[3] : null);
+              $_kSidikmuHelpersJs
+              var selMapel = findSelectByKeyword(['mapel', 'pelajaran'], 3);
               if (!selMapel) return JSON.stringify({ ready: false });
               var optText = Array.from(selMapel.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
               var isReady = selMapel.options.length > 1 && !optText.includes('pilih kelas dulu');
@@ -680,44 +776,31 @@ class SidikmuService {
           mapelWaitMs += 300;
         }
 
-        // 3.4: Pilih Mapel
+        // 3.4: Pilih Mapel (Mencocokkan opsi SidikMu yang MENGANDUNG nama mapel di e-Learning)
         emit(0.44, 'Memilih Mapel ($targetSubjectName)...', 3, totalSteps);
-        await controller.runJavaScriptReturningResult('''
+        final mapelRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var selects = Array.from(document.querySelectorAll('select'));
-            var selMapel = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('mapel') || label.includes('pelajaran');
-            }) || (selects.length > 3 ? selects[3] : null);
+            $_kSidikmuHelpersJs
+            var selMapel = findSelectByKeyword(['mapel', 'pelajaran'], 3);
             if (selMapel) {
-              var target = ${jsonEncode(targetSubjectName.toLowerCase().trim())};
-              var opt = Array.from(selMapel.options).find(function(o) {
-                var t = (o.text || '').toLowerCase();
-                return t.includes(target) || target.includes(t);
-              }) || (selMapel.options.length > 1 ? selMapel.options[1] : null);
-              if (opt && opt.value) {
-                selMapel.value = opt.value;
-                selMapel.dispatchEvent(new Event('input', { bubbles: true }));
-                selMapel.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) window.jQuery(selMapel).val(opt.value).trigger('input').trigger('change');
+              var opt = matchOptionContains(selMapel, ${jsonEncode(targetSubjectName)});
+              if (opt && selectAndTriggerChange(selMapel, opt)) {
                 return JSON.stringify({ success: true, val: opt.value, text: opt.text });
               }
             }
             return JSON.stringify({ success: false });
           })();
         ''');
+        debugPrint('[Sidikmu] Select Mapel result: $mapelRes');
 
-        // 3.5: Pilih CP (Capaian Pembelajaran)
+        // 3.5: Pilih CP (Mencocokkan opsi SidikMu yang MENGANDUNG kode CP di e-Learning, misal 'CP 1' -> 'CP 1 - ...')
         emit(0.48, 'Memuat & memilih Kode CP dari SidikMu...', 3, totalSteps);
         int cpWaitMs = 0;
         while (cpWaitMs < 10000) {
           final cpCheck = await controller.runJavaScriptReturningResult('''
             (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selCp = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('cp') || label.includes('capaian');
-              }) || (selects.length > 4 ? selects[4] : null);
+              $_kSidikmuHelpersJs
+              var selCp = findSelectByKeyword(['kode cp', 'cp', 'capaian'], 4);
               if (!selCp) return JSON.stringify({ ready: false, count: 0 });
               var optText = Array.from(selCp.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
               var isReady = selCp.options.length > 1 && !optText.includes('pilih mapel dulu');
@@ -730,51 +813,31 @@ class SidikmuService {
           cpWaitMs += 300;
         }
 
-        await controller.runJavaScriptReturningResult('''
+        final cpTarget = (targetCpCode != null && targetCpCode.trim().isNotEmpty) ? targetCpCode.trim() : 'CP 1';
+        final cpRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var selects = Array.from(document.querySelectorAll('select'));
-            var selCp = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('cp') || label.includes('capaian');
-            }) || (selects.length > 4 ? selects[4] : null);
-            if (selCp && selCp.options.length > 1) {
-              var target = ${jsonEncode((targetCpCode ?? '').toLowerCase().trim())};
-              var numMatch = target.match(/\\d+(\\.\\d+)?/);
-              var num = numMatch ? numMatch[0] : '';
-              var opt = null;
-              if (target) {
-                opt = Array.from(selCp.options).find(function(o) {
-                  var t = (o.text || '').toLowerCase().trim();
-                  if (t === target || t.includes(target) || target.includes(t)) return true;
-                  if (num && (t.startsWith('cp ' + num) || t.startsWith('cp' + num) || t.startsWith(num + ' ') || t.startsWith(num + '-') || t.startsWith(num + '.'))) return true;
-                  return false;
-                });
-              }
-              if (!opt) opt = selCp.options[1];
-              if (opt && opt.value) {
-                selCp.value = opt.value;
-                selCp.dispatchEvent(new Event('input', { bubbles: true }));
-                selCp.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) window.jQuery(selCp).val(opt.value).trigger('input').trigger('change');
+            $_kSidikmuHelpersJs
+            var selCp = findSelectByKeyword(['kode cp', 'cp', 'capaian'], 4);
+            if (selCp) {
+              var opt = matchOptionContains(selCp, ${jsonEncode(cpTarget)});
+              if (opt && selectAndTriggerChange(selCp, opt)) {
                 return JSON.stringify({ success: true, val: opt.value, text: opt.text });
               }
             }
             return JSON.stringify({ success: false });
           })();
         ''');
+        debugPrint('[Sidikmu] Select CP result: $cpRes');
 
-        // 3.6: Pilih TP (Tujuan Pembelajaran) jika Formatif
+        // 3.6: Pilih TP jika Formatif (Mencocokkan opsi SidikMu yang MENGANDUNG kode TP di e-Learning, misal '1.1' -> '1.1 - ...')
         if (isFormatif) {
           emit(0.52, 'Memuat & memilih Kode TP dari SidikMu...', 3, totalSteps);
           int tpWaitMs = 0;
           while (tpWaitMs < 10000) {
             final tpCheck = await controller.runJavaScriptReturningResult('''
               (function() {
-                var selects = Array.from(document.querySelectorAll('select'));
-                var selTp = selects.find(function(s) {
-                  var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                  return label.includes('tp') || label.includes('tujuan');
-                }) || (selects.length > 5 ? selects[5] : null);
+                $_kSidikmuHelpersJs
+                var selTp = findSelectByKeyword(['kode tp', 'tp', 'tujuan'], 5);
                 if (!selTp) return JSON.stringify({ ready: false, count: 0 });
                 var optText = Array.from(selTp.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
                 var isReady = selTp.options.length > 1 && !optText.includes('pilih cp dulu');
@@ -787,38 +850,21 @@ class SidikmuService {
             tpWaitMs += 300;
           }
 
-          await controller.runJavaScriptReturningResult('''
+          final tpTarget = (targetTpCode != null && targetTpCode.trim().isNotEmpty) ? targetTpCode.trim() : '1.1';
+          final tpRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selTp = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('tp') || label.includes('tujuan');
-              }) || (selects.length > 5 ? selects[5] : null);
-              if (selTp && selTp.options.length > 1) {
-                var target = ${jsonEncode((targetTpCode ?? '').toLowerCase().trim())};
-                var numMatch = target.match(/\\d+(\\.\\d+)?/);
-                var num = numMatch ? numMatch[0] : '';
-                var opt = null;
-                if (target) {
-                  opt = Array.from(selTp.options).find(function(o) {
-                    var t = (o.text || '').toLowerCase().trim();
-                    if (t === target || t.includes(target) || target.includes(t)) return true;
-                    if (num && (t.startsWith('tp ' + num) || t.startsWith('tp' + num) || t.startsWith(num + ' ') || t.startsWith(num + '-') || t.startsWith(num + '.'))) return true;
-                    return false;
-                  });
-                }
-                if (!opt) opt = selTp.options[1];
-                if (opt && opt.value) {
-                  selTp.value = opt.value;
-                  selTp.dispatchEvent(new Event('input', { bubbles: true }));
-                  selTp.dispatchEvent(new Event('change', { bubbles: true }));
-                  if (window.jQuery) window.jQuery(selTp).val(opt.value).trigger('input').trigger('change');
+              $_kSidikmuHelpersJs
+              var selTp = findSelectByKeyword(['kode tp', 'tp', 'tujuan'], 5);
+              if (selTp) {
+                var opt = matchOptionContains(selTp, ${jsonEncode(tpTarget)});
+                if (opt && selectAndTriggerChange(selTp, opt)) {
                   return JSON.stringify({ success: true, val: opt.value, text: opt.text });
                 }
               }
               return JSON.stringify({ success: false });
             })();
           ''');
+          debugPrint('[Sidikmu] Select TP result: $tpRes');
         }
 
         // Set tanggal dan field tambahan jika ada
@@ -847,8 +893,8 @@ class SidikmuService {
         ''');
         await Future.delayed(const Duration(milliseconds: 500));
 
-        // ──────── STEP 4: PROSES SELANJUTNYA ────────
-        emit(0.55, 'Membuka tabel nilai siswa (Proses Selanjutnya)...', 4, totalSteps);
+        // ──────── STEP 4: PROSES / SUBMIT FORMULIR ────────
+        emit(0.55, 'Membuka tabel nilai siswa (Memproses Formulir)...', 4, totalSteps);
         final nextBtnJs = '''
           (function() {
             $_kFindStudentGradeTableJs
@@ -857,36 +903,13 @@ class SidikmuService {
               return JSON.stringify({ success: true, tableAlreadyVisible: true });
             }
 
-            // 1. Cari tombol dengan teks 'Proses Selanjutnya'
-            var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
-            var nextBtn = btns.find(function(b) {
-              var txt = (b.innerText || b.value || '').toLowerCase().trim();
-              return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
-            });
-
-            if (!nextBtn) {
-              var filterForm = Array.from(document.querySelectorAll('form')).find(function(f) {
-                return f.querySelectorAll('select').length >= 2;
-              });
-              if (filterForm) {
-                nextBtn = filterForm.querySelector('button[type="submit"], input[type="submit"], button.btn-info, button.btn-primary, button');
-              }
-            }
-
-            if (nextBtn) {
-              nextBtn.scrollIntoView();
-              nextBtn.focus();
-              nextBtn.click();
-              if (window.jQuery) {
-                try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
-              }
-              return JSON.stringify({ success: true, method: 'nextBtn' });
-            }
-
-            return JSON.stringify({ success: false, error: 'Tombol Proses Selanjutnya tidak ditemukan' });
+            $_kSidikmuHelpersJs
+            var clickRes = findAndClickSubmitButton();
+            return JSON.stringify(clickRes);
           })();
         ''';
-        await controller.runJavaScriptReturningResult(nextBtnJs);
+        final submitRes = await controller.runJavaScriptReturningResult(nextBtnJs);
+        debugPrint('[Sidikmu] Submit button click result: $submitRes');
       }
 
       // ──────── DETEKSI AKTIF TABEL NILAI SISWA (POLLING DINAMIS HINGGA 25 DETIK) ────────
@@ -928,7 +951,7 @@ class SidikmuService {
             lastDetectedAlertText = alertText;
           }
 
-          if (pollData['found'] == true || detectedRows >= 5) {
+          if (pollData['found'] == true || pollData['hasSaveBtn'] == true || detectedRows >= 1) {
             isTableDetected = true;
             break;
           }
@@ -936,22 +959,13 @@ class SidikmuService {
           // WebView might be navigating or reloading DOM, ignore and continue polling
         }
 
-        // Retry klik 'Proses Selanjutnya' pada detik ke-3.5 dan 7.0 jika tabel belum muncul
+        // Retry klik tombol 'Proses / Tampilkan' pada detik ke-3.5 dan 7.0 jika tabel belum muncul
         if ((waitedMs == 3500 || waitedMs == 7000) && detectedRows == 0) {
           try {
             await controller.runJavaScriptReturningResult('''
               (function() {
-                var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
-                var nextBtn = btns.find(function(b) {
-                  var txt = (b.innerText || b.value || '').toLowerCase().trim();
-                  return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
-                });
-                if (nextBtn) {
-                  nextBtn.click();
-                  if (window.jQuery) {
-                    try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
-                  }
-                }
+                $_kSidikmuHelpersJs
+                return JSON.stringify(findAndClickSubmitButton());
               })();
             ''');
           } catch (_) {}

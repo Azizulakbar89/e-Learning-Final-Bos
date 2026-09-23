@@ -468,10 +468,52 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildParamRow(
-                icon: Icons.calendar_month_rounded,
-                label: 'Tahun Ajaran & Semester',
-                value: '$_academicYear ($_semester)',
+              Row(
+                children: [
+                  const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF0284C7)),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Tahun & Smt',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const Spacer(),
+                  DropdownButton<String>(
+                    value: ['2026/2027', '2025/2026', '2024/2025'].contains(_academicYear) ? _academicYear : '2026/2027',
+                    underline: const SizedBox.shrink(),
+                    isDense: true,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    items: ['2026/2027', '2025/2026', '2024/2025'].map((y) {
+                      return DropdownMenuItem(value: y, child: Text(y));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _academicYear = val);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: ['Gasal', 'Genap'].contains(_semester) ? _semester : 'Gasal',
+                    underline: const SizedBox.shrink(),
+                    isDense: true,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    items: ['Gasal', 'Genap'].map((s) {
+                      return DropdownMenuItem(value: s, child: Text(s));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _semester = val);
+                    },
+                  ),
+                ],
               ),
               const Divider(height: 14),
               Builder(builder: (context) {
@@ -680,7 +722,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withOpacity(0.1),
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -716,7 +758,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: _studentGradesByNis.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                    separatorBuilder: (_, index) => Divider(height: 1, color: Colors.grey.shade200),
                     itemBuilder: (ctx, idx) {
                       final nis = _studentGradesByNis.keys.elementAt(idx);
                       final name = _studentNamesByNis[nis] ?? 'Siswa $nis';

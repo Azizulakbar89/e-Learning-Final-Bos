@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Nilai siswa yang belum terisi otomatis diatur ke 0 saat sinkronisasi SidikMu sesuai aturan sekolah. Otomasi 1-klik tuntas untuk semua baris siswa.'
+            '✨ Versi $version: Perbaikan pencocokan otomatis Kelas, CP, TP SidikMu berbasis kesamaan/substring, perbaikan tombol proses formulir, serta fleksibilitas pemilihan Tahun Ajaran & Semester.'
       },
       'force_update': {'booleanValue': false}
     }
