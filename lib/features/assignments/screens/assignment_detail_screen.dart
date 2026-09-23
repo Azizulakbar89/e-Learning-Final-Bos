@@ -734,7 +734,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     for (final s in classStudents) {
       final nis = (s.nis ?? '').trim();
       if (nis.isNotEmpty) {
-        studentGradesByNis[nis] = null; // Default null (empty / not submitted)
+        studentGradesByNis[nis] = 0.0; // Default 0 for unsubmitted
         studentNamesByNis[nis] = s.fullName;
       }
     }
@@ -747,7 +747,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
       );
       final nis = (student.nis ?? '').trim();
       if (nis.isNotEmpty) {
-        studentGradesByNis[nis] = sub.score;
+        studentGradesByNis[nis] = sub.score ?? 0.0;
         studentNamesByNis[nis] = student.fullName.isNotEmpty ? student.fullName : sub.submitterName;
       }
       // Group members sync
@@ -758,7 +758,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
         );
         final memNis = (mem.nis ?? '').trim();
         if (memNis.isNotEmpty) {
-          studentGradesByNis[memNis] = sub.score;
+          studentGradesByNis[memNis] = sub.score ?? 0.0;
           studentNamesByNis[memNis] = mem.fullName;
         }
       }

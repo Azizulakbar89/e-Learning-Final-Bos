@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Sinkronisasi 1-klik SidikMu tuntas! Dropdown berantai otomatis (Tahun, Semester, Kelas, Mapel, CP, TP), pencocokan akurat NIS & nama siswa, pratinjau & edit nilai, serta konfirmasi simpan nilai otomatis.'
+            '✨ Versi $version: Nilai siswa yang belum terisi otomatis diatur ke 0 saat sinkronisasi SidikMu sesuai aturan sekolah. Otomasi 1-klik tuntas untuk semua baris siswa.'
       },
       'force_update': {'booleanValue': false}
     }

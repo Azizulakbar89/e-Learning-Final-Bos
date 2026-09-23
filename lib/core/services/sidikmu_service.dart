@@ -1025,11 +1025,8 @@ class SidikmuService {
             if (cells.length > 1) {
               var rawCandidate = (cells[1].innerText || '').trim();
               var candidate = rawCandidate.replace(/[^0-9]/g, '');
-              if (candidate) {
-                var score = getScoreForNis(candidate);
-                if (score !== undefined) {
-                  matchedNis = candidate;
-                }
+              if (candidate && candidate.length >= 2) {
+                matchedNis = candidate;
               }
             }
 
@@ -1055,47 +1052,42 @@ class SidikmuService {
               }
             }
 
-            if (!matchedNis) return;
-
-            var studentFullName = (cells.length > 2 ? cells[2].innerText : (names[matchedNis] || '')).trim();
+            var studentFullName = (cells.length > 2 ? cells[2].innerText : (matchedNis ? names[matchedNis] : '')) || '';
+            studentFullName = studentFullName.trim();
             var inps = Array.from(row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="radio"])'));
             var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
             if (!input) return;
 
-            var scoreVal = getScoreForNis(matchedNis);
-            if (scoreVal !== null && scoreVal !== undefined) {
-              var scoreStr = (scoreVal % 1 === 0) ? scoreVal.toFixed(0) : scoreVal.toString();
-              input.removeAttribute('disabled');
-              input.removeAttribute('readonly');
-              input.value = scoreStr;
-              input.setAttribute('value', scoreStr);
-              input.defaultValue = scoreStr;
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              input.dispatchEvent(new Event('blur', { bubbles: true }));
-              input.dispatchEvent(new Event('keyup', { bubbles: true }));
-              if (window.jQuery) {
-                try {
-                  window.jQuery(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
-                } catch(e) {}
-              }
-              filled++;
-
-              if (scoreVal === 0) {
-                zeroList.push({ nis: matchedNis, name: studentFullName });
-              }
+            // Jika nilai tidak diisi / kosong, maka buat 0 saja sesuai instruksi pengguna
+            var scoreVal = matchedNis ? getScoreForNis(matchedNis) : null;
+            var isProvided = (scoreVal !== null && scoreVal !== undefined && String(scoreVal).trim() !== '');
+            var scoreStr = '0';
+            if (isProvided) {
+              var num = Number(scoreVal);
+              scoreStr = (!isNaN(num) && num % 1 === 0) ? num.toFixed(0) : String(scoreVal);
             } else {
-              input.value = '';
-              input.setAttribute('value', '');
-              input.defaultValue = '';
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              if (window.jQuery) {
-                try {
-                  window.jQuery(input).val('').trigger('input').trigger('change');
-                } catch(e) {}
-              }
-              emptyList.push({ nis: matchedNis, name: studentFullName });
+              scoreStr = '0';
+              emptyList.push({ nis: matchedNis || '', name: studentFullName });
+            }
+
+            input.removeAttribute('disabled');
+            input.removeAttribute('readonly');
+            input.value = scoreStr;
+            input.setAttribute('value', scoreStr);
+            input.defaultValue = scoreStr;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('blur', { bubbles: true }));
+            input.dispatchEvent(new Event('keyup', { bubbles: true }));
+            if (window.jQuery) {
+              try {
+                window.jQuery(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
+              } catch(e) {}
+            }
+            filled++;
+
+            if (scoreStr === '0') {
+              zeroList.push({ nis: matchedNis || '', name: studentFullName });
             }
           });
 
@@ -1136,13 +1128,15 @@ class SidikmuService {
           emptyOrZeroList.add(SidikmuUnsyncedItem(
             nis: item['nis']?.toString() ?? '',
             studentName: item['name']?.toString() ?? '',
-            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
+            reason: 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)',
+            score: 0.0,
           ));
         } else {
           emptyOrZeroList.add(SidikmuUnsyncedItem(
             nis: item?.toString() ?? '',
             studentName: '',
-            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
+            reason: 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)',
+            score: 0.0,
           ));
         }
       }
@@ -1334,22 +1328,17 @@ class SidikmuService {
 
       studentGradesByNis.forEach((nis, score) {
         final name = studentNamesByNis[nis] ?? 'Siswa $nis';
-        if (score == null) {
+        final effectiveScore = score ?? 0.0;
+        filled++;
+        if (effectiveScore == 0.0) {
           emptyOrZeroList.add(SidikmuUnsyncedItem(
             nis: nis,
             studentName: name,
-            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
-          ));
-        } else if (score == 0.0) {
-          filled++;
-          emptyOrZeroList.add(SidikmuUnsyncedItem(
-            nis: nis,
-            studentName: name,
-            reason: 'Nilai Siswa adalah 0',
+            reason: score == null
+                ? 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)'
+                : 'Nilai Siswa adalah 0',
             score: 0.0,
           ));
-        } else {
-          filled++;
         }
       });
 
@@ -1421,22 +1410,17 @@ class SidikmuService {
 
       studentGradesByNis.forEach((nis, score) {
         final name = studentNamesByNis[nis] ?? 'Siswa $nis';
-        if (score == null) {
+        final effectiveScore = score ?? 0.0;
+        filled++;
+        if (effectiveScore == 0.0) {
           emptyOrZeroList.add(SidikmuUnsyncedItem(
             nis: nis,
             studentName: name,
-            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
-          ));
-        } else if (score == 0.0) {
-          filled++;
-          emptyOrZeroList.add(SidikmuUnsyncedItem(
-            nis: nis,
-            studentName: name,
-            reason: 'Nilai Siswa adalah 0',
+            reason: score == null
+                ? 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)'
+                : 'Nilai Siswa adalah 0',
             score: 0.0,
           ));
-        } else {
-          filled++;
         }
       });
 

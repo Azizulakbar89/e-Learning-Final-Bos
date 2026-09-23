@@ -125,7 +125,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     _cpCtrl = TextEditingController(text: initialCp);
     _tpCtrl = TextEditingController(text: initialTp);
 
-    _studentGradesByNis = Map.from(widget.studentGradesByNis);
+    _studentGradesByNis = widget.studentGradesByNis.map((k, v) => MapEntry(k, v ?? 0.0));
     _studentNamesByNis = Map.from(widget.studentNamesByNis);
 
     _initWebView();
@@ -192,7 +192,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         for (final s in classStudents) {
           final nis = (s.nis ?? '').trim();
           if (nis.isNotEmpty) {
-            newGrades[nis] = null;
+            newGrades[nis] = 0.0;
             newNames[nis] = s.fullName;
           }
         }
@@ -203,14 +203,14 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
             final student = fb.allStudents.where((std) => std.id == sub.submitterId).firstOrNull;
             final nis = (student?.nis ?? '').trim();
             if (nis.isNotEmpty && newGrades.containsKey(nis)) {
-              newGrades[nis] = sub.score;
+              newGrades[nis] = sub.score ?? 0.0;
               newNames[nis] = student!.fullName.isNotEmpty ? student.fullName : sub.submitterName;
             }
             for (final memId in sub.memberStudentIds) {
               final mem = fb.allStudents.where((m) => m.id == memId).firstOrNull;
               final memNis = (mem?.nis ?? '').trim();
               if (memNis.isNotEmpty && newGrades.containsKey(memNis)) {
-                newGrades[memNis] = sub.score;
+                newGrades[memNis] = sub.score ?? 0.0;
                 newNames[memNis] = mem!.fullName;
               }
             }
@@ -218,7 +218,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         } else {
           for (final entry in widget.studentGradesByNis.entries) {
             if (newGrades.containsKey(entry.key)) {
-              newGrades[entry.key] = entry.value;
+              newGrades[entry.key] = entry.value ?? 0.0;
             }
           }
         }
@@ -268,6 +268,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     final sidikmuUrl = teacher?.sidikmuUrl ?? SidikmuService.defaultUrl;
     final username = teacher?.sidikmuUsername ?? _usernameCtrl.text.trim();
     final password = teacher?.sidikmuPassword ?? _passwordCtrl.text;
+    final sanitizedGrades = _studentGradesByNis.map((k, v) => MapEntry(k, v ?? 0.0));
 
     final SidikmuSyncResult result;
     if (_webController != null) {
@@ -284,7 +285,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         targetSubjectName: _subjectName,
         targetCpCode: _cpCtrl.text.trim().isNotEmpty ? _cpCtrl.text.trim() : null,
         targetTpCode: _tpCtrl.text.trim().isNotEmpty ? _tpCtrl.text.trim() : null,
-        studentGradesByNis: _studentGradesByNis,
+        studentGradesByNis: sanitizedGrades,
         studentNamesByNis: _studentNamesByNis,
         onProgress: (p) {
           if (mounted) {
@@ -308,7 +309,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         targetSubjectName: _subjectName,
         targetCpCode: _cpCtrl.text.trim().isNotEmpty ? _cpCtrl.text.trim() : null,
         targetTpCode: _tpCtrl.text.trim().isNotEmpty ? _tpCtrl.text.trim() : null,
-        studentGradesByNis: _studentGradesByNis,
+        studentGradesByNis: sanitizedGrades,
         studentNamesByNis: _studentNamesByNis,
         onProgress: (p) {
           if (mounted) {
@@ -719,10 +720,8 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                     itemBuilder: (ctx, idx) {
                       final nis = _studentGradesByNis.keys.elementAt(idx);
                       final name = _studentNamesByNis[nis] ?? 'Siswa $nis';
-                      final score = _studentGradesByNis[nis];
-                      final scoreStr = score != null
-                          ? (score % 1 == 0 ? score.toInt().toString() : score.toString())
-                          : '';
+                      final score = _studentGradesByNis[nis] ?? 0.0;
+                      final scoreStr = score % 1 == 0 ? score.toInt().toString() : score.toString();
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -762,20 +761,20 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: score != null ? const Color(0xFF15803D) : Colors.grey.shade700,
+                                  color: score > 0 ? const Color(0xFF15803D) : Colors.grey.shade700,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: '-',
+                                  hintText: '0',
                                   contentPadding: EdgeInsets.zero,
                                   filled: true,
-                                  fillColor: score != null ? const Color(0xFFF0FDF4) : Colors.grey.shade100,
+                                  fillColor: score > 0 ? const Color(0xFFF0FDF4) : Colors.grey.shade100,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(6),
                                     borderSide: BorderSide(color: Colors.grey.shade300),
                                   ),
                                 ),
                                 onChanged: (val) {
-                                  final numVal = double.tryParse(val.trim());
+                                  final numVal = double.tryParse(val.trim()) ?? 0.0;
                                   _studentGradesByNis[nis] = numVal;
                                 },
                               ),

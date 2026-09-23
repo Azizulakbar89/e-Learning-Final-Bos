@@ -205,7 +205,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     for (final s in classStudents) {
       final nis = (s.nis ?? '').trim();
       if (nis.isNotEmpty) {
-        studentGradesByNis[nis] = null;
+        studentGradesByNis[nis] = 0.0;
         studentNamesByNis[nis] = s.fullName;
       }
     }
@@ -218,7 +218,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
       }
       final nis = session.studentNis.trim();
       if (nis.isNotEmpty) {
-        final score = session.finalScore ?? session.nonEssayScore;
+        final score = session.finalScore ?? session.nonEssayScore ?? 0.0;
         studentGradesByNis[nis] = score;
         studentNamesByNis[nis] = session.studentName;
       }
