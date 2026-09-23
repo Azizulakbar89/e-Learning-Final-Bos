@@ -79,12 +79,12 @@ jobs:
           body: |
             ## 📱 e-Learning Spemdalas ${{ steps.version.outputs.tag }}
 
-            ### ✨ Fitur yang Diperbarui
-            - 🔄 **Sinkronisasi Nilai Otomatis ke SidikMu** — Integrasi langsung nilai formatif (tugas materi) dan sumatif (ujian/kuis/PTS/PAS) ke portal SidikMu sekolah (smpm12gkb.sidikmu.com) dengan pencocokan otomatis NIS siswa, tahun ajaran, semester, kelas, dan CP/TP.
-            - 🔐 **Penyimpanan Akun SidikMu di Profil Guru** — Kredensial akun SidikMu guru tersimpan aman di Firestore profil guru sehingga tidak perlu login ulang saat berpindah perangkat.
-            - 📊 **Dialog Progres Real-Time & Deteksi Nilai Kosong/0** — Dialog progres sinkronisasi real-time dengan rekapitulasi data siswa yang nilainya masih kosong atau bernilai 0.
-            - 📚 **Kelola Edit & Hapus CP & TP bagi Guru** — Guru dapat mengedit dan menghapus Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) langsung dari aplikasi secara aman (dengan cascade deletion).
-            - 🚀 **Peningkatan Performa & Stabilitas** — Optimasi antarmuka dan penanganan respon jaringan.
+            ### ✨ Fitur Baru & Peningkatan v1.3.8
+            - 🤖 **Automasi 100% Latar Belakang SidikMu (Headless WebView Android)** — Sinkronisasi nilai berjalan otomatis di latar belakang tanpa perlu membuka browser. Sistem login otomatis, membuka formulir kelas, mengisi nilai seluruh siswa berdasarkan NIS, dan menyimpan nilai ke SidikMu secara instan.
+            - 🔑 **Tautkan Akun SidikMu Instan dari Dialog** — Guru dapat langsung menautkan username & password SidikMu dari dalam dialog sinkronisasi dengan aman.
+            - 📁 **Fitur "Unduh Excel SidikMu" & Kompatibilitas Import Excel** — Disediakan berkas Excel berformat standar yang langsung bisa diimport via tombol `[ Import Excel ]` di portal SidikMu.
+            - 🎯 **Isolasi Ketat Tugas Materi** — Tugas hanya muncul pada materi yang dituju (tidak bocor ke materi lain) dan guru dapat menghapus tugas langsung dari Tab Materi.
+            - 📚 **Kelola Edit & Hapus CP/TP & Input Materi** — Manajemen penuh CP & TP kurikulum serta pemilihan CP/TP langsung saat membuat atau mengedit materi.
 
             ### 📥 Cara Install / Update
             1. Download file APK di bawah ini

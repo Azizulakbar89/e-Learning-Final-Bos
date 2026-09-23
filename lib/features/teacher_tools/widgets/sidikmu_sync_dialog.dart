@@ -88,6 +88,11 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   // Result state
   SidikmuSyncResult? _syncResult;
 
+  // Quick SidikMu credentials input when teacher hasn't linked account yet
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _obscurePassword = true;
+
   @override
   void initState() {
     super.initState();
@@ -105,17 +110,23 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     _initWebView();
   }
 
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
   void _initWebView() {
+    if (kIsWeb) {
+      _webController = null;
+      return;
+    }
     try {
-      if (WebViewPlatform.instance == null) {
-        debugPrint('[SidikMu] WebViewPlatform.instance is null on this device. Using HTTP direct sync.');
-        _webController = null;
-        return;
-      }
       _webController = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setUserAgent(
-            'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36')
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         ..setNavigationDelegate(
           NavigationDelegate(
             onPageFinished: (url) {
@@ -288,16 +299,32 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
 
   Future<void> _startSync() async {
     final fb = context.read<FirebaseService>();
-    final teacher = fb.currentUser;
+    var teacher = fb.currentUser;
 
     if (!kIsWeb && (teacher == null || !teacher.hasSidikmuAccount)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Akun SidikMu belum ditautkan. Silakan hubungkan di menu Profil.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
+      if (_usernameCtrl.text.trim().isNotEmpty && _passwordCtrl.text.isNotEmpty) {
+        if (teacher != null) {
+          try {
+            await fb.updateTeacherSidikmuCredentials(
+              teacherId: teacher.id,
+              sidikmuUrl: SidikmuService.defaultUrl,
+              sidikmuUsername: _usernameCtrl.text.trim(),
+              sidikmuPassword: _passwordCtrl.text,
+            );
+            teacher = fb.currentUser;
+          } catch (e) {
+            debugPrint('[SidikmuSyncDialog] updateTeacherSidikmuCredentials error: $e');
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan masukkan username dan password SidikMu untuk melanjutkan.'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -307,8 +334,8 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     });
 
     final sidikmuUrl = teacher?.sidikmuUrl ?? SidikmuService.defaultUrl;
-    final username = teacher?.sidikmuUsername ?? '';
-    final password = teacher?.sidikmuPassword ?? '';
+    final username = teacher?.sidikmuUsername ?? _usernameCtrl.text.trim();
+    final password = teacher?.sidikmuPassword ?? _passwordCtrl.text;
 
     final SidikmuSyncResult result;
     if (_webController != null) {
@@ -383,14 +410,16 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            // Headless WebView container (only active if WebView platform is available)
+            // Headless Desktop-viewport WebView container for Android Automation
             if (_webController != null)
-              SizedBox(
-                width: 1,
-                height: 1,
-                child: Opacity(
-                  opacity: 0.01,
+              Positioned(
+                left: -4000,
+                top: -4000,
+                width: 1280,
+                height: 800,
+                child: IgnorePointer(
                   child: WebViewWidget(controller: _webController!),
                 ),
               ),
@@ -527,6 +556,119 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         ),
         const SizedBox(height: 16),
 
+        // Android Background Automation Banner / Setup Card
+        if (!kIsWeb) ...[
+          Builder(builder: (context) {
+            final fb = context.watch<FirebaseService>();
+            final teacher = fb.currentUser;
+            final isLinked = teacher?.hasSidikmuAccount ?? false;
+
+            if (isLinked) {
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.smart_toy_rounded, color: Color(0xFF16A34A), size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Mode Automasi Latar Belakang (Android)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Akun SidikMu terhubung: ${teacher?.sidikmuUsername}. Sistem akan otomatis login, membuka formulir kelas, mengisi nilai $totalStudents siswa, dan menyimpannya di latar belakang tanpa membuka browser.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.key_rounded, color: Color(0xFFD97706), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tautkan Akun SidikMu Guru',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFB45309),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Masukkan username & password SidikMu sekali saja untuk automasi login dan input nilai tanpa keluar aplikasi:',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _usernameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Username SidikMu',
+                        labelStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _passwordCtrl,
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Password SidikMu',
+                        labelStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }),
+          const SizedBox(height: 14),
+        ],
+
         // Web Quick Helper Banner
         if (kIsWeb) ...[
           Container(
@@ -637,10 +779,12 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.play_arrow_rounded, size: 22),
+              Icon(!kIsWeb ? Icons.smart_toy_rounded : Icons.play_arrow_rounded, size: 22),
               const SizedBox(width: 8),
               Text(
-                'Mulai Sinkronisasi Sekarang',
+                !kIsWeb
+                    ? '🚀 Mulai Sinkronisasi Otomatis 100%'
+                    : 'Mulai Sinkronisasi Sekarang',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

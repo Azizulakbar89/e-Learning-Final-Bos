@@ -367,18 +367,37 @@ class SidikmuService {
 
       final navMenuJs = '''
         (function() {
-          // Cari link berdasarkan teks
+          // 1. Cek apakah sudah di halaman input nilai
+          if (document.querySelector('table') && (document.body.innerText.includes('Nilai Ke') || document.body.innerText.includes('Import Excel'))) {
+            return JSON.stringify({ success: true, alreadyOnPage: true });
+          }
+
+          // 2. Buka accordion 'Nilai KM' atau 'AKADEMIK' jika terlipat (collapsed)
+          var accordions = Array.from(document.querySelectorAll('a, .nav-link, [data-bs-toggle="collapse"]'));
+          var nilaiKmParent = accordions.find(function(el) {
+            var t = (el.innerText || '').trim().toLowerCase();
+            return t === 'nilai km' || t.includes('nilai km');
+          });
+          if (nilaiKmParent) {
+            if (nilaiKmParent.classList.contains('collapsed') || nilaiKmParent.getAttribute('aria-expanded') === 'false') {
+              nilaiKmParent.click();
+            }
+          }
+
+          // 3. Cari link menu target
+          var target = ${jsonEncode(targetMenuText.toLowerCase())};
           var links = Array.from(document.querySelectorAll('a, button, span, .nav-link, .card'));
           var targetEl = links.find(function(el) {
-            var txt = (el.innerText || '').trim();
-            return txt.toLowerCase().includes(${jsonEncode(targetMenuText.toLowerCase())});
+            var txt = (el.innerText || '').trim().toLowerCase();
+            return txt.includes(target) || (target.includes('formatif') && txt.includes('formatif')) || (target.includes('sumatif') && txt.includes('sumatif'));
           });
           if (targetEl) {
             targetEl.click();
             return JSON.stringify({ success: true });
           }
-          // Jika tidak ada langsung, cari href yang mengandung formatif / sumatif
-          var hrefTarget = isFormatif ? 'formatif' : 'sumatif';
+
+          // 4. Fallback cari tautan dengan atribut href
+          var hrefTarget = $isFormatif ? 'formatif' : 'sumatif';
           var aTag = Array.from(document.querySelectorAll('a')).find(function(a) {
             return (a.href || '').toLowerCase().includes(hrefTarget);
           });
@@ -386,6 +405,12 @@ class SidikmuService {
             aTag.click();
             return JSON.stringify({ success: true, href: aTag.href });
           }
+
+          // Jika halaman sudah memuat dropdown formulir nilai, izinkan lanjut
+          if (document.querySelectorAll('select').length >= 3) {
+            return JSON.stringify({ success: true, fallback: true });
+          }
+
           return JSON.stringify({ success: false, error: 'Menu ' + ${jsonEncode(targetMenuText)} + ' tidak ditemukan' });
         })();
       ''';
@@ -399,6 +424,10 @@ class SidikmuService {
         (function() {
           var selects = Array.from(document.querySelectorAll('select'));
           if (selects.length === 0) {
+            // Jika tabel nilai sudah langsung terbuka (karena navigasi sesi aktif)
+            if (document.querySelector('table tbody tr, table tr')) {
+              return JSON.stringify({ success: true, alreadyTableLoaded: true });
+            }
             return JSON.stringify({ success: false, error: 'Dropdown formulir tidak ditemukan' });
           }
 
@@ -411,7 +440,9 @@ class SidikmuService {
             });
             if (matched) {
               selectEl.value = matched.value;
+              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
               selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) { window.jQuery(selectEl).trigger('change'); }
               return true;
             }
             return false;
@@ -428,7 +459,7 @@ class SidikmuService {
           var semVal = ${jsonEncode(semester)};
           var selSem = selects.find(function(s) {
             return Array.from(s.options).some(function(o) { return (o.text || '').toLowerCase().includes(semVal.toLowerCase()); });
-          }) || selects[1];
+          }) || (selects.length > 1 ? selects[1] : null);
           selectOptionContaining(selSem, semVal);
 
           // 3. Jenis Nilai (Sumatif) jika ada
@@ -488,12 +519,16 @@ class SidikmuService {
             });
             if (matched) {
               selectEl.value = matched.value;
+              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
               selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) { window.jQuery(selectEl).trigger('change'); }
               return true;
             }
             if (options.length > 1 && options[1].value) {
               selectEl.value = options[1].value;
+              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
               selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) { window.jQuery(selectEl).trigger('change'); }
               return true;
             }
             return false;
@@ -514,7 +549,7 @@ class SidikmuService {
         })();
       ''';
       await controller.runJavaScriptReturningResult(cpTpJs);
-      await Future.delayed(const Duration(milliseconds: 1800));
+      await Future.delayed(const Duration(milliseconds: 2000));
 
       if (isFormatif) {
         // TP Select dinamis setelah CP dipilih
@@ -536,29 +571,34 @@ class SidikmuService {
               } else {
                 selTp.value = selTp.options[1].value;
               }
+              selTp.dispatchEvent(new Event('input', { bubbles: true }));
               selTp.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) { window.jQuery(selTp).trigger('change'); }
             }
             return JSON.stringify({ success: true });
           })();
         ''';
         await controller.runJavaScriptReturningResult(tpJs);
-        await Future.delayed(const Duration(milliseconds: 1200));
+        await Future.delayed(const Duration(milliseconds: 1500));
       }
 
       // ──────── STEP 4: PROSES SELANJUTNYA (52% - 68%) ────────
       emit(0.55, 'Membuka tabel nilai siswa (Proses Selanjutnya)...', 4, totalSteps);
       final nextBtnJs = '''
         (function() {
+          if (document.querySelector('table tbody tr, table tr input')) {
+            return JSON.stringify({ success: true, tableAlreadyVisible: true });
+          }
           var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
           var nextBtn = btns.find(function(b) {
             var txt = (b.innerText || b.value || '').toLowerCase();
-            return txt.includes('proses selanjutnya') || txt.includes('selanjutnya');
+            return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
           });
           if (nextBtn) {
             nextBtn.click();
             return JSON.stringify({ success: true });
           }
-          return JSON.stringify({ success: false, error: 'Tombol Proses Selanjutnya tidak ditemukan' });
+          return JSON.stringify({ success: true, note: 'Tombol lanjut otomatis dilewati' });
         })();
       ''';
       await controller.runJavaScriptReturningResult(nextBtnJs);
@@ -570,9 +610,9 @@ class SidikmuService {
       final populateGradesJs = '''
         (function() {
           var grades = ${jsonEncode(studentGradesByNis)};
-          var rows = Array.from(document.querySelectorAll('table tbody tr'));
+          var rows = Array.from(document.querySelectorAll('table tbody tr, table tr'));
           if (rows.length === 0) {
-            return JSON.stringify({ success: false, error: 'Tabel nilai siswa tidak ditemukan' });
+            return JSON.stringify({ success: false, error: 'Tabel nilai siswa tidak ditemukan di halaman SidikMu' });
           }
 
           var filled = 0;
@@ -581,35 +621,54 @@ class SidikmuService {
 
           rows.forEach(function(row) {
             var cells = row.querySelectorAll('td');
-            if (cells.length < 3) return;
+            if (cells.length < 2) return;
 
-            // Kolom NIS biasanya indeks 1
-            var nisCell = cells[1];
-            var nameCell = cells.length > 2 ? cells[2] : null;
-            var nis = (nisCell ? nisCell.innerText : '').trim();
-            var name = (nameCell ? nameCell.innerText : '').trim();
+            var rowText = (row.innerText || '').replace(/\\s+/g, ' ');
+            var matchedNis = null;
 
-            var input = row.querySelector('input[type="number"], input[type="text"]');
+            // Prioritas cek sel NIS indeks 1
+            if (cells.length > 1) {
+              var candidate = (cells[1].innerText || '').trim();
+              if (grades.hasOwnProperty(candidate)) {
+                matchedNis = candidate;
+              }
+            }
+
+            // Jika belum cocok, cari apakah ada kunci NIS di rowText
+            if (!matchedNis) {
+              for (var key in grades) {
+                if (rowText.indexOf(key) !== -1) {
+                  matchedNis = key;
+                  break;
+                }
+              }
+            }
+
+            if (!matchedNis) return;
+
+            var name = (cells.length > 2 ? cells[2].innerText : '').trim();
+            var inps = Array.from(row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])'));
+            var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
             if (!input) return;
 
-            if (grades.hasOwnProperty(nis) && grades[nis] !== null && grades[nis] !== undefined) {
-              var scoreVal = grades[nis];
-              // Format score (bilangan bulat jika tidak ada desimal)
+            var scoreVal = grades[matchedNis];
+            if (scoreVal !== null && scoreVal !== undefined) {
               var scoreStr = (scoreVal % 1 === 0) ? scoreVal.toFixed(0) : scoreVal.toString();
               input.value = scoreStr;
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) { window.jQuery(input).trigger('input').trigger('change'); }
               filled++;
 
               if (scoreVal === 0) {
-                zeroList.push({ nis: nis, name: name });
+                zeroList.push({ nis: matchedNis, name: name });
               }
             } else {
-              // Kosongkan jika NIS tidak ada nilai di e-learning
               input.value = '';
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
-              emptyList.push({ nis: nis, name: name });
+              if (window.jQuery) { window.jQuery(input).trigger('input').trigger('change'); }
+              emptyList.push({ nis: matchedNis, name: name });
             }
           });
 
