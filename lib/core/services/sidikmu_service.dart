@@ -272,6 +272,39 @@ class SidikmuService {
     return {};
   }
 
+  /// Helper JavaScript untuk mendeteksi tabel nilai siswa yang sebenarnya
+  /// (Membedakan secara pasti antara tabel formulir filter 4 baris vs tabel nilai 29 siswa)
+  static const String _kFindStudentGradeTableJs = r'''
+    function findStudentGradeTable() {
+      var tables = Array.from(document.querySelectorAll('table'));
+      for (var i = 0; i < tables.length; i++) {
+        var tbl = tables[i];
+        // Abaikan tabel formulir filter yang memiliki dropdown select
+        if (tbl.querySelectorAll('select').length >= 2) continue;
+
+        var text = (tbl.innerText || '').toLowerCase();
+        var hasNis = text.includes('nis');
+        var hasNama = text.includes('nama');
+        var hasNilai = text.includes('nilai');
+
+        var rows = Array.from(tbl.querySelectorAll('tbody tr, tr')).filter(function(r) {
+          if (r.querySelector('th')) return false;
+          var cells = r.querySelectorAll('td');
+          if (cells.length < 3) return false;
+          var inps = r.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="radio"])');
+          if (inps.length === 0) return false;
+          var rowStr = (r.innerText || '').replace(/\s+/g, ' ');
+          return /\d{3,}/.test(rowStr);
+        });
+
+        if (rows.length >= 5 || ((hasNis || hasNama) && hasNilai && rows.length >= 1)) {
+          return { table: tbl, rows: rows, count: rows.length };
+        }
+      }
+      return null;
+    }
+  ''';
+
   /// 6. Automasi Utama Sinkronisasi Nilai Formatif & Sumatif
   static Future<SidikmuSyncResult> syncGradesAutomation({
     required WebViewController controller,
@@ -314,15 +347,11 @@ class SidikmuService {
       // (Contoh: jika guru membuka tautan langsung form nilai seperti di gambar pengguna)
       final quickCheckRes = await controller.runJavaScriptReturningResult('''
         (function() {
-          var inps = document.querySelectorAll('table tbody tr input:not([type="hidden"]):not([type="checkbox"]), table tr input:not([type="hidden"]):not([type="checkbox"]), table td input:not([type="hidden"]):not([type="checkbox"])');
-          var rows = document.querySelectorAll('table tbody tr, table tr');
-          var validRows = Array.from(rows).filter(function(r) {
-            return r.querySelectorAll('td').length >= 2;
-          });
+          $_kFindStudentGradeTableJs
+          var info = findStudentGradeTable();
           return JSON.stringify({
-            isReady: validRows.length > 0 && inps.length > 0,
-            rowCount: validRows.length,
-            inputCount: inps.length
+            isReady: !!info,
+            rowCount: info ? info.count : 0
           });
         })();
       ''');
@@ -333,8 +362,9 @@ class SidikmuService {
         emit(0.14, 'Mengotentikasi akun guru ($username)...', 1, totalSteps);
         final loginJs = '''
           (function() {
-            var inps = document.querySelectorAll('table tbody tr input, table tr input');
-            if (inps.length > 0) return JSON.stringify({ alreadyLoggedIn: true, tableReady: true });
+            $_kFindStudentGradeTableJs
+            var info = findStudentGradeTable();
+            if (info) return JSON.stringify({ alreadyLoggedIn: true, tableReady: true });
 
             var userEl = document.querySelector('input[name="user"], #card-user');
             var passEl = document.querySelector('input[name="passw"], #card-password');
@@ -368,8 +398,9 @@ class SidikmuService {
           emit(0.18, 'Memverifikasi status login...', 1, totalSteps);
           final verifyLoginJs = '''
             (function() {
-              var inps = document.querySelectorAll('table tbody tr input, table tr input');
-              if (inps.length > 0) return JSON.stringify({ ok: true, tableReady: true });
+              $_kFindStudentGradeTableJs
+              var info = findStudentGradeTable();
+              if (info) return JSON.stringify({ ok: true, tableReady: true });
 
               var body = document.body.innerText || '';
               if (body.includes('salah') || body.includes('gagal') || body.includes('Invalid credentials')) {
@@ -405,9 +436,9 @@ class SidikmuService {
             window.confirm = function() { return true; };
             window.alert = function() { return true; };
 
-            // Cek apakah tabel nilai sudah terbuka
-            var inps = document.querySelectorAll('table tbody tr input, table tr input');
-            if (inps.length > 0) {
+            $_kFindStudentGradeTableJs
+            var info = findStudentGradeTable();
+            if (info) {
               return JSON.stringify({ success: true, alreadyOnPage: true });
             }
 
@@ -485,10 +516,11 @@ class SidikmuService {
         while (navWaitMs < 6000) {
           final checkPageRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var inps = document.querySelectorAll('table tbody tr input:not([type="hidden"]):not([type="checkbox"]), table tr input:not([type="hidden"]):not([type="checkbox"])');
+              $_kFindStudentGradeTableJs
+              var info = findStudentGradeTable();
               var selects = document.querySelectorAll('select');
               return JSON.stringify({
-                isTable: inps.length > 0,
+                isTable: !!info,
                 isFilter: selects.length >= 2
               });
             })();
@@ -510,16 +542,14 @@ class SidikmuService {
 
         final filterJs = '''
           (function() {
-            var inps = document.querySelectorAll('table tbody tr input, table tr input');
-            if (inps.length > 0) {
+            $_kFindStudentGradeTableJs
+            var info = findStudentGradeTable();
+            if (info) {
               return JSON.stringify({ success: true, alreadyTableLoaded: true });
             }
 
             var selects = Array.from(document.querySelectorAll('select'));
             if (selects.length === 0) {
-              if (document.querySelector('table tbody tr, table tr')) {
-                return JSON.stringify({ success: true, alreadyTableLoaded: true });
-              }
               return JSON.stringify({ success: false, error: 'Dropdown formulir tidak ditemukan' });
             }
 
@@ -527,10 +557,22 @@ class SidikmuService {
               if (!selectEl) return false;
               var target = (text || '').toLowerCase().trim();
               var options = Array.from(selectEl.options);
+              
+              // 1. Exact or substring match
               var matched = options.find(function(o) {
                 var oTxt = (o.text || '').toLowerCase().trim();
-                return oTxt.includes(target) || target.includes(oTxt);
+                return oTxt === target || oTxt.includes(target) || (target.length > 3 && target.includes(oTxt));
               });
+
+              // 2. Token match (contoh: "HELIUM" mencocokkan "VIII HELIUM" atau "VII HELIUM")
+              if (!matched && target) {
+                var tokens = target.split(/\\s+/).filter(function(t) { return t.length >= 3; });
+                matched = options.find(function(o) {
+                  var oTxt = (o.text || '').toLowerCase();
+                  return tokens.some(function(tok) { return oTxt.includes(tok); });
+                });
+              }
+
               if (matched) {
                 selectEl.value = matched.value;
                 selectEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -570,7 +612,7 @@ class SidikmuService {
               if (selJenis) selectOptionContaining(selJenis, sumType);
             }
 
-            // 4. Kelas (Mencocokkan nama kelas, misal "VIII HELIUM")
+            // 4. Kelas (Mencocokkan nama kelas, misal "VIII HELIUM" atau "HELIUM")
             var targetClass = ${jsonEncode(targetClassName.toLowerCase())};
             var selKelas = selects.find(function(s) {
               var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
@@ -748,44 +790,39 @@ class SidikmuService {
         emit(0.55, 'Membuka tabel nilai siswa (Proses Selanjutnya)...', 4, totalSteps);
         final nextBtnJs = '''
           (function() {
-            if (document.querySelector('table tbody tr input, table tr input, input[name*="nilai"]')) {
+            $_kFindStudentGradeTableJs
+            var info = findStudentGradeTable();
+            if (info) {
               return JSON.stringify({ success: true, tableAlreadyVisible: true });
             }
 
             // 1. Cari tombol dengan teks 'Proses Selanjutnya'
-            var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+            var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
             var nextBtn = btns.find(function(b) {
               var txt = (b.innerText || b.value || '').toLowerCase().trim();
               return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
             });
+
+            if (!nextBtn) {
+              var filterForm = Array.from(document.querySelectorAll('form')).find(function(f) {
+                return f.querySelectorAll('select').length >= 2;
+              });
+              if (filterForm) {
+                nextBtn = filterForm.querySelector('button[type="submit"], input[type="submit"], button.btn-info, button.btn-primary, button');
+              }
+            }
+
             if (nextBtn) {
+              nextBtn.scrollIntoView();
               nextBtn.focus();
               nextBtn.click();
               if (window.jQuery) {
                 try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
               }
-              var form = nextBtn.closest('form');
-              if (form) {
-                try { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); } catch(e) {}
-              }
               return JSON.stringify({ success: true, method: 'nextBtn' });
             }
 
-            // 2. Cari form filter spesifik (bukan form search navbar)
-            var filterForm = Array.from(document.querySelectorAll('form')).find(function(f) {
-              return f.querySelectorAll('select').length >= 2;
-            });
-            if (filterForm) {
-              var sub = filterForm.querySelector('button[type="submit"], input[type="submit"], button.btn-info, button.btn-primary');
-              if (sub) {
-                sub.click();
-                return JSON.stringify({ success: true, method: 'filterFormSubmitBtn' });
-              }
-              filterForm.submit();
-              return JSON.stringify({ success: true, method: 'filterFormSubmit' });
-            }
-
-            return JSON.stringify({ success: true, note: 'Tombol lanjut dilewati' });
+            return JSON.stringify({ success: false, error: 'Tombol Proses Selanjutnya tidak ditemukan' });
           })();
         ''';
         await controller.runJavaScriptReturningResult(nextBtnJs);
@@ -796,80 +833,68 @@ class SidikmuService {
       bool isTableDetected = false;
       int waitedMs = 0;
       int detectedRows = 0;
-      int detectedInputs = 0;
       String lastDetectedAlertText = '';
 
       while (waitedMs < 25000) {
-        final pollRes = await controller.runJavaScriptReturningResult('''
-          (function() {
-            var inps = document.querySelectorAll(
-              'table tbody tr input:not([type="hidden"]):not([type="checkbox"]), ' +
-              'table tr input:not([type="hidden"]):not([type="checkbox"]), ' +
-              'table td input:not([type="hidden"]):not([type="checkbox"]), ' +
-              'input[name*="nilai"], input[type="number"]'
-            );
-            var rows = document.querySelectorAll('table tbody tr, table tr');
-            var validRows = Array.from(rows).filter(function(r) {
-              return r.querySelectorAll('td').length >= 2;
-            });
-
-            // Cek apakah tombol Simpan Nilai sudah ada di DOM (tanda valid tabel nilai sudah terbuka)
-            var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
-            var hasSaveBtn = btns.some(function(b) {
-              var txt = (b.innerText || b.value || '').toLowerCase();
-              return txt.includes('simpan nilai') || (txt.includes('simpan') && !txt.includes('kembali') && !txt.includes('filter'));
-            });
-
-            var alertEl = document.querySelector('.alert-danger, .alert-warning, .invalid-feedback, .text-danger, .modal-body');
-            var alertText = alertEl ? (alertEl.innerText || '').trim() : '';
-
-            var ready = (validRows.length > 0 && inps.length > 0) || (hasSaveBtn && (validRows.length > 0 || inps.length > 0));
-
-            return JSON.stringify({
-              found: ready,
-              rowCount: validRows.length,
-              inputCount: inps.length,
-              hasSaveBtn: hasSaveBtn,
-              alertText: alertText
-            });
-          })();
-        ''');
-
-        final pollData = _safeParseJsObject(pollRes);
-        detectedRows = (pollData['rowCount'] as num?)?.toInt() ?? 0;
-        detectedInputs = (pollData['inputCount'] as num?)?.toInt() ?? 0;
-        final alertText = pollData['alertText']?.toString() ?? '';
-        if (alertText.isNotEmpty) {
-          lastDetectedAlertText = alertText;
-        }
-
-        if (pollData['found'] == true || (detectedRows > 0 && detectedInputs > 0)) {
-          isTableDetected = true;
-          break;
-        }
-
-        // Retry klik 'Proses Selanjutnya' pada detik ke-3.5 jika tabel belum muncul sama sekali
-        if (waitedMs == 3500 && detectedRows == 0) {
-          await controller.runJavaScriptReturningResult('''
+        try {
+          final pollRes = await controller.runJavaScriptReturningResult('''
             (function() {
-              var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
-              var nextBtn = btns.find(function(b) {
-                var txt = (b.innerText || b.value || '').toLowerCase().trim();
-                return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
+              $_kFindStudentGradeTableJs
+              var info = findStudentGradeTable();
+
+              var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
+              var hasSaveBtn = btns.some(function(b) {
+                var txt = (b.innerText || b.value || '').toLowerCase();
+                return txt.includes('simpan nilai') || (txt.includes('simpan') && !txt.includes('kembali') && !txt.includes('filter'));
               });
-              if (nextBtn) {
-                nextBtn.click();
-                if (window.jQuery) {
-                  try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
-                }
-              }
+
+              var alertEl = document.querySelector('.alert-danger, .alert-warning, .invalid-feedback, .text-danger');
+              var alertText = alertEl ? (alertEl.innerText || '').trim() : '';
+
+              return JSON.stringify({
+                found: !!info,
+                rowCount: info ? info.count : 0,
+                hasSaveBtn: hasSaveBtn,
+                alertText: alertText
+              });
             })();
           ''');
+
+          final pollData = _safeParseJsObject(pollRes);
+          detectedRows = (pollData['rowCount'] as num?)?.toInt() ?? 0;
+          final alertText = pollData['alertText']?.toString() ?? '';
+          if (alertText.isNotEmpty) {
+            lastDetectedAlertText = alertText;
+          }
+
+          if (pollData['found'] == true || detectedRows >= 5) {
+            isTableDetected = true;
+            break;
+          }
+        } catch (_) {
+          // WebView might be navigating or reloading DOM, ignore and continue polling
         }
 
-        // PERHATIAN: JANGAN pernah abort di tengah polling hanya karena ada notice/banner!
-        // Banner seperti "Ada inputan nilai baru..." adalah notifikasi standar SidikMu, BUKAN error fatal.
-        // Polling harus tetap berjalan sampai timeout penuh agar tabel nilai selesai dimuat.
+        // Retry klik 'Proses Selanjutnya' pada detik ke-3.5 dan 7.0 jika tabel belum muncul
+        if ((waitedMs == 3500 || waitedMs == 7000) && detectedRows == 0) {
+          try {
+            await controller.runJavaScriptReturningResult('''
+              (function() {
+                var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
+                var nextBtn = btns.find(function(b) {
+                  var txt = (b.innerText || b.value || '').toLowerCase().trim();
+                  return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
+                });
+                if (nextBtn) {
+                  nextBtn.click();
+                  if (window.jQuery) {
+                    try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
+                  }
+                }
+              })();
+            ''');
+          } catch (_) {}
+        }
 
         await Future.delayed(const Duration(milliseconds: 500));
         waitedMs += 500;
@@ -903,17 +928,15 @@ class SidikmuService {
 
       final populateGradesJs = '''
         (function() {
-          var grades = ${jsonEncode(studentGradesByNis)};
-          var names = ${jsonEncode(studentNamesByNis)};
-          var rows = Array.from(document.querySelectorAll('table tbody tr, table tr'));
-          
-          var validRows = rows.filter(function(r) {
-            return r.querySelectorAll('td').length >= 2;
-          });
-
-          if (validRows.length === 0) {
+          $_kFindStudentGradeTableJs
+          var info = findStudentGradeTable();
+          if (!info || info.rows.length === 0) {
             return JSON.stringify({ success: false, error: 'Tabel nilai siswa tidak ditemukan di halaman SidikMu' });
           }
+
+          var grades = ${jsonEncode(studentGradesByNis)};
+          var names = ${jsonEncode(studentNamesByNis)};
+          var validRows = info.rows;
 
           var filled = 0;
           var emptyList = [];
@@ -928,13 +951,14 @@ class SidikmuService {
 
             // 1. Prioritas: Cek sel NIS (kolom ke-2 / index 1)
             if (cells.length > 1) {
-              var candidate = (cells[1].innerText || '').trim();
-              if (grades.hasOwnProperty(candidate)) {
+              var rawCandidate = (cells[1].innerText || '').trim();
+              var candidate = rawCandidate.replace(/[^0-9]/g, '');
+              if (candidate && grades.hasOwnProperty(candidate)) {
                 matchedNis = candidate;
               }
             }
 
-            // 2. Cek apakah ada nomor NIS di teks baris
+            // 2. Cek apakah ada nomor NIS di kolom lain atau teks baris
             if (!matchedNis) {
               for (var key in grades) {
                 if (key && rowText.indexOf(key) !== -1) {
@@ -944,12 +968,12 @@ class SidikmuService {
               }
             }
 
-            // 3. Fallback cerdas: Cocokkan berdasarkan Nama Siswa
+            // 3. Fallback cerdas: Cocokkan berdasarkan Nama Siswa (kolom ke-3 / index 2)
             if (!matchedNis && cells.length > 2) {
               var cellName = (cells[2].innerText || '').toLowerCase().trim();
               for (var nisKey in names) {
                 var studentName = (names[nisKey] || '').toLowerCase().trim();
-                if (studentName.length > 3 && (cellName.indexOf(studentName) !== -1 || studentName.indexOf(cellName) !== -1)) {
+                if (studentName.length >= 3 && (cellName.indexOf(studentName) !== -1 || studentName.indexOf(cellName) !== -1)) {
                   matchedNis = nisKey;
                   break;
                 }
@@ -959,7 +983,7 @@ class SidikmuService {
             if (!matchedNis) return;
 
             var studentFullName = (cells.length > 2 ? cells[2].innerText : (names[matchedNis] || '')).trim();
-            var inps = Array.from(row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])'));
+            var inps = Array.from(row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="radio"])'));
             var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
             if (!input) return;
 
@@ -1104,13 +1128,9 @@ class SidikmuService {
             return txt.includes('simpan nilai') || (txt.includes('simpan') && !txt.includes('kembali') && !txt.includes('filter'));
           });
 
-          // 5. Cari form tabel nilai
-          var tableForm = Array.from(document.querySelectorAll('form')).find(function(f) {
-            return f.querySelectorAll('table, input:not([type="hidden"]):not([type="checkbox"])').length >= 3;
-          }) || (saveBtn ? saveBtn.closest('form') : null);
-
           var clicked = false;
           if (saveBtn) {
+            saveBtn.scrollIntoView();
             saveBtn.focus();
             saveBtn.click();
             if (window.jQuery) {
@@ -1121,8 +1141,7 @@ class SidikmuService {
 
           return JSON.stringify({
             success: clicked,
-            hasSaveBtn: !!saveBtn,
-            hasTableForm: !!tableForm
+            hasSaveBtn: !!saveBtn
           });
         })();
       ''';
