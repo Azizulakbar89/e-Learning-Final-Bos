@@ -230,6 +230,7 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
       targetClassName: targetClass.isNotEmpty ? targetClass : 'Semua Kelas',
       targetSubjectName: subjectName,
       examTitle: currentExam.title,
+      examId: currentExam.id,
       studentGradesByNis: studentGradesByNis,
       studentNamesByNis: studentNamesByNis,
     );

@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Perbaikan tuntas selektor tabel siswa SidikMu (mencegah error 0 dari 4 siswa), navigasi akurat kelas HELIUM, pencocokan NIS otomatis, dan auto-save nilai ke portal SidikMu.'
+            '✨ Versi $version: Sinkronisasi 1-klik SidikMu tuntas! Dropdown berantai otomatis (Tahun, Semester, Kelas, Mapel, CP, TP), pencocokan akurat NIS & nama siswa, pratinjau & edit nilai, serta konfirmasi simpan nilai otomatis.'
       },
       'force_update': {'booleanValue': false}
     }

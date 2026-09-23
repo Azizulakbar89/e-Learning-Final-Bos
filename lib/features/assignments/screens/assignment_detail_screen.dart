@@ -779,6 +779,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
       targetSubjectName: subject.name,
       targetCpCode: cp?.code,
       targetTpCode: tp?.code,
+      assignmentId: widget.assignment.id,
       studentGradesByNis: studentGradesByNis,
       studentNamesByNis: studentNamesByNis,
     );

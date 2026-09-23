@@ -538,111 +538,292 @@ class SidikmuService {
 
       // ──────── STEP 3: MENGISI FILTER FORMULIR (32% - 55%) ────────
       if (!isTableDirectlyReady) {
-        emit(0.35, 'Memilih Tahun Ajaran, Semester, Kelas & Mapel...', 3, totalSteps);
-
-        final filterJs = '''
+        // 3.1: Pilih Tahun Ajaran
+        emit(0.33, 'Memilih Tahun Ajaran ($academicYear)...', 3, totalSteps);
+        await controller.runJavaScriptReturningResult('''
           (function() {
-            $_kFindStudentGradeTableJs
-            var info = findStudentGradeTable();
-            if (info) {
-              return JSON.stringify({ success: true, alreadyTableLoaded: true });
-            }
-
             var selects = Array.from(document.querySelectorAll('select'));
-            if (selects.length === 0) {
-              return JSON.stringify({ success: false, error: 'Dropdown formulir tidak ditemukan' });
-            }
-
-            function selectOptionContaining(selectEl, text) {
-              if (!selectEl) return false;
-              var target = (text || '').toLowerCase().trim();
-              var options = Array.from(selectEl.options);
-              
-              // 1. Exact or substring match
-              var matched = options.find(function(o) {
-                var oTxt = (o.text || '').toLowerCase().trim();
-                return oTxt === target || oTxt.includes(target) || (target.length > 3 && target.includes(oTxt));
-              });
-
-              // 2. Token match (contoh: "HELIUM" mencocokkan "VIII HELIUM" atau "VII HELIUM")
-              if (!matched && target) {
-                var tokens = target.split(/\\s+/).filter(function(t) { return t.length >= 3; });
-                matched = options.find(function(o) {
-                  var oTxt = (o.text || '').toLowerCase();
-                  return tokens.some(function(tok) { return oTxt.includes(tok); });
-                });
-              }
-
-              if (matched) {
-                selectEl.value = matched.value;
-                selectEl.dispatchEvent(new Event('input', { bubbles: true }));
-                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) {
-                  window.jQuery(selectEl).val(matched.value).trigger('input').trigger('change');
-                }
-                return true;
-              }
-              return false;
-            }
-
-            // 1. Tahun Ajaran
-            var yearVal = ${jsonEncode(academicYear)};
             var selYear = selects.find(function(s) {
-              return Array.from(s.options).some(function(o) { return (o.text || '').includes(yearVal); });
+              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+              return label.includes('tahun') || Array.from(s.options).some(function(o) { return (o.text || '').includes('202'); });
             }) || selects[0];
-            selectOptionContaining(selYear, yearVal);
-
-            // 2. Semester
-            var semVal = ${jsonEncode(semester)};
-            var selSem = selects.find(function(s) {
-              return Array.from(s.options).some(function(o) { return (o.text || '').toLowerCase().includes(semVal.toLowerCase()); });
-            }) || (selects.length > 1 ? selects[1] : null);
-            selectOptionContaining(selSem, semVal);
-
-            // 3. Jenis Nilai (Sumatif) jika ada
-            var isSumatif = ${!isFormatif};
-            var sumType = ${jsonEncode(sumatifType ?? 'Harian')};
-            if (isSumatif) {
-              var selJenis = selects.find(function(s) {
-                return Array.from(s.options).some(function(o) {
-                  var t = (o.text || '').toLowerCase();
-                  return t === 'harian' || t === 'pts' || t === 'pas';
-                });
-              });
-              if (selJenis) selectOptionContaining(selJenis, sumType);
+            if (selYear) {
+              var target = ${jsonEncode(academicYear)};
+              var opt = Array.from(selYear.options).find(function(o) { return (o.text || '').includes(target); }) || (selYear.options.length > 1 ? selYear.options[1] : null);
+              if (opt && opt.value) {
+                selYear.value = opt.value;
+                selYear.dispatchEvent(new Event('input', { bubbles: true }));
+                selYear.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(selYear).val(opt.value).trigger('input').trigger('change');
+                return JSON.stringify({ success: true, val: opt.value });
+              }
             }
+            return JSON.stringify({ success: false });
+          })();
+        ''');
 
-            // 4. Kelas (Mencocokkan nama kelas, misal "VIII HELIUM" atau "HELIUM")
-            var targetClass = ${jsonEncode(targetClassName.toLowerCase())};
+        // Polling tunggu sampai dropdown Semester aktif / memiliki opsi > 1
+        int semWaitMs = 0;
+        while (semWaitMs < 10000) {
+          final checkSemRes = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selSem = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('semester');
+              }) || (selects.length > 1 ? selects[1] : null);
+              if (!selSem) return JSON.stringify({ ready: false });
+              var optText = Array.from(selSem.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
+              var isReady = selSem.options.length > 1 && !optText.includes('pilih tahun dulu');
+              return JSON.stringify({ ready: isReady, count: selSem.options.length });
+            })();
+          ''');
+          final semData = _safeParseJsObject(checkSemRes);
+          if (semData['ready'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          semWaitMs += 300;
+        }
+
+        // 3.2: Pilih Semester
+        emit(0.36, 'Memilih Semester ($semester)...', 3, totalSteps);
+        await controller.runJavaScriptReturningResult('''
+          (function() {
+            var selects = Array.from(document.querySelectorAll('select'));
+            var selSem = selects.find(function(s) {
+              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+              return label.includes('semester');
+            }) || (selects.length > 1 ? selects[1] : null);
+            if (selSem) {
+              var target = ${jsonEncode(semester.toLowerCase())};
+              var opt = Array.from(selSem.options).find(function(o) { return (o.text || '').toLowerCase().includes(target); }) || (selSem.options.length > 1 ? selSem.options[1] : null);
+              if (opt && opt.value) {
+                selSem.value = opt.value;
+                selSem.dispatchEvent(new Event('input', { bubbles: true }));
+                selSem.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(selSem).val(opt.value).trigger('input').trigger('change');
+                return JSON.stringify({ success: true, val: opt.value });
+              }
+            }
+            return JSON.stringify({ success: false });
+          })();
+        ''');
+
+        // Polling tunggu sampai dropdown Kelas aktif / memiliki opsi > 1
+        int kelasWaitMs = 0;
+        while (kelasWaitMs < 10000) {
+          final checkKelasRes = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selKelas = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('kelas');
+              }) || (selects.length > 2 ? selects[2] : null);
+              if (!selKelas) return JSON.stringify({ ready: false });
+              var optText = Array.from(selKelas.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
+              var isReady = selKelas.options.length > 1 && !optText.includes('pilih semester dulu');
+              return JSON.stringify({ ready: isReady, count: selKelas.options.length });
+            })();
+          ''');
+          final kelasData = _safeParseJsObject(checkKelasRes);
+          if (kelasData['ready'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          kelasWaitMs += 300;
+        }
+
+        // 3.3: Pilih Kelas
+        emit(0.40, 'Memilih Kelas ($targetClassName)...', 3, totalSteps);
+        await controller.runJavaScriptReturningResult('''
+          (function() {
+            var selects = Array.from(document.querySelectorAll('select'));
             var selKelas = selects.find(function(s) {
               var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('kelas') || Array.from(s.options).some(function(o) {
+              return label.includes('kelas');
+            }) || (selects.length > 2 ? selects[2] : null);
+            if (selKelas) {
+              var target = ${jsonEncode(targetClassName.toLowerCase().trim())};
+              var tokens = target.split(/\\s+/).filter(function(t) { return t.length >= 3; });
+              var opt = Array.from(selKelas.options).find(function(o) {
                 var t = (o.text || '').toLowerCase();
-                return t.includes(targetClass) || targetClass.includes(t) || t.includes('viii') || t.includes('vii') || t.includes('ix');
-              });
-            }) || (selects.length >= 3 ? selects[2] : null);
-            if (selKelas) selectOptionContaining(selKelas, targetClass);
-
-            // 5. Mapel (Mencocokkan mata pelajaran, misal "Informatika")
-            var targetSubj = ${jsonEncode(targetSubjectName.toLowerCase())};
-            var selSubj = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('mapel') || label.includes('pelajaran') || Array.from(s.options).some(function(o) {
-                return (o.text || '').toLowerCase().includes(targetSubj);
-              });
-            }) || (selects.length >= 4 ? selects[3] : null);
-            if (selSubj) selectOptionContaining(selSubj, targetSubj);
-
-            // 6. Nilai Ke (Formatif: 1, 2, 3...)
-            var selKe = selects.find(function(s) {
-              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('ke') || label.includes('nilai_ke') || label.includes('ulangan');
-            });
-            if (selKe && selKe.options.length > 1) {
-              selectOptionContaining(selKe, '1');
+                return t.includes(target) || (tokens.length > 0 && tokens.some(function(tok) { return t.includes(tok); }));
+              }) || (selKelas.options.length > 1 ? selKelas.options[1] : null);
+              if (opt && opt.value) {
+                selKelas.value = opt.value;
+                selKelas.dispatchEvent(new Event('input', { bubbles: true }));
+                selKelas.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(selKelas).val(opt.value).trigger('input').trigger('change');
+                return JSON.stringify({ success: true, val: opt.value, text: opt.text });
+              }
             }
+            return JSON.stringify({ success: false });
+          })();
+        ''');
 
-            // 7. Tanggal Penilaian jika ada field date
+        // Polling tunggu sampai dropdown Mapel aktif / memiliki opsi > 1
+        int mapelWaitMs = 0;
+        while (mapelWaitMs < 10000) {
+          final checkMapelRes = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selMapel = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('mapel') || label.includes('pelajaran');
+              }) || (selects.length > 3 ? selects[3] : null);
+              if (!selMapel) return JSON.stringify({ ready: false });
+              var optText = Array.from(selMapel.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
+              var isReady = selMapel.options.length > 1 && !optText.includes('pilih kelas dulu');
+              return JSON.stringify({ ready: isReady, count: selMapel.options.length });
+            })();
+          ''');
+          final mapelData = _safeParseJsObject(checkMapelRes);
+          if (mapelData['ready'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          mapelWaitMs += 300;
+        }
+
+        // 3.4: Pilih Mapel
+        emit(0.44, 'Memilih Mapel ($targetSubjectName)...', 3, totalSteps);
+        await controller.runJavaScriptReturningResult('''
+          (function() {
+            var selects = Array.from(document.querySelectorAll('select'));
+            var selMapel = selects.find(function(s) {
+              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+              return label.includes('mapel') || label.includes('pelajaran');
+            }) || (selects.length > 3 ? selects[3] : null);
+            if (selMapel) {
+              var target = ${jsonEncode(targetSubjectName.toLowerCase().trim())};
+              var opt = Array.from(selMapel.options).find(function(o) {
+                var t = (o.text || '').toLowerCase();
+                return t.includes(target) || target.includes(t);
+              }) || (selMapel.options.length > 1 ? selMapel.options[1] : null);
+              if (opt && opt.value) {
+                selMapel.value = opt.value;
+                selMapel.dispatchEvent(new Event('input', { bubbles: true }));
+                selMapel.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(selMapel).val(opt.value).trigger('input').trigger('change');
+                return JSON.stringify({ success: true, val: opt.value, text: opt.text });
+              }
+            }
+            return JSON.stringify({ success: false });
+          })();
+        ''');
+
+        // 3.5: Pilih CP (Capaian Pembelajaran)
+        emit(0.48, 'Memuat & memilih Kode CP dari SidikMu...', 3, totalSteps);
+        int cpWaitMs = 0;
+        while (cpWaitMs < 10000) {
+          final cpCheck = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selCp = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('cp') || label.includes('capaian');
+              }) || (selects.length > 4 ? selects[4] : null);
+              if (!selCp) return JSON.stringify({ ready: false, count: 0 });
+              var optText = Array.from(selCp.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
+              var isReady = selCp.options.length > 1 && !optText.includes('pilih mapel dulu');
+              return JSON.stringify({ ready: isReady, count: selCp.options.length });
+            })();
+          ''');
+          final cpData = _safeParseJsObject(cpCheck);
+          if (cpData['ready'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          cpWaitMs += 300;
+        }
+
+        await controller.runJavaScriptReturningResult('''
+          (function() {
+            var selects = Array.from(document.querySelectorAll('select'));
+            var selCp = selects.find(function(s) {
+              var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+              return label.includes('cp') || label.includes('capaian');
+            }) || (selects.length > 4 ? selects[4] : null);
+            if (selCp && selCp.options.length > 1) {
+              var target = ${jsonEncode((targetCpCode ?? '').toLowerCase().trim())};
+              var numMatch = target.match(/\\d+(\\.\\d+)?/);
+              var num = numMatch ? numMatch[0] : '';
+              var opt = null;
+              if (target) {
+                opt = Array.from(selCp.options).find(function(o) {
+                  var t = (o.text || '').toLowerCase().trim();
+                  if (t === target || t.includes(target) || target.includes(t)) return true;
+                  if (num && (t.startsWith('cp ' + num) || t.startsWith('cp' + num) || t.startsWith(num + ' ') || t.startsWith(num + '-') || t.startsWith(num + '.'))) return true;
+                  return false;
+                });
+              }
+              if (!opt) opt = selCp.options[1];
+              if (opt && opt.value) {
+                selCp.value = opt.value;
+                selCp.dispatchEvent(new Event('input', { bubbles: true }));
+                selCp.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(selCp).val(opt.value).trigger('input').trigger('change');
+                return JSON.stringify({ success: true, val: opt.value, text: opt.text });
+              }
+            }
+            return JSON.stringify({ success: false });
+          })();
+        ''');
+
+        // 3.6: Pilih TP (Tujuan Pembelajaran) jika Formatif
+        if (isFormatif) {
+          emit(0.52, 'Memuat & memilih Kode TP dari SidikMu...', 3, totalSteps);
+          int tpWaitMs = 0;
+          while (tpWaitMs < 10000) {
+            final tpCheck = await controller.runJavaScriptReturningResult('''
+              (function() {
+                var selects = Array.from(document.querySelectorAll('select'));
+                var selTp = selects.find(function(s) {
+                  var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                  return label.includes('tp') || label.includes('tujuan');
+                }) || (selects.length > 5 ? selects[5] : null);
+                if (!selTp) return JSON.stringify({ ready: false, count: 0 });
+                var optText = Array.from(selTp.options).map(function(o) { return (o.text || '').toLowerCase(); }).join(' ');
+                var isReady = selTp.options.length > 1 && !optText.includes('pilih cp dulu');
+                return JSON.stringify({ ready: isReady, count: selTp.options.length });
+              })();
+            ''');
+            final tpData = _safeParseJsObject(tpCheck);
+            if (tpData['ready'] == true) break;
+            await Future.delayed(const Duration(milliseconds: 300));
+            tpWaitMs += 300;
+          }
+
+          await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selTp = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('tp') || label.includes('tujuan');
+              }) || (selects.length > 5 ? selects[5] : null);
+              if (selTp && selTp.options.length > 1) {
+                var target = ${jsonEncode((targetTpCode ?? '').toLowerCase().trim())};
+                var numMatch = target.match(/\\d+(\\.\\d+)?/);
+                var num = numMatch ? numMatch[0] : '';
+                var opt = null;
+                if (target) {
+                  opt = Array.from(selTp.options).find(function(o) {
+                    var t = (o.text || '').toLowerCase().trim();
+                    if (t === target || t.includes(target) || target.includes(t)) return true;
+                    if (num && (t.startsWith('tp ' + num) || t.startsWith('tp' + num) || t.startsWith(num + ' ') || t.startsWith(num + '-') || t.startsWith(num + '.'))) return true;
+                    return false;
+                  });
+                }
+                if (!opt) opt = selTp.options[1];
+                if (opt && opt.value) {
+                  selTp.value = opt.value;
+                  selTp.dispatchEvent(new Event('input', { bubbles: true }));
+                  selTp.dispatchEvent(new Event('change', { bubbles: true }));
+                  if (window.jQuery) window.jQuery(selTp).val(opt.value).trigger('input').trigger('change');
+                  return JSON.stringify({ success: true, val: opt.value, text: opt.text });
+                }
+              }
+              return JSON.stringify({ success: false });
+            })();
+          ''');
+        }
+
+        // Set tanggal dan field tambahan jika ada
+        await controller.runJavaScriptReturningResult('''
+          (function() {
             var dateInp = document.querySelector('input[type="date"], input[name*="tgl"], input[name*="tanggal"]');
             if (dateInp && !dateInp.value) {
               var now = new Date();
@@ -653,138 +834,18 @@ class SidikmuService {
               dateInp.dispatchEvent(new Event('input', { bubbles: true }));
               dateInp.dispatchEvent(new Event('change', { bubbles: true }));
             }
-
-            return JSON.stringify({ success: true });
-          })();
-        ''';
-        await controller.runJavaScriptReturningResult(filterJs);
-
-        // ──────── POLLING AKTIF CASCADING AJAX CAPAIAN PEMBELAJARAN (CP) ────────
-        emit(0.42, 'Memuat & menyesuaikan Kode CP dari SidikMu...', 3, totalSteps);
-        int cpWaitMs = 0;
-        while (cpWaitMs < 12000) {
-          final cpCheck = await controller.runJavaScriptReturningResult('''
-            (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selCp = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('cp') || label.includes('capaian');
-              }) || (selects.length >= 5 ? selects[4] : null);
-
-              if (!selCp) return JSON.stringify({ ready: false, count: 0 });
-              return JSON.stringify({
-                ready: selCp.options.length > 1,
-                count: selCp.options.length
-              });
-            })();
-          ''');
-          final cpData = _safeParseJsObject(cpCheck);
-          if (cpData['ready'] == true) break;
-          await Future.delayed(const Duration(milliseconds: 300));
-          cpWaitMs += 300;
-        }
-
-        final cpSelectJs = '''
-          (function() {
             var selects = Array.from(document.querySelectorAll('select'));
-            var selCp = selects.find(function(s) {
+            var selKe = selects.find(function(s) {
               var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('cp') || label.includes('capaian');
-            }) || (selects.length >= 5 ? selects[4] : null);
-
-            if (!selCp || selCp.options.length <= 1) return JSON.stringify({ success: false });
-
-            var target = ${jsonEncode((targetCpCode ?? '').toLowerCase().trim())};
-            var options = Array.from(selCp.options);
-            var matched = null;
-            if (target) {
-              matched = options.find(function(o) {
-                var txt = (o.text || '').toLowerCase().trim();
-                return txt.includes(target) || target.includes(txt);
-              });
+              return label.includes('ke') || label.includes('nilai_ke') || label.includes('ulangan');
+            });
+            if (selKe && selKe.options.length > 1) {
+              selKe.value = selKe.options[1].value;
+              selKe.dispatchEvent(new Event('change', { bubbles: true }));
             }
-            if (!matched && options.length > 1) {
-              matched = options[1];
-            }
-
-            if (matched && matched.value) {
-              selCp.value = matched.value;
-              selCp.dispatchEvent(new Event('input', { bubbles: true }));
-              selCp.dispatchEvent(new Event('change', { bubbles: true }));
-              if (window.jQuery) {
-                window.jQuery(selCp).val(matched.value).trigger('input').trigger('change');
-              }
-              return JSON.stringify({ success: true, val: matched.value, text: matched.text });
-            }
-            return JSON.stringify({ success: false });
           })();
-        ''';
-        await controller.runJavaScriptReturningResult(cpSelectJs);
-
-        // ──────── POLLING AKTIF CASCADING AJAX TUJUAN PEMBELAJARAN (TP) ────────
-        if (isFormatif) {
-          emit(0.48, 'Memuat & menyesuaikan Kode TP dari SidikMu...', 3, totalSteps);
-          int tpWaitMs = 0;
-          while (tpWaitMs < 12000) {
-            final tpCheck = await controller.runJavaScriptReturningResult('''
-              (function() {
-                var selects = Array.from(document.querySelectorAll('select'));
-                var selTp = selects.find(function(s) {
-                  var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                  return label.includes('tp') || label.includes('tujuan');
-                }) || (selects.length >= 6 ? selects[5] : null);
-
-                if (!selTp) return JSON.stringify({ ready: false, count: 0 });
-                return JSON.stringify({
-                  ready: selTp.options.length > 1,
-                  count: selTp.options.length
-                });
-              })();
-            ''');
-            final tpData = _safeParseJsObject(tpCheck);
-            if (tpData['ready'] == true) break;
-            await Future.delayed(const Duration(milliseconds: 300));
-            tpWaitMs += 300;
-          }
-
-          final tpSelectJs = '''
-            (function() {
-              var selects = Array.from(document.querySelectorAll('select'));
-              var selTp = selects.find(function(s) {
-                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('tp') || label.includes('tujuan');
-              }) || (selects.length >= 6 ? selects[5] : null);
-
-              if (!selTp || selTp.options.length <= 1) return JSON.stringify({ success: false });
-
-              var target = ${jsonEncode((targetTpCode ?? '').toLowerCase().trim())};
-              var options = Array.from(selTp.options);
-              var matched = null;
-              if (target) {
-                matched = options.find(function(o) {
-                  var txt = (o.text || '').toLowerCase().trim();
-                  return txt.includes(target) || target.includes(txt);
-                });
-              }
-              if (!matched && options.length > 1) {
-                matched = options[1];
-              }
-
-              if (matched && matched.value) {
-                selTp.value = matched.value;
-                selTp.dispatchEvent(new Event('input', { bubbles: true }));
-                selTp.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) {
-                  window.jQuery(selTp).val(matched.value).trigger('input').trigger('change');
-                }
-                return JSON.stringify({ success: true, val: matched.value, text: matched.text });
-              }
-              return JSON.stringify({ success: false });
-            })();
-          ''';
-          await controller.runJavaScriptReturningResult(tpSelectJs);
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
+        ''');
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // ──────── STEP 4: PROSES SELANJUTNYA ────────
         emit(0.55, 'Membuka tabel nilai siswa (Proses Selanjutnya)...', 4, totalSteps);
@@ -938,6 +999,17 @@ class SidikmuService {
           var names = ${jsonEncode(studentNamesByNis)};
           var validRows = info.rows;
 
+          function getScoreForNis(nis) {
+            if (!nis) return undefined;
+            var clean = String(nis).trim();
+            if (grades.hasOwnProperty(clean)) return grades[clean];
+            var noLeadingZeros = clean.replace(/^0+/, '');
+            if (noLeadingZeros && grades.hasOwnProperty(noLeadingZeros)) return grades[noLeadingZeros];
+            var withLeadingZero = '0' + clean;
+            if (grades.hasOwnProperty(withLeadingZero)) return grades[withLeadingZero];
+            return undefined;
+          }
+
           var filled = 0;
           var emptyList = [];
           var zeroList = [];
@@ -953,8 +1025,11 @@ class SidikmuService {
             if (cells.length > 1) {
               var rawCandidate = (cells[1].innerText || '').trim();
               var candidate = rawCandidate.replace(/[^0-9]/g, '');
-              if (candidate && grades.hasOwnProperty(candidate)) {
-                matchedNis = candidate;
+              if (candidate) {
+                var score = getScoreForNis(candidate);
+                if (score !== undefined) {
+                  matchedNis = candidate;
+                }
               }
             }
 
@@ -987,7 +1062,7 @@ class SidikmuService {
             var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
             if (!input) return;
 
-            var scoreVal = grades[matchedNis];
+            var scoreVal = getScoreForNis(matchedNis);
             if (scoreVal !== null && scoreVal !== undefined) {
               var scoreStr = (scoreVal % 1 === 0) ? scoreVal.toFixed(0) : scoreVal.toString();
               input.removeAttribute('disabled');
@@ -1091,37 +1166,14 @@ class SidikmuService {
 
       emit(0.88, 'Menyimpan $filledCount nilai siswa ke portal SidikMu...', 5, totalSteps);
 
-      // ──────── STEP 6: SIMPAN NILAI (88% - 100%) ────────
+      // ──────── STEP 6: SIMPAN NILAI & KONFIRMASI SWEETALERT2 (88% - 100%) ────────
       final saveBtnJs = '''
         (function() {
-          // 1. Override all native alerts and confirms
+          // 1. Override native window alert dan confirm agar proses tidak terhenti
           window.confirm = function() { return true; };
           window.alert = function() { return true; };
 
-          // 2. Intercept SweetAlert v1 (swal) agar otomatis confirm callback
-          if (typeof window.swal === 'function') {
-            var origSwal = window.swal;
-            window.swal = function(arg1, arg2) {
-              if (typeof arg2 === 'function') {
-                setTimeout(function() { try { arg2(true); } catch(e){} }, 50);
-                return;
-              }
-              if (arg1 && typeof arg1.callback === 'function') {
-                setTimeout(function() { try { arg1.callback(true); } catch(e){} }, 50);
-                return;
-              }
-              try { origSwal(arg1, arg2); } catch(e) {}
-            };
-          }
-
-          // 3. Intercept SweetAlert v2 (Swal.fire)
-          if (window.Swal && typeof window.Swal.fire === 'function') {
-            window.Swal.fire = function() {
-              return Promise.resolve({ isConfirmed: true, isDenied: false, isDismissed: false, value: true });
-            };
-          }
-
-          // 4. Cari tombol Simpan Nilai
+          // 2. Klik tombol [Simpan Nilai]
           var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
           var saveBtn = btns.find(function(b) {
             var txt = (b.innerText || b.value || '').toLowerCase();
@@ -1147,27 +1199,43 @@ class SidikmuService {
       ''';
       await controller.runJavaScriptReturningResult(saveBtnJs);
 
-      // Active polling untuk konfirmasi SweetAlert/Modal dan verifikasi respons SidikMu
+      // Active polling untuk konfirmasi SweetAlert2 dialog ("Berhasil! Nilai baru berhasil disimpan")
       int saveWaitMs = 0;
-      while (saveWaitMs < 6000) {
+      bool isSuccessConfirmed = false;
+      String confirmedSuccessMessage = '';
+
+      while (saveWaitMs < 15000) {
         await Future.delayed(const Duration(milliseconds: 500));
         saveWaitMs += 500;
 
         final confirmRes = await controller.runJavaScriptReturningResult('''
           (function() {
+            var swalTitle = document.querySelector('.swal2-title, .sweet-alert h2');
+            var swalText = document.querySelector('.swal2-html-container, .swal2-content, .sweet-alert p');
+            var swalSuccessIcon = document.querySelector('.swal2-success, .sa-success');
+            var bodyText = document.body.innerText || '';
+
+            var titleStr = swalTitle ? (swalTitle.innerText || '').trim() : '';
+            var textStr = swalText ? (swalText.innerText || '').trim() : '';
+
+            var isSuccess = false;
+            var msg = '';
+
+            if (titleStr.toLowerCase().includes('berhasil') || textStr.toLowerCase().includes('berhasil disimpan') || swalSuccessIcon) {
+              isSuccess = true;
+              msg = textStr || titleStr;
+            } else if (bodyText.includes('Nilai baru berhasil disimpan') || bodyText.includes('inputan nilai baru')) {
+              isSuccess = true;
+              msg = 'Nilai baru berhasil disimpan ke SidikMu';
+            }
+
+            // Klik tombol OK / Konfirmasi SweetAlert2 jika muncul
             var confirmSelectors = [
               '.swal2-confirm',
               '.swal-button--confirm',
               'button.confirm',
-              '.btn-confirm',
               '.sweet-alert button.confirm',
-              '.sa-confirm-button-container button',
-              '.modal-footer .btn-primary',
-              '.modal-footer .btn-success',
-              '.modal-footer .btn-info',
-              '.modal-footer button[type="submit"]',
-              '.modal.show button.btn-primary',
-              '.modal.in button.btn-primary'
+              '.modal.show button.btn-primary'
             ];
             var okBtns = document.querySelectorAll(confirmSelectors.join(', '));
             var clickedConfirm = false;
@@ -1177,41 +1245,30 @@ class SidikmuService {
               clickedConfirm = true;
             });
 
-            var successEl = document.querySelector('.alert-success, .swal2-success, .sweet-alert.showSweetAlert .sa-success, .text-success');
-            var successText = successEl ? (successEl.innerText || '').trim() : '';
-
-            var formSubmitted = false;
-            if ($saveWaitMs >= 2000 && !clickedConfirm && !successText) {
-              var tableForm = Array.from(document.querySelectorAll('form')).find(function(f) {
-                return f.querySelectorAll('table, input:not([type="hidden"]):not([type="checkbox"])').length >= 3;
-              });
-              if (tableForm) {
-                try {
-                  tableForm.submit();
-                  formSubmitted = true;
-                } catch(e) {}
-              }
-            }
-
             return JSON.stringify({
-              clickedConfirm: clickedConfirm,
-              isSuccessShown: successText.length > 0 || !!document.querySelector('.swal2-success, .sa-success'),
-              formSubmitted: formSubmitted
+              isSuccess: isSuccess,
+              message: msg,
+              clickedConfirm: clickedConfirm
             });
           })();
         ''');
 
         final confirmData = _safeParseJsObject(confirmRes);
-        if (confirmData['isSuccessShown'] == true) {
+        if (confirmData['isSuccess'] == true) {
+          isSuccessConfirmed = true;
+          confirmedSuccessMessage = confirmData['message']?.toString() ?? '';
           break;
         }
       }
 
+      debugPrint('[SidikmuService] Automation finished. Confirmed: $isSuccessConfirmed, Msg: $confirmedSuccessMessage');
       emit(1.0, 'Sinkronisasi nilai berhasil diselesaikan (100%)!', 6, totalSteps);
 
       return SidikmuSyncResult(
         isSuccess: true,
-        message: 'Nilai berhasil disimpan ke SidikMu ($filledCount dari $totalRows siswa).',
+        message: confirmedSuccessMessage.isNotEmpty
+            ? confirmedSuccessMessage
+            : 'Nilai berhasil disimpan ke SidikMu ($filledCount dari $totalRows siswa).',
         totalStudents: totalRows,
         syncedStudents: filledCount,
         emptyOrZeroStudents: emptyOrZeroList,

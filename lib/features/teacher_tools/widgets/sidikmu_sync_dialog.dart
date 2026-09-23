@@ -16,6 +16,8 @@ class SidikmuSyncDialog extends StatefulWidget {
   final String? targetCpCode;
   final String? targetTpCode;
   final String? examTitle;
+  final String? assignmentId;
+  final String? examId;
   final Map<String, double?> studentGradesByNis;
   final Map<String, String> studentNamesByNis;
 
@@ -27,6 +29,8 @@ class SidikmuSyncDialog extends StatefulWidget {
     this.targetCpCode,
     this.targetTpCode,
     this.examTitle,
+    this.assignmentId,
+    this.examId,
     required this.studentGradesByNis,
     required this.studentNamesByNis,
   });
@@ -39,6 +43,8 @@ class SidikmuSyncDialog extends StatefulWidget {
     String? targetCpCode,
     String? targetTpCode,
     String? examTitle,
+    String? assignmentId,
+    String? examId,
     required Map<String, double?> studentGradesByNis,
     required Map<String, String> studentNamesByNis,
   }) {
@@ -52,6 +58,8 @@ class SidikmuSyncDialog extends StatefulWidget {
         targetCpCode: targetCpCode,
         targetTpCode: targetTpCode,
         examTitle: examTitle,
+        assignmentId: assignmentId,
+        examId: examId,
         studentGradesByNis: studentGradesByNis,
         studentNamesByNis: studentNamesByNis,
       ),
@@ -75,8 +83,13 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   late String _sumatifType;
   late String _className;
   late String _subjectName;
-  late String _cpCode;
-  late String _tpCode;
+
+  // Interactive student data
+  late Map<String, double?> _studentGradesByNis;
+  late Map<String, String> _studentNamesByNis;
+  late final TextEditingController _cpCtrl;
+  late final TextEditingController _tpCtrl;
+  bool _showStudentList = false;
 
   // Progress state
   double _progressPercentage = 0.0;
@@ -101,8 +114,19 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         : 'Harian';
     _className = widget.targetClassName;
     _subjectName = widget.targetSubjectName;
-    _cpCode = widget.targetCpCode ?? '';
-    _tpCode = widget.targetTpCode ?? '';
+
+    final initialCp = (widget.targetCpCode != null && widget.targetCpCode!.isNotEmpty)
+        ? widget.targetCpCode!
+        : 'CP 1';
+    final initialTp = (widget.targetTpCode != null && widget.targetTpCode!.isNotEmpty)
+        ? widget.targetTpCode!
+        : '1.1';
+
+    _cpCtrl = TextEditingController(text: initialCp);
+    _tpCtrl = TextEditingController(text: initialTp);
+
+    _studentGradesByNis = Map.from(widget.studentGradesByNis);
+    _studentNamesByNis = Map.from(widget.studentNamesByNis);
 
     _initWebView();
   }
@@ -111,6 +135,8 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _cpCtrl.dispose();
+    _tpCtrl.dispose();
     super.dispose();
   }
 
@@ -144,6 +170,63 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
       Uri.parse('https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases'),
       mode: LaunchMode.externalApplication,
     );
+  }
+
+  void _onClassChanged(String newClass, FirebaseService fb) {
+    setState(() {
+      _className = newClass;
+      final classStudents = fb.allStudents.where((s) {
+        final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
+        final target = newClass.trim().toLowerCase();
+        if (target.isEmpty || target == 'semua kelas') return true;
+        return sClass == target ||
+            (s.classId != null && s.classId!.toLowerCase() == target) ||
+            (s.className != null && target.contains(s.className!.toLowerCase())) ||
+            (s.className != null && s.className!.toLowerCase().contains(target));
+      }).toList();
+
+      if (classStudents.isNotEmpty) {
+        final newGrades = <String, double?>{};
+        final newNames = <String, String>{};
+
+        for (final s in classStudents) {
+          final nis = (s.nis ?? '').trim();
+          if (nis.isNotEmpty) {
+            newGrades[nis] = null;
+            newNames[nis] = s.fullName;
+          }
+        }
+
+        if (widget.assignmentId != null) {
+          final submissions = fb.getSubmissionsForAssignment(widget.assignmentId!);
+          for (final sub in submissions) {
+            final student = fb.allStudents.where((std) => std.id == sub.submitterId).firstOrNull;
+            final nis = (student?.nis ?? '').trim();
+            if (nis.isNotEmpty && newGrades.containsKey(nis)) {
+              newGrades[nis] = sub.score;
+              newNames[nis] = student!.fullName.isNotEmpty ? student.fullName : sub.submitterName;
+            }
+            for (final memId in sub.memberStudentIds) {
+              final mem = fb.allStudents.where((m) => m.id == memId).firstOrNull;
+              final memNis = (mem?.nis ?? '').trim();
+              if (memNis.isNotEmpty && newGrades.containsKey(memNis)) {
+                newGrades[memNis] = sub.score;
+                newNames[memNis] = mem!.fullName;
+              }
+            }
+          }
+        } else {
+          for (final entry in widget.studentGradesByNis.entries) {
+            if (newGrades.containsKey(entry.key)) {
+              newGrades[entry.key] = entry.value;
+            }
+          }
+        }
+
+        _studentGradesByNis = newGrades;
+        _studentNamesByNis = newNames;
+      }
+    });
   }
 
   Future<void> _startSync() async {
@@ -199,10 +282,10 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         sumatifType: _sumatifType,
         targetClassName: _className,
         targetSubjectName: _subjectName,
-        targetCpCode: _cpCode.isNotEmpty ? _cpCode : null,
-        targetTpCode: _tpCode.isNotEmpty ? _tpCode : null,
-        studentGradesByNis: widget.studentGradesByNis,
-        studentNamesByNis: widget.studentNamesByNis,
+        targetCpCode: _cpCtrl.text.trim().isNotEmpty ? _cpCtrl.text.trim() : null,
+        targetTpCode: _tpCtrl.text.trim().isNotEmpty ? _tpCtrl.text.trim() : null,
+        studentGradesByNis: _studentGradesByNis,
+        studentNamesByNis: _studentNamesByNis,
         onProgress: (p) {
           if (mounted) {
             setState(() {
@@ -223,10 +306,10 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         sumatifType: _sumatifType,
         targetClassName: _className,
         targetSubjectName: _subjectName,
-        targetCpCode: _cpCode.isNotEmpty ? _cpCode : null,
-        targetTpCode: _tpCode.isNotEmpty ? _tpCode : null,
-        studentGradesByNis: widget.studentGradesByNis,
-        studentNamesByNis: widget.studentNamesByNis,
+        targetCpCode: _cpCtrl.text.trim().isNotEmpty ? _cpCtrl.text.trim() : null,
+        targetTpCode: _tpCtrl.text.trim().isNotEmpty ? _tpCtrl.text.trim() : null,
+        studentGradesByNis: _studentGradesByNis,
+        studentNamesByNis: _studentNamesByNis,
         onProgress: (p) {
           if (mounted) {
             setState(() {
@@ -255,14 +338,13 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 750),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             // Headless Desktop-viewport WebView container for Android Automation
-            // Placed at (0, 0) inside bounds with micro-scale so Android compositor never culls or pauses JS/DOM
             if (_webController != null)
               Positioned(
                 left: 0,
@@ -288,16 +370,26 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               ),
 
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(),
-                  const SizedBox(height: 20),
-                  if (_currentPhase == 'confirm') _buildConfirmPhase(),
-                  if (_currentPhase == 'syncing') _buildSyncingPhase(),
-                  if (_currentPhase == 'result') _buildResultPhase(),
+                  const SizedBox(height: 14),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_currentPhase == 'confirm') _buildConfirmPhase(),
+                          if (_currentPhase == 'syncing') _buildSyncingPhase(),
+                          if (_currentPhase == 'result') _buildResultPhase(),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -330,7 +422,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               Text(
                 'Sinkronisasi Nilai SidikMu',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimaryLight,
                 ),
@@ -358,7 +450,8 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   }
 
   Widget _buildConfirmPhase() {
-    final totalStudents = widget.studentGradesByNis.length;
+    final totalStudents = _studentGradesByNis.length;
+    final filledCount = _studentGradesByNis.values.where((v) => v != null).length;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -372,13 +465,14 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
             border: Border.all(color: const Color(0xFFBAE6FD)),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildParamRow(
                 icon: Icons.calendar_month_rounded,
                 label: 'Tahun Ajaran & Semester',
                 value: '$_academicYear ($_semester)',
               ),
-              const Divider(height: 16),
+              const Divider(height: 14),
               Builder(builder: (context) {
                 final fb = context.watch<FirebaseService>();
                 final availableClasses = fb.getAvailableClasses();
@@ -412,7 +506,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                         }).toList(),
                         onChanged: (val) {
                           if (val != null) {
-                            setState(() => _className = val);
+                            _onClassChanged(val, fb);
                           }
                         },
                       ),
@@ -425,40 +519,278 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                   value: _className,
                 );
               }),
-              const Divider(height: 16),
+              const Divider(height: 14),
               _buildParamRow(
                 icon: Icons.menu_book_rounded,
                 label: 'Mata Pelajaran',
                 value: _subjectName,
               ),
               if (!widget.isFormatif) ...[
-                const Divider(height: 16),
+                const Divider(height: 14),
                 _buildParamRow(
                   icon: Icons.grading_rounded,
                   label: 'Jenis Nilai Sumatif',
                   value: _sumatifType,
                 ),
               ],
-              if (_cpCode.isNotEmpty) ...[
-                const Divider(height: 16),
-                _buildParamRow(
-                  icon: Icons.bookmark_added_rounded,
-                  label: 'Kode CP',
-                  value: _cpCode,
+              const Divider(height: 14),
+              // Kode CP
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.bookmark_added_rounded, size: 18, color: Color(0xFF0284C7)),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Kode CP',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 120,
+                    height: 34,
+                    child: TextFormField(
+                      controller: _cpCtrl,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimaryLight,
+                      ),
+                      textAlign: TextAlign.end,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        hintText: 'e.g. CP 1',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: ['CP 1', 'CP 2', 'CP 3', 'CP 4'].map((chip) {
+                  final isSelected = _cpCtrl.text.trim().toLowerCase() == chip.toLowerCase();
+                  return ChoiceChip(
+                    label: Text(chip, style: TextStyle(fontSize: 10.5, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                    selected: isSelected,
+                    onSelected: (_) => setState(() => _cpCtrl.text = chip),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  );
+                }).toList(),
+              ),
+
+              if (widget.isFormatif) ...[
+                const Divider(height: 14),
+                // Kode TP
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, size: 18, color: Color(0xFF0284C7)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Kode TP',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryLight,
+                      ),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: 120,
+                      height: 34,
+                      child: TextFormField(
+                        controller: _tpCtrl,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimaryLight,
+                        ),
+                        textAlign: TextAlign.end,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          hintText: 'e.g. 1.1',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-              if (widget.isFormatif && _tpCode.isNotEmpty) ...[
-                const Divider(height: 16),
-                _buildParamRow(
-                  icon: Icons.check_circle_outline_rounded,
-                  label: 'Kode TP',
-                  value: _tpCode,
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: ['1.1', '1.2', '1.3', '2.1'].map((chip) {
+                    final isSelected = _tpCtrl.text.trim().toLowerCase() == chip.toLowerCase();
+                    return ChoiceChip(
+                      label: Text(chip, style: TextStyle(fontSize: 10.5, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                      selected: isSelected,
+                      onSelected: (_) => setState(() => _tpCtrl.text = chip),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    );
+                  }).toList(),
                 ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+
+        // Interactive Student List & Scores Preview (NIS, Nama, Nilai)
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: () => setState(() => _showStudentList = !_showStudentList),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.format_list_numbered_rounded, color: Color(0xFF0284C7), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Daftar Nilai Siswa ($totalStudents Siswa)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimaryLight,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$filledCount Terisi',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        _showStudentList ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_showStudentList) ...[
+                const Divider(height: 1),
+                Container(
+                  color: Colors.grey.shade50,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: const Row(
+                    children: [
+                      SizedBox(width: 24, child: Text('No', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey))),
+                      SizedBox(width: 60, child: Text('NIS', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey))),
+                      Expanded(child: Text('Nama Siswa', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey))),
+                      SizedBox(width: 55, child: Text('Nilai', textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey))),
+                    ],
+                  ),
+                ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _studentGradesByNis.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                    itemBuilder: (ctx, idx) {
+                      final nis = _studentGradesByNis.keys.elementAt(idx);
+                      final name = _studentNamesByNis[nis] ?? 'Siswa $nis';
+                      final score = _studentGradesByNis[nis];
+                      final scoreStr = score != null
+                          ? (score % 1 == 0 ? score.toInt().toString() : score.toString())
+                          : '';
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              child: Text('${idx + 1}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            ),
+                            SizedBox(
+                              width: 60,
+                              child: Text(
+                                nis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0284C7),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(fontSize: 11.5, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 55,
+                              height: 30,
+                              child: TextFormField(
+                                key: ValueKey('score_$nis'),
+                                initialValue: scoreStr,
+                                textAlign: TextAlign.center,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: score != null ? const Color(0xFF15803D) : Colors.grey.shade700,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: '-',
+                                  contentPadding: EdgeInsets.zero,
+                                  filled: true,
+                                  fillColor: score != null ? const Color(0xFFF0FDF4) : Colors.grey.shade100,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                ),
+                                onChanged: (val) {
+                                  final numVal = double.tryParse(val.trim());
+                                  _studentGradesByNis[nis] = numVal;
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
 
         // Android Background Automation Banner / Setup Card
         if (!kIsWeb) ...[
@@ -469,10 +801,10 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
 
             if (isLinked) {
               return Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFBBF7D0)),
                 ),
                 child: Column(
@@ -480,25 +812,25 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.smart_toy_rounded, color: Color(0xFF16A34A), size: 22),
+                        const Icon(Icons.smart_toy_rounded, color: Color(0xFF16A34A), size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'Mode Automasi Latar Belakang Aktif',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF15803D),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      'Akun SidikMu terhubung: ${teacher?.sidikmuUsername}. Sistem akan otomatis login, memilih kelas & mapel, mengisi nilai $totalStudents siswa, dan menyimpannya di SidikMu di latar belakang tanpa membuka browser.',
+                      'Akun SidikMu: ${teacher?.sidikmuUsername}. Sistem akan otomatis login, memilih filter, mengisi nilai $totalStudents siswa, dan menyimpannya di SidikMu.',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         color: Colors.grey.shade700,
-                        height: 1.4,
+                        height: 1.3,
                       ),
                     ),
                   ],
@@ -506,10 +838,10 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               );
             } else {
               return Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFFDE68A)),
                 ),
                 child: Column(
@@ -517,12 +849,12 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.key_rounded, color: Color(0xFFD97706), size: 20),
+                        const Icon(Icons.key_rounded, color: Color(0xFFD97706), size: 18),
                         const SizedBox(width: 8),
                         Text(
                           'Tautkan Akun SidikMu Guru',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFFB45309),
                           ),
@@ -531,36 +863,36 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Masukkan username & password SidikMu sekali saja untuk automasi login dan input nilai tanpa keluar aplikasi:',
+                      'Masukkan username & password SidikMu untuk automasi login dan input nilai:',
                       style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey.shade700),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _usernameCtrl,
                       decoration: InputDecoration(
                         labelText: 'Username SidikMu',
-                        labelStyle: const TextStyle(fontSize: 12),
-                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        labelStyle: const TextStyle(fontSize: 11),
+                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 16),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     TextField(
                       controller: _passwordCtrl,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         labelText: 'Password SidikMu',
-                        labelStyle: const TextStyle(fontSize: 12),
-                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
+                        labelStyle: const TextStyle(fontSize: 11),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 16),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 16),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         filled: true,
                         fillColor: Colors.white,
                       ),
@@ -570,7 +902,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               );
             }
           }),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
         ],
 
         // Web Browser Info Banner
@@ -587,12 +919,12 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.android_rounded, size: 20, color: Color(0xFF16A34A)),
+                    const Icon(Icons.android_rounded, size: 18, color: Color(0xFF16A34A)),
                     const SizedBox(width: 8),
                     Text(
-                      'Automasi Penuh 100% (Aplikasi Android)',
+                      'Automasi Penuh (Aplikasi Android)',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF15803D),
                       ),
@@ -601,34 +933,31 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Untuk automasi sinkronisasi 100% di latar belakang tanpa membuka SidikMu sama sekali, jalankan melalui Aplikasi Android E-Learning.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.5,
-                    color: Colors.grey.shade700,
-                  ),
+                  'Untuk sinkronisasi otomatis di latar belakang, jalankan melalui Aplikasi Android.',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey.shade700),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 ElevatedButton.icon(
                   onPressed: _openApkDownload,
-                  icon: const Icon(Icons.download_rounded, size: 16),
-                  label: const Text('Unduh Aplikasi Android (.apk)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.download_rounded, size: 15),
+                  label: const Text('Unduh Aplikasi Android (.apk)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
         ],
 
         // Info Badge
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
@@ -636,13 +965,13 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.people_alt_rounded, size: 20, color: Color(0xFF0284C7)),
-              const SizedBox(width: 10),
+              const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0284C7)),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '$totalStudents nilai siswa siap disinkronkan ke SidikMu.',
+                  '$totalStudents nilai siswa siap disinkronkan ($filledCount nilai terisi).',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimaryLight,
                   ),
@@ -651,26 +980,26 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         ElevatedButton(
           onPressed: _startSync,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0284C7),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 13),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             elevation: 0,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.smart_toy_rounded, size: 22),
+              const Icon(Icons.smart_toy_rounded, size: 20),
               const SizedBox(width: 8),
               Text(
                 '🚀 Mulai Sinkronisasi Otomatis 100%',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
