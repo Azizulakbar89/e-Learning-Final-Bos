@@ -401,13 +401,35 @@ class SidikmuService {
 
         final navMenuJs = '''
           (function() {
+            // Pasang override dialog agar tidak membekukan proses otomatis
+            window.confirm = function() { return true; };
+            window.alert = function() { return true; };
+
             // Cek apakah tabel nilai sudah terbuka
             var inps = document.querySelectorAll('table tbody tr input, table tr input');
             if (inps.length > 0) {
               return JSON.stringify({ success: true, alreadyOnPage: true });
             }
 
-            // Buka accordion 'Nilai KM' atau 'AKADEMIK' jika terlipat
+            var targetMenu = ${jsonEncode(isFormatif ? 'formatif' : 'sumatif')};
+
+            // 1. Cek kartu menu besar di halaman Dashboard
+            var cards = Array.from(document.querySelectorAll('.card, a, button, div'));
+            var cardTarget = cards.find(function(c) {
+              var txt = (c.innerText || '').toLowerCase();
+              return txt.includes('input nilai ' + targetMenu) || txt.includes('nilai ' + targetMenu);
+            });
+            if (cardTarget) {
+              var a = cardTarget.closest('a') || cardTarget.querySelector('a');
+              if (a && a.href) {
+                window.location.href = a.href;
+                return JSON.stringify({ success: true, action: 'nav_card_href', href: a.href });
+              }
+              cardTarget.click();
+              return JSON.stringify({ success: true, action: 'nav_card_click' });
+            }
+
+            // 2. Buka accordion 'Nilai KM' atau 'AKADEMIK' jika terlipat
             var accordions = Array.from(document.querySelectorAll('a, .nav-link, [data-bs-toggle="collapse"]'));
             var nilaiKmParent = accordions.find(function(el) {
               var t = (el.innerText || '').trim().toLowerCase();
@@ -419,15 +441,20 @@ class SidikmuService {
               }
             }
 
-            // Cari link menu target
+            // 3. Cari link menu target di sidebar
             var target = ${jsonEncode(targetMenuText.toLowerCase())};
-            var links = Array.from(document.querySelectorAll('a, button, span, .nav-link, .card'));
+            var links = Array.from(document.querySelectorAll('a, button, span, .nav-link'));
             var targetEl = links.find(function(el) {
               var txt = (el.innerText || '').trim().toLowerCase();
               return txt.includes(target) || (target.includes('formatif') && txt.includes('formatif')) || (target.includes('sumatif') && txt.includes('sumatif'));
             });
             if (targetEl) {
-              targetEl.click();
+              var anchor = targetEl.closest('a') || targetEl;
+              if (anchor.href) {
+                window.location.href = anchor.href;
+              } else {
+                anchor.click();
+              }
               return JSON.stringify({ success: true });
             }
 
@@ -436,7 +463,11 @@ class SidikmuService {
               return (a.href || '').toLowerCase().includes(hrefTarget);
             });
             if (aTag) {
-              aTag.click();
+              if (aTag.href) {
+                window.location.href = aTag.href;
+              } else {
+                aTag.click();
+              }
               return JSON.stringify({ success: true, href: aTag.href });
             }
 
@@ -448,10 +479,32 @@ class SidikmuService {
           })();
         ''';
         await controller.runJavaScriptReturningResult(navMenuJs);
-        await Future.delayed(const Duration(milliseconds: 2500));
+
+        // Polling tunggu sampai formulir filter termuat
+        int navWaitMs = 0;
+        while (navWaitMs < 6000) {
+          final checkPageRes = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var inps = document.querySelectorAll('table tbody tr input:not([type="hidden"]):not([type="checkbox"]), table tr input:not([type="hidden"]):not([type="checkbox"])');
+              var selects = document.querySelectorAll('select');
+              return JSON.stringify({
+                isTable: inps.length > 0,
+                isFilter: selects.length >= 2
+              });
+            })();
+          ''');
+          final checkPage = _safeParseJsObject(checkPageRes);
+          if (checkPage['isTable'] == true) {
+            isTableDirectlyReady = true;
+            break;
+          }
+          if (checkPage['isFilter'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          navWaitMs += 300;
+        }
       }
 
-      // ──────── STEP 3: MENGISI FILTER FORMULIR (32% - 52%) ────────
+      // ──────── STEP 3: MENGISI FILTER FORMULIR (32% - 55%) ────────
       if (!isTableDirectlyReady) {
         emit(0.35, 'Memilih Tahun Ajaran, Semester, Kelas & Mapel...', 3, totalSteps);
 
@@ -482,7 +535,9 @@ class SidikmuService {
                 selectEl.value = matched.value;
                 selectEl.dispatchEvent(new Event('input', { bubbles: true }));
                 selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) { window.jQuery(selectEl).trigger('change'); }
+                if (window.jQuery) {
+                  window.jQuery(selectEl).val(matched.value).trigger('input').trigger('change');
+                }
                 return true;
               }
               return false;
@@ -523,7 +578,7 @@ class SidikmuService {
                 var t = (o.text || '').toLowerCase();
                 return t.includes(targetClass) || targetClass.includes(t) || t.includes('viii') || t.includes('vii') || t.includes('ix');
               });
-            });
+            }) || (selects.length >= 3 ? selects[2] : null);
             if (selKelas) selectOptionContaining(selKelas, targetClass);
 
             // 5. Mapel (Mencocokkan mata pelajaran, misal "Informatika")
@@ -533,7 +588,7 @@ class SidikmuService {
               return label.includes('mapel') || label.includes('pelajaran') || Array.from(s.options).some(function(o) {
                 return (o.text || '').toLowerCase().includes(targetSubj);
               });
-            });
+            }) || (selects.length >= 4 ? selects[3] : null);
             if (selSubj) selectOptionContaining(selSubj, targetSubj);
 
             // 6. Nilai Ke (Formatif: 1, 2, 3...)
@@ -561,83 +616,132 @@ class SidikmuService {
           })();
         ''';
         await controller.runJavaScriptReturningResult(filterJs);
-        await Future.delayed(const Duration(milliseconds: 1800));
 
-        // Memilih CP & TP
-        emit(0.44, 'Menyesuaikan Kode CP & TP...', 3, totalSteps);
-        final cpTpJs = '''
-          (function() {
-            var inps = document.querySelectorAll('table tbody tr input, table tr input');
-            if (inps.length > 0) return JSON.stringify({ success: true, tableAlreadyVisible: true });
+        // ──────── POLLING AKTIF CASCADING AJAX CAPAIAN PEMBELAJARAN (CP) ────────
+        emit(0.42, 'Memuat & menyesuaikan Kode CP dari SidikMu...', 3, totalSteps);
+        int cpWaitMs = 0;
+        while (cpWaitMs < 12000) {
+          final cpCheck = await controller.runJavaScriptReturningResult('''
+            (function() {
+              var selects = Array.from(document.querySelectorAll('select'));
+              var selCp = selects.find(function(s) {
+                var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                return label.includes('cp') || label.includes('capaian');
+              }) || (selects.length >= 5 ? selects[4] : null);
 
-            var selects = Array.from(document.querySelectorAll('select'));
-            function selectOptionContaining(selectEl, text) {
-              if (!selectEl) return false;
-              var target = (text || '').toLowerCase().trim();
-              var options = Array.from(selectEl.options);
-              var matched = options.find(function(o) {
-                return (o.text || '').toLowerCase().includes(target);
+              if (!selCp) return JSON.stringify({ ready: false, count: 0 });
+              return JSON.stringify({
+                ready: selCp.options.length > 1,
+                count: selCp.options.length
               });
-              if (matched) {
-                selectEl.value = matched.value;
-              } else if (options.length > 1 && options[1].value) {
-                selectEl.value = options[1].value;
-              } else {
-                return false;
-              }
-              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
-              selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-              if (window.jQuery) { window.jQuery(selectEl).trigger('change'); }
-              return true;
-            }
+            })();
+          ''');
+          final cpData = _safeParseJsObject(cpCheck);
+          if (cpData['ready'] == true) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+          cpWaitMs += 300;
+        }
 
-            var cpCode = ${jsonEncode(targetCpCode ?? '')};
+        final cpSelectJs = '''
+          (function() {
+            var selects = Array.from(document.querySelectorAll('select'));
             var selCp = selects.find(function(s) {
               var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-              return label.includes('cp');
+              return label.includes('cp') || label.includes('capaian');
             }) || (selects.length >= 5 ? selects[4] : null);
 
-            if (selCp) {
-              selectOptionContaining(selCp, cpCode);
+            if (!selCp || selCp.options.length <= 1) return JSON.stringify({ success: false });
+
+            var target = ${jsonEncode((targetCpCode ?? '').toLowerCase().trim())};
+            var options = Array.from(selCp.options);
+            var matched = null;
+            if (target) {
+              matched = options.find(function(o) {
+                var txt = (o.text || '').toLowerCase().trim();
+                return txt.includes(target) || target.includes(txt);
+              });
+            }
+            if (!matched && options.length > 1) {
+              matched = options[1];
             }
 
-            return JSON.stringify({ success: true });
+            if (matched && matched.value) {
+              selCp.value = matched.value;
+              selCp.dispatchEvent(new Event('input', { bubbles: true }));
+              selCp.dispatchEvent(new Event('change', { bubbles: true }));
+              if (window.jQuery) {
+                window.jQuery(selCp).val(matched.value).trigger('input').trigger('change');
+              }
+              return JSON.stringify({ success: true, val: matched.value, text: matched.text });
+            }
+            return JSON.stringify({ success: false });
           })();
         ''';
-        await controller.runJavaScriptReturningResult(cpTpJs);
-        await Future.delayed(const Duration(milliseconds: 1500));
+        await controller.runJavaScriptReturningResult(cpSelectJs);
 
+        // ──────── POLLING AKTIF CASCADING AJAX TUJUAN PEMBELAJARAN (TP) ────────
         if (isFormatif) {
-          final tpJs = '''
-            (function() {
-              var inps = document.querySelectorAll('table tbody tr input, table tr input');
-              if (inps.length > 0) return JSON.stringify({ success: true, tableAlreadyVisible: true });
+          emit(0.48, 'Memuat & menyesuaikan Kode TP dari SidikMu...', 3, totalSteps);
+          int tpWaitMs = 0;
+          while (tpWaitMs < 12000) {
+            final tpCheck = await controller.runJavaScriptReturningResult('''
+              (function() {
+                var selects = Array.from(document.querySelectorAll('select'));
+                var selTp = selects.find(function(s) {
+                  var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
+                  return label.includes('tp') || label.includes('tujuan');
+                }) || (selects.length >= 6 ? selects[5] : null);
 
+                if (!selTp) return JSON.stringify({ ready: false, count: 0 });
+                return JSON.stringify({
+                  ready: selTp.options.length > 1,
+                  count: selTp.options.length
+                });
+              })();
+            ''');
+            final tpData = _safeParseJsObject(tpCheck);
+            if (tpData['ready'] == true) break;
+            await Future.delayed(const Duration(milliseconds: 300));
+            tpWaitMs += 300;
+          }
+
+          final tpSelectJs = '''
+            (function() {
               var selects = Array.from(document.querySelectorAll('select'));
-              var tpCode = ${jsonEncode(targetTpCode ?? '')};
               var selTp = selects.find(function(s) {
                 var label = (s.getAttribute('name') || s.getAttribute('id') || '').toLowerCase();
-                return label.includes('tp');
+                return label.includes('tp') || label.includes('tujuan');
               }) || (selects.length >= 6 ? selects[5] : null);
 
-              if (selTp && selTp.options.length > 1) {
-                var matched = Array.from(selTp.options).find(function(o) {
-                  return (o.text || '').toLowerCase().includes(tpCode.toLowerCase());
+              if (!selTp || selTp.options.length <= 1) return JSON.stringify({ success: false });
+
+              var target = ${jsonEncode((targetTpCode ?? '').toLowerCase().trim())};
+              var options = Array.from(selTp.options);
+              var matched = null;
+              if (target) {
+                matched = options.find(function(o) {
+                  var txt = (o.text || '').toLowerCase().trim();
+                  return txt.includes(target) || target.includes(txt);
                 });
-                if (matched) {
-                  selTp.value = matched.value;
-                } else {
-                  selTp.value = selTp.options[1].value;
-                }
+              }
+              if (!matched && options.length > 1) {
+                matched = options[1];
+              }
+
+              if (matched && matched.value) {
+                selTp.value = matched.value;
                 selTp.dispatchEvent(new Event('input', { bubbles: true }));
                 selTp.dispatchEvent(new Event('change', { bubbles: true }));
-                if (window.jQuery) { window.jQuery(selTp).trigger('change'); }
+                if (window.jQuery) {
+                  window.jQuery(selTp).val(matched.value).trigger('input').trigger('change');
+                }
+                return JSON.stringify({ success: true, val: matched.value, text: matched.text });
               }
-              return JSON.stringify({ success: true });
+              return JSON.stringify({ success: false });
             })();
           ''';
-          await controller.runJavaScriptReturningResult(tpJs);
-          await Future.delayed(const Duration(milliseconds: 1000));
+          await controller.runJavaScriptReturningResult(tpSelectJs);
+          await Future.delayed(const Duration(milliseconds: 500));
         }
 
         // ──────── STEP 4: PROSES SELANJUTNYA ────────
@@ -647,34 +751,46 @@ class SidikmuService {
             if (document.querySelector('table tbody tr input, table tr input')) {
               return JSON.stringify({ success: true, tableAlreadyVisible: true });
             }
+
+            // 1. Cari tombol dengan teks 'Proses Selanjutnya'
             var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
             var nextBtn = btns.find(function(b) {
-              var txt = (b.innerText || b.value || '').toLowerCase();
-              return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan') || txt.includes('proses');
+              var txt = (b.innerText || b.value || '').toLowerCase().trim();
+              return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
             });
             if (nextBtn) {
               nextBtn.click();
-              return JSON.stringify({ success: true });
+              return JSON.stringify({ success: true, method: 'nextBtn' });
             }
-            var form = document.querySelector('form');
-            if (form) {
-              form.submit();
-              return JSON.stringify({ success: true, formSubmitted: true });
+
+            // 2. Cari form filter spesifik (bukan form search navbar)
+            var filterForm = Array.from(document.querySelectorAll('form')).find(function(f) {
+              return f.querySelectorAll('select').length >= 2;
+            });
+            if (filterForm) {
+              var sub = filterForm.querySelector('button[type="submit"], input[type="submit"], button.btn-info, button.btn-primary');
+              if (sub) {
+                sub.click();
+                return JSON.stringify({ success: true, method: 'filterFormSubmitBtn' });
+              }
+              filterForm.submit();
+              return JSON.stringify({ success: true, method: 'filterFormSubmit' });
             }
+
             return JSON.stringify({ success: true, note: 'Tombol lanjut dilewati' });
           })();
         ''';
         await controller.runJavaScriptReturningResult(nextBtnJs);
       }
 
-      // ──────── DETEKSI AKTIF TABEL NILAI SISWA (POLLING DINAMIS HINGGA 20 DETIK) ────────
+      // ──────── DETEKSI AKTIF TABEL NILAI SISWA (POLLING DINAMIS HINGGA 25 DETIK) ────────
       emit(0.60, 'Mendeteksi tabel nilai siswa di halaman...', 4, totalSteps);
       bool isTableDetected = false;
       int waitedMs = 0;
       int detectedRows = 0;
       int detectedInputs = 0;
 
-      while (waitedMs < 20000) {
+      while (waitedMs < 25000) {
         final pollRes = await controller.runJavaScriptReturningResult('''
           (function() {
             var inps = document.querySelectorAll('table tbody tr input:not([type="hidden"]):not([type="checkbox"]), table tr input:not([type="hidden"]):not([type="checkbox"]), table td input:not([type="hidden"]):not([type="checkbox"])');
@@ -879,6 +995,10 @@ class SidikmuService {
       // ──────── STEP 6: SIMPAN NILAI (88% - 100%) ────────
       final saveBtnJs = '''
         (function() {
+          // Dismiss any alert or confirm dialog
+          window.confirm = function() { return true; };
+          window.alert = function() { return true; };
+
           var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
           var saveBtn = btns.find(function(b) {
             var txt = (b.innerText || b.value || '').toLowerCase();
@@ -886,7 +1006,20 @@ class SidikmuService {
           });
           if (saveBtn) {
             saveBtn.click();
-            return JSON.stringify({ success: true });
+            return JSON.stringify({ success: true, method: 'saveBtn' });
+          }
+          // Form yang membungkus tabel nilai siswa
+          var tableForm = Array.from(document.querySelectorAll('form')).find(function(f) {
+            return f.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])').length > 3;
+          });
+          if (tableForm) {
+            var sub = tableForm.querySelector('button[type="submit"], input[type="submit"], button.btn-primary, button.btn-info');
+            if (sub) {
+              sub.click();
+              return JSON.stringify({ success: true, method: 'tableFormSubmitBtn' });
+            }
+            tableForm.submit();
+            return JSON.stringify({ success: true, method: 'tableFormSubmit' });
           }
           return JSON.stringify({ success: false, error: 'Tombol Simpan Nilai tidak ditemukan' });
         })();

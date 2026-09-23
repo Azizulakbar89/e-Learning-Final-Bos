@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Perbaikan tuntas deteksi tabel nilai siswa SidikMu dengan Dynamic Polling hingga 20 detik, pencocokan ganda NIS + Nama, form Nilai Ke, dan integrasi kurikulum CP/TP.'
+            '✨ Versi $version: Automasi sinkronisasi nilai SidikMu 100% di latar belakang (tanpa intervensi manual), polling asinkron cerdas CP/TP, deteksi akurat formulir penilaian, dan auto-save nilai otomatis.'
       },
       'force_update': {'booleanValue': false}
     }
