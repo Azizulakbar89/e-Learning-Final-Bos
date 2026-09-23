@@ -707,7 +707,8 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     if (_submissionClassFilter != 'all') {
       targetClass = _submissionClassFilter;
     } else if (widget.assignment.classIds.isNotEmpty) {
-      targetClass = widget.assignment.classIds.first;
+      final cid = widget.assignment.classIds.first;
+      targetClass = fb.schoolClasses.where((c) => c.id == cid).firstOrNull?.name ?? cid;
     }
 
     // Determine subject name
@@ -723,8 +724,11 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     // Include all students in this class from fb.allStudents
     final classStudents = fb.allStudents.where((s) {
       final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
-      if (targetClass.isEmpty) return true;
-      return sClass == targetClass.toLowerCase();
+      if (targetClass.isEmpty || targetClass.toLowerCase() == 'semua kelas') return true;
+      return sClass == targetClass.toLowerCase() ||
+          (s.classId != null && s.classId!.toLowerCase() == targetClass.toLowerCase()) ||
+          (s.className != null && targetClass.toLowerCase().contains(s.className!.toLowerCase())) ||
+          (s.className != null && s.className!.toLowerCase().contains(targetClass.toLowerCase()));
     }).toList();
 
     for (final s in classStudents) {

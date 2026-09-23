@@ -91,6 +91,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   // Quick SidikMu credentials input when teacher hasn't linked account yet
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _directUrlCtrl = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -114,6 +115,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _directUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -144,36 +146,71 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
 
   void _copyAutoFillScript() {
     final cleanMap = <String, num>{};
+    final cleanNames = <String, String>{};
     widget.studentGradesByNis.forEach((nis, score) {
+      final cleanNis = nis.trim();
       if (score != null) {
-        cleanMap[nis.trim()] = (score % 1 == 0) ? score.toInt() : score;
+        cleanMap[cleanNis] = (score % 1 == 0) ? score.toInt() : score;
+      }
+      if (widget.studentNamesByNis.containsKey(nis)) {
+        cleanNames[cleanNis] = widget.studentNamesByNis[nis]!.trim();
       }
     });
 
     final jsonGrades = jsonEncode(cleanMap);
+    final jsonNames = jsonEncode(cleanNames);
     final script = '''javascript:(function(){
   var g = $jsonGrades;
-  var rows = Array.from(document.querySelectorAll("table tbody tr, table tr"));
+  var names = $jsonNames;
+  var rows = Array.from(document.querySelectorAll("table tbody tr, table tr")).filter(function(r){
+    return r.querySelectorAll("td").length >= 2;
+  });
   var count = 0;
   rows.forEach(function(row){
     var cells = row.querySelectorAll("td");
     if(cells.length < 2) return;
     var rowText = (row.innerText || "").replace(/\\s+/g, " ");
-    for(var nis in g){
-      if(rowText.indexOf(nis) !== -1){
-        var inps = row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])');
-        var inp = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
-        if(inp){
-          inp.value = g[nis];
-          inp.dispatchEvent(new Event("input", {bubbles: true}));
-          inp.dispatchEvent(new Event("change", {bubbles: true}));
-          count++;
+    var matchedNis = null;
+
+    if(cells.length > 1){
+      var cand = (cells[1].innerText || "").trim();
+      if(g.hasOwnProperty(cand)) matchedNis = cand;
+    }
+    if(!matchedNis){
+      for(var k in g){
+        if(k && rowText.indexOf(k) !== -1){
+          matchedNis = k;
           break;
         }
       }
     }
+    if(!matchedNis && cells.length > 2){
+      var cName = (cells[2].innerText || "").toLowerCase().trim();
+      for(var k in names){
+        var nm = (names[k] || "").toLowerCase().trim();
+        if(nm.length > 3 && (cName.indexOf(nm) !== -1 || nm.indexOf(cName) !== -1)){
+          matchedNis = k;
+          break;
+        }
+      }
+    }
+
+    if(matchedNis && g.hasOwnProperty(matchedNis)){
+      var inps = row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])');
+      var inp = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
+      if(inp){
+        var val = g[matchedNis];
+        inp.value = val;
+        inp.dispatchEvent(new Event("input", {bubbles: true}));
+        inp.dispatchEvent(new Event("change", {bubbles: true}));
+        inp.dispatchEvent(new Event("blur", {bubbles: true}));
+        inp.dispatchEvent(new Event("keyup", {bubbles: true}));
+        if(window.jQuery){ window.jQuery(inp).val(val).trigger("input").trigger("change").trigger("blur"); }
+        count++;
+      }
+    }
   });
-  alert("Alhamdulillah! Berhasil mengisi " + count + " nilai siswa ke formulir SidikMu.");
+  alert("Alhamdulillah! Berhasil mengisi " + count + " nilai siswa ke tabel SidikMu.");
 })();''';
 
     Clipboard.setData(ClipboardData(text: script));
@@ -333,7 +370,10 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
       _progressMessage = 'Menginisialisasi sinkronisasi SidikMu...';
     });
 
-    final sidikmuUrl = teacher?.sidikmuUrl ?? SidikmuService.defaultUrl;
+    final inputUrl = _directUrlCtrl.text.trim();
+    final sidikmuUrl = inputUrl.isNotEmpty
+        ? inputUrl
+        : (teacher?.sidikmuUrl ?? SidikmuService.defaultUrl);
     final username = teacher?.sidikmuUsername ?? _usernameCtrl.text.trim();
     final password = teacher?.sidikmuPassword ?? _passwordCtrl.text;
 
@@ -516,11 +556,52 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                 value: '$_academicYear ($_semester)',
               ),
               const Divider(height: 16),
-              _buildParamRow(
-                icon: Icons.meeting_room_rounded,
-                label: 'Kelas Target',
-                value: _className,
-              ),
+              Builder(builder: (context) {
+                final fb = context.watch<FirebaseService>();
+                final availableClasses = fb.getAvailableClasses();
+                if (availableClasses.length > 1) {
+                  return Row(
+                    children: [
+                      const Icon(Icons.meeting_room_rounded, size: 18, color: Color(0xFF0284C7)),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Kelas Target',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const Spacer(),
+                      DropdownButton<String>(
+                        value: availableClasses.contains(_className) ? _className : availableClasses.firstOrNull,
+                        underline: const SizedBox.shrink(),
+                        isDense: true,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimaryLight,
+                        ),
+                        items: availableClasses.map((c) {
+                          return DropdownMenuItem<String>(
+                            value: c,
+                            child: Text(c),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _className = val);
+                          }
+                        },
+                      ),
+                    ],
+                  );
+                }
+                return _buildParamRow(
+                  icon: Icons.meeting_room_rounded,
+                  label: 'Kelas Target',
+                  value: _className,
+                );
+              }),
               const Divider(height: 16),
               _buildParamRow(
                 icon: Icons.menu_book_rounded,
@@ -554,7 +635,65 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+
+        // Tautan Langsung Halaman Nilai SidikMu (Opsional)
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.link_rounded, size: 18, color: Color(0xFF0284C7)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tautan Langsung Tabel SidikMu (Opsional)',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Jika tabel nilai sudah dibuka di browser (seperti di gambar Anda), tempelkan link URL-nya di sini agar aplikasi langsung mendeteksi tabel:',
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _directUrlCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Contoh: smpm12gkb.sidikmu.com/index.php?EhZE6wa...',
+                  hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.content_paste_rounded, size: 18),
+                    tooltip: 'Tempel dari Clipboard',
+                    onPressed: () async {
+                      final data = await Clipboard.getData('text/plain');
+                      if (data?.text != null) {
+                        setState(() => _directUrlCtrl.text = data!.text!.trim());
+                      }
+                    },
+                  ),
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
 
         // Android Background Automation Banner / Setup Card
         if (!kIsWeb) ...[

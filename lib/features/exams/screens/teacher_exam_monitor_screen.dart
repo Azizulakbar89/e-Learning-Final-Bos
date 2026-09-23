@@ -180,7 +180,8 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     if (_selectedClassFilter != 'all') {
       targetClass = _selectedClassFilter;
     } else if (currentExam.classIds.isNotEmpty) {
-      targetClass = currentExam.classIds.first;
+      final cid = currentExam.classIds.first;
+      targetClass = fb.schoolClasses.where((c) => c.id == cid).firstOrNull?.name ?? cid;
     }
 
     // Determine subject
@@ -194,8 +195,11 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     // Pre-populate with all students in this class so missing ones are properly tracked
     final classStudents = fb.allStudents.where((s) {
       final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
-      if (targetClass.isEmpty) return true;
-      return sClass == targetClass.toLowerCase();
+      if (targetClass.isEmpty || targetClass.toLowerCase() == 'semua kelas') return true;
+      return sClass == targetClass.toLowerCase() ||
+          (s.classId != null && s.classId!.toLowerCase() == targetClass.toLowerCase()) ||
+          (s.className != null && targetClass.toLowerCase().contains(s.className!.toLowerCase())) ||
+          (s.className != null && s.className!.toLowerCase().contains(targetClass.toLowerCase()));
     }).toList();
 
     for (final s in classStudents) {
