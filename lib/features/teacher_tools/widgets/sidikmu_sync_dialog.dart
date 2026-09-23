@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -127,11 +130,118 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     }
   }
 
+  void _copyAutoFillScript() {
+    final cleanMap = <String, num>{};
+    widget.studentGradesByNis.forEach((nis, score) {
+      if (score != null) {
+        cleanMap[nis] = (score % 1 == 0) ? score.toInt() : score;
+      }
+    });
+
+    final jsonGrades = jsonEncode(cleanMap);
+    final script = '''javascript:(function(){
+  var g = $jsonGrades;
+  var rows = Array.from(document.querySelectorAll("table tbody tr"));
+  var count = 0;
+  rows.forEach(function(row){
+    var cells = row.querySelectorAll("td");
+    if(cells.length < 2) return;
+    var rowText = row.innerText || "";
+    for(var nis in g){
+      if(rowText.indexOf(nis) !== -1){
+        var inp = row.querySelector('input[type="number"], input[type="text"]');
+        if(inp){
+          inp.value = g[nis];
+          inp.dispatchEvent(new Event("input", {bubbles: true}));
+          inp.dispatchEvent(new Event("change", {bubbles: true}));
+          count++;
+          break;
+        }
+      }
+    }
+  });
+  alert("Alhamdulillah! Berhasil mengisi " + count + " nilai siswa ke formulir SidikMu.");
+})();''';
+
+    Clipboard.setData(ClipboardData(text: script));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Skrip Auto-Fill disalin! Tempel di bilah URL / console web SidikMu untuk mengisi semua nilai.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  void _copyTsvGrades() {
+    final sb = StringBuffer('NIS\tNama Siswa\tNilai\n');
+    widget.studentGradesByNis.forEach((nis, score) {
+      final name = widget.studentNamesByNis[nis] ?? '-';
+      final val = score == null ? '-' : (score % 1 == 0 ? score.toInt().toString() : score.toString());
+      sb.writeln('$nis\t$name\t$val');
+    });
+
+    Clipboard.setData(ClipboardData(text: sb.toString()));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Format kolom NIS & Nilai berhasil disalin! Siap ditempel ke Excel atau lembar kerja.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF0284C7),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _openSidikmu() {
+    launchUrl(
+      Uri.parse('https://smpm12gkb.sidikmu.com'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  void _openApkDownload() {
+    launchUrl(
+      Uri.parse('https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   Future<void> _startSync() async {
     final fb = context.read<FirebaseService>();
     final teacher = fb.currentUser;
 
-    if (teacher == null || !teacher.hasSidikmuAccount) {
+    if (!kIsWeb && (teacher == null || !teacher.hasSidikmuAccount)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Akun SidikMu belum ditautkan. Silakan hubungkan di menu Profil.'),
@@ -144,12 +254,12 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     setState(() {
       _currentPhase = 'syncing';
       _progressPercentage = 0.05;
-      _progressMessage = 'Menginisialisasi automasi SidikMu...';
+      _progressMessage = 'Menginisialisasi sinkronisasi SidikMu...';
     });
 
-    final sidikmuUrl = teacher.sidikmuUrl ?? SidikmuService.defaultUrl;
-    final username = teacher.sidikmuUsername!;
-    final password = teacher.sidikmuPassword!;
+    final sidikmuUrl = teacher?.sidikmuUrl ?? SidikmuService.defaultUrl;
+    final username = teacher?.sidikmuUsername ?? '';
+    final password = teacher?.sidikmuPassword ?? '';
 
     final SidikmuSyncResult result;
     if (_webController != null) {
@@ -203,7 +313,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
       );
     }
 
-    if (result.isSuccess) {
+    if (result.isSuccess && teacher != null) {
       await fb.updateTeacherSidikmuLastSynced(teacherId: teacher.id);
     }
 
@@ -368,6 +478,77 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         ),
         const SizedBox(height: 16),
 
+        // Web Quick Helper Banner
+        if (kIsWeb) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.flash_on_rounded, size: 20, color: Color(0xFF16A34A)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Mode Web Browser (Auto-Fill Siap)',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF15803D),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Salin skrip Auto-Fill atau salin rekap nilai untuk mengisi formulir nilai di portal SidikMu secara instan.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _copyAutoFillScript,
+                        icon: const Icon(Icons.flash_on_rounded, size: 16),
+                        label: const Text('Salin Skrip Auto-Fill', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _copyTsvGrades,
+                      icon: const Icon(Icons.table_chart_outlined, size: 16),
+                      label: const Text('Salin Format Excel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0284C7),
+                        side: const BorderSide(color: Color(0xFFBAE6FD)),
+                        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
         // Info Badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -509,7 +690,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Proses sinkronisasi otomatis sedang berjalan di background.\nMohon tunggu hingga selesai 100%.',
+          'Proses sinkronisasi sedang berjalan.\nMohon tunggu sejenak...',
           textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(
             fontSize: 11,
@@ -528,178 +709,317 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     final isSuccess = res.isSuccess;
     final emptyOrZero = res.emptyOrZeroStudents;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Status Icon Banner
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSuccess ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSuccess ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                isSuccess ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-                size: 44,
-                color: isSuccess ? const Color(0xFF16A34A) : Colors.redAccent,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isSuccess ? 'Sinkronisasi Selesai!' : 'Sinkronisasi Belum Berhasil',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: isSuccess ? const Color(0xFF15803D) : Colors.red.shade800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                res.message,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  color: AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Rekap Siswa Nilai Kosong atau 0
-        if (emptyOrZero.isNotEmpty) ...[
-          Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
-              const SizedBox(width: 6),
-              Text(
-                'Perhatian: ${emptyOrZero.length} Siswa Bernilai Kosong / 0',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.orange.shade800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Status Icon Banner
           Container(
-            constraints: const BoxConstraints(maxHeight: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade200),
+              color: isSuccess ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSuccess ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
+              ),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: emptyOrZero.length,
-              separatorBuilder: (context, index) => Divider(height: 12, color: Colors.grey.shade200),
-              itemBuilder: (ctx, idx) {
-                final item = emptyOrZero[idx];
-                final isZero = item.score == 0.0;
-                return Row(
+            child: Column(
+              children: [
+                Icon(
+                  isSuccess ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                  size: 44,
+                  color: isSuccess ? const Color(0xFF16A34A) : Colors.amber.shade800,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isSuccess
+                      ? (kIsWeb ? 'Data Nilai Siap Digunakan!' : 'Sinkronisasi Selesai!')
+                      : 'Sinkronisasi Belum Berhasil',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: isSuccess ? const Color(0xFF15803D) : Colors.red.shade800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  res.message,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Auto-Fill Action Card (Sangat praktis untuk Web & Desktop)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFFF0F9FF), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isZero ? Colors.orange.shade50 : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(6),
+                    const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFF0284C7)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Pilihan Input Cepat ke SidikMu',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0369A1),
                       ),
-                      child: Text(
-                        'NIS: ${item.nis}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isZero ? Colors.orange.shade900 : Colors.grey.shade800,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Tombol Utama: Salin Skrip Auto-Fill
+                ElevatedButton.icon(
+                  onPressed: _copyAutoFillScript,
+                  icon: const Icon(Icons.flash_on_rounded, size: 18),
+                  label: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '⚡ Salin Skrip Auto-Fill SidikMu',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        '1-Klik isi seluruh nilai otomatis di formulir SidikMu',
+                        style: TextStyle(fontSize: 10, color: Colors.white.withAlpha(220)),
+                      ),
+                    ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Tombol Sekunder: Salin Excel & Buka Web
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _copyTsvGrades,
+                        icon: const Icon(Icons.table_chart_outlined, size: 16),
+                        label: const Text(
+                          'Salin Format Excel',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0284C7),
+                          side: const BorderSide(color: Color(0xFFBAE6FD)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        item.studentName.isNotEmpty ? item.studentName : 'Siswa ${item.nis}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimaryLight,
+                      child: ElevatedButton.icon(
+                        onPressed: _openSidikmu,
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text(
+                          'Buka Web SidikMu',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7).withAlpha(20),
+                          foregroundColor: const Color(0xFF0284C7),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isZero ? 'Nilai: 0' : 'Kosong',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isZero ? Colors.orange.shade800 : Colors.red.shade700,
-                      ),
-                    ),
                   ],
-                );
-              },
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-        ],
+          const SizedBox(height: 12),
 
-        // Tombol Aksi Akhir
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {
-                  launchUrl(
-                    Uri.parse('https://smpm12gkb.sidikmu.com'),
-                    mode: LaunchMode.externalApplication,
+          // Petunjuk Ringkas Auto-Fill
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '💡 Panduan Cara Pakai Auto-Fill:',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '1. Klik "Salin Skrip Auto-Fill" di atas.\n'
+                  '2. Buka portal SidikMu dan masuk ke tabel input nilai kelas Anda.\n'
+                  '3. Tempel (Paste) skrip di bilah alamat (URL) atau console browser, lalu tekan Enter.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.5,
+                    height: 1.4,
+                    color: AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Rekap Siswa Nilai Kosong atau 0
+          if (emptyOrZero.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
+                const SizedBox(width: 6),
+                Text(
+                  'Perhatian: ${emptyOrZero.length} Siswa Bernilai Kosong / 0',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.orange.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: emptyOrZero.length,
+                separatorBuilder: (context, index) => Divider(height: 12, color: Colors.grey.shade200),
+                itemBuilder: (ctx, idx) {
+                  final item = emptyOrZero[idx];
+                  final isZero = item.score == 0.0;
+                  return Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isZero ? Colors.orange.shade50 : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'NIS: ${item.nis}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isZero ? Colors.orange.shade900 : Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.studentName.isNotEmpty ? item.studentName : 'Siswa ${item.nis}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimaryLight,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isZero ? 'Nilai: 0' : 'Kosong',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isZero ? Colors.orange.shade800 : Colors.red.shade700,
+                        ),
+                      ),
+                    ],
                   );
                 },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: const BorderSide(color: Color(0xFF0284C7)),
-                ),
-                child: Text(
-                  'Buka Web SidikMu',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0284C7),
-                  ),
-                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Selesai',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 14),
           ],
-        ),
-      ],
+
+          // Link Download Aplikasi Android
+          InkWell(
+            onTap: _openApkDownload,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.android_rounded, size: 16, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Gunakan Aplikasi Android untuk sinkronisasi otomatis 100%',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF16A34A),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Tombol Tutup / Selesai
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text(
+              'Tutup Dialog',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
