@@ -58,6 +58,36 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
     }
   }
 
+  bool _initializedExistingAssignment = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedExistingAssignment && widget.existingMaterial != null) {
+      _initializedExistingAssignment = true;
+      final fb = context.read<FirebaseService>();
+      final existingAsgs = fb.getAssignmentsForMaterial(widget.existingMaterial!.id);
+      if (existingAsgs.isNotEmpty) {
+        final asg = existingAsgs.first;
+        _assignmentType = asg.assignmentType;
+        _assignTitleCtrl.text = asg.title;
+        _assignDescCtrl.text = asg.description;
+        _deadline = asg.deadline;
+        _maxGroupMembers = asg.maxGroupMembers;
+        if (asg.allowedSubmissionTypes.isNotEmpty) {
+          _selectedSubmTypes.clear();
+          _selectedSubmTypes.addAll(asg.allowedSubmissionTypes);
+        }
+        if (asg.codeConfig != null) {
+          _selectedLanguages.clear();
+          _selectedLanguages.addAll(asg.codeConfig!.allowedLanguages);
+          _starterCodeCtrl.text = asg.codeConfig!.starterCode;
+          _requireCompile = asg.codeConfig!.requireSuccessfulCompile;
+        }
+      }
+    }
+  }
+
   // Material fields
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
@@ -203,6 +233,7 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
           await fb.addMaterial(material);
         }
 
+        final existingAssignments = fb.getAssignmentsForMaterial(materialId);
         if (_assignmentType != 'none') {
           final aTitle = _assignTitleCtrl.text.trim().isNotEmpty
               ? _assignTitleCtrl.text.trim()
@@ -213,32 +244,68 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
             questionIds = await _savePgQuestions(fb, subjectId);
           }
 
-          final assignment = AssignmentModel(
-            id: _uuid.v4(),
-            materialId: materialId,
-            subjectId: subjectId,
-            teacherId: fb.currentUser?.id ?? '',
-            title: aTitle,
-            description: _assignDescCtrl.text.trim(),
-            assignmentType: _assignmentType,
-            classIds: _selectedClassIds.toList(),
-            isGroup: _assignmentType == 'kelompok',
-            maxGroupMembers: _assignmentType == 'kelompok' ? _maxGroupMembers : 1,
-            allowedSubmissionTypes: _assignmentType == 'pilihan_ganda'
-                ? [SubmissionType.text]
-                : _selectedSubmTypes.toList(),
-            codeConfig: _selectedSubmTypes.contains(SubmissionType.code) && _assignmentType != 'pilihan_ganda'
-                ? CodeConfig(
-                    allowedLanguages: _selectedLanguages.toList(),
-                    starterCode: _starterCodeCtrl.text.trim(),
-                    requireSuccessfulCompile: _requireCompile,
-                  )
-                : null,
-            questionIds: questionIds,
-            deadline: _deadline,
-            createdAt: DateTime.now(),
-          );
-          await fb.addAssignment(assignment);
+          if (existingAssignments.isNotEmpty) {
+            // Update existing assignment rather than creating duplicates
+            final existing = existingAssignments.first;
+            final updatedAssignment = AssignmentModel(
+              id: existing.id,
+              materialId: materialId.trim(),
+              subjectId: subjectId.trim(),
+              teacherId: existing.teacherId.isNotEmpty ? existing.teacherId : (fb.currentUser?.id ?? ''),
+              title: aTitle,
+              description: _assignDescCtrl.text.trim(),
+              assignmentType: _assignmentType,
+              classIds: _selectedClassIds.toList(),
+              isGroup: _assignmentType == 'kelompok',
+              maxGroupMembers: _assignmentType == 'kelompok' ? _maxGroupMembers : 1,
+              allowedSubmissionTypes: _assignmentType == 'pilihan_ganda'
+                  ? [SubmissionType.text]
+                  : _selectedSubmTypes.toList(),
+              codeConfig: _selectedSubmTypes.contains(SubmissionType.code) && _assignmentType != 'pilihan_ganda'
+                  ? CodeConfig(
+                      allowedLanguages: _selectedLanguages.toList(),
+                      starterCode: _starterCodeCtrl.text.trim(),
+                      requireSuccessfulCompile: _requireCompile,
+                    )
+                  : null,
+              questionIds: questionIds.isNotEmpty ? questionIds : existing.questionIds,
+              deadline: _deadline,
+              createdAt: existing.createdAt,
+            );
+            await fb.updateAssignment(updatedAssignment);
+          } else {
+            final assignment = AssignmentModel(
+              id: _uuid.v4(),
+              materialId: materialId.trim(),
+              subjectId: subjectId.trim(),
+              teacherId: fb.currentUser?.id ?? '',
+              title: aTitle,
+              description: _assignDescCtrl.text.trim(),
+              assignmentType: _assignmentType,
+              classIds: _selectedClassIds.toList(),
+              isGroup: _assignmentType == 'kelompok',
+              maxGroupMembers: _assignmentType == 'kelompok' ? _maxGroupMembers : 1,
+              allowedSubmissionTypes: _assignmentType == 'pilihan_ganda'
+                  ? [SubmissionType.text]
+                  : _selectedSubmTypes.toList(),
+              codeConfig: _selectedSubmTypes.contains(SubmissionType.code) && _assignmentType != 'pilihan_ganda'
+                  ? CodeConfig(
+                      allowedLanguages: _selectedLanguages.toList(),
+                      starterCode: _starterCodeCtrl.text.trim(),
+                      requireSuccessfulCompile: _requireCompile,
+                    )
+                  : null,
+              questionIds: questionIds,
+              deadline: _deadline,
+              createdAt: DateTime.now(),
+            );
+            await fb.addAssignment(assignment);
+          }
+        } else if (existingAssignments.isNotEmpty && isEdit2) {
+          // If teacher explicitly set assignment type to none, remove existing assignment
+          for (final asg in existingAssignments) {
+            await fb.deleteAssignment(asg.id);
+          }
         }
       },
       successMessage: isEdit ? 'Materi berhasil diperbarui!' : 'Materi berhasil diterbitkan!',

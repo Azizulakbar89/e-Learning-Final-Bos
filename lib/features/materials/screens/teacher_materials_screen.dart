@@ -63,9 +63,11 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> {
         }
       }
       if (_selectedAssignmentFilter != 'all') {
-        if (_selectedAssignmentFilter == 'none' && m.assignmentType != null) {
+        final matAssignments = fb.getAssignmentsForMaterial(m.id);
+        final effectiveType = matAssignments.isNotEmpty ? matAssignments.first.assignmentType : m.assignmentType;
+        if (_selectedAssignmentFilter == 'none' && effectiveType != null) {
           return false;
-        } else if (_selectedAssignmentFilter != 'none' && m.assignmentType != _selectedAssignmentFilter) {
+        } else if (_selectedAssignmentFilter != 'none' && effectiveType != _selectedAssignmentFilter) {
           return false;
         }
       }
@@ -438,7 +440,8 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> {
     final assignment = assignments.isNotEmpty ? assignments.first : null;
 
     final mediaBadge = _getMediaBadge(material.contentType);
-    final assignBadge = _getAssignmentBadge(material.assignmentType);
+    final effectiveAssignType = assignments.isNotEmpty ? assignments.first.assignmentType : material.assignmentType;
+    final assignBadge = _getAssignmentBadge(effectiveAssignType);
 
     // Tombol Edit & Hapus hanya untuk guru pembuat (author) atau admin
     final currentUser = fb.currentUser;

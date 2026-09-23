@@ -37,17 +37,19 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
   String? _selectedForumClass;
   String _selectedAssignmentClass = 'all';
 
-  List<AssignmentModel> _getApplicableAssignments(FirebaseService fbService) {
-    final assignments = fbService.getAssignmentsForMaterial(widget.material.id);
+  List<AssignmentModel> _getApplicableAssignments(FirebaseService fbService, [String? materialId]) {
+    final mId = (materialId ?? widget.material.id).trim();
+    if (mId.isEmpty) return [];
+    final assignments = fbService.getAssignmentsForMaterial(mId);
     final user = fbService.currentUser;
-    final userClass = user?.className ?? user?.classId ?? '';
-    if (user == null || user.isGuru || user.role == 'guru') {
+    final userClass = (user?.className ?? user?.classId ?? '').trim().toLowerCase();
+    if (user == null || user.isGuru || user.role == 'guru' || user.isAdmin) {
       return assignments;
     }
     return assignments.where((a) {
       if (a.classIds.isEmpty) return true;
       if (userClass.isEmpty) return true;
-      return a.classIds.any((c) => c.toLowerCase() == userClass.toLowerCase());
+      return a.classIds.any((c) => c.trim().toLowerCase() == userClass);
     }).toList();
   }
 
@@ -271,6 +273,36 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
     );
   }
 
+  void _confirmDeleteAssignment(BuildContext context, FirebaseService fb, AssignmentModel asg) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus Tugas?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(
+          'Tugas "${asg.title}" beserta seluruh pengumpulan siswa terkait akan dihapus secara permanen.',
+          style: GoogleFonts.outfit(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.outfit()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await fb.deleteAssignment(asg.id);
+              if (context.mounted) {
+                AppSnackBar.success(context, 'Tugas berhasil dihapus.');
+              }
+            },
+            child: Text('Hapus', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final fbService = context.watch<FirebaseService>();
@@ -342,7 +374,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
     }
 
     final assignments = fbService.getAssignmentsForMaterial(currentMaterial.id);
-    final applicableAssignments = _getApplicableAssignments(fbService);
+    final applicableAssignments = _getApplicableAssignments(fbService, currentMaterial.id);
     final hasAssignments = applicableAssignments.isNotEmpty;
     final assignmentsDone = _areAssignmentsCompleted(fbService, applicableAssignments);
     final maxAllowedProgress = (!hasAssignments || assignmentsDone) ? 100.0 : 50.0;
@@ -1390,9 +1422,11 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
           // TAB 3: Assignments List
           Builder(
             builder: (context) {
-              final displayedAssignments = isTeacher && _selectedAssignmentClass != 'all'
-                  ? assignments.where((a) => a.classIds.isEmpty || a.classIds.contains(_selectedAssignmentClass)).toList()
-                  : assignments;
+              final displayedAssignments = isTeacher
+                  ? (_selectedAssignmentClass != 'all'
+                      ? assignments.where((a) => a.classIds.isEmpty || a.classIds.any((c) => c.trim().toLowerCase() == _selectedAssignmentClass.trim().toLowerCase())).toList()
+                      : assignments)
+                  : applicableAssignments;
 
               return Column(
                 children: [
@@ -1516,8 +1550,9 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AssignmentFormScreen(
-                                  materialId: widget.material.id,
-                                  subjectId: widget.material.subjectId,
+                                  materialId: currentMaterial.id,
+                                  subjectId: currentMaterial.subjectId,
+                                  initialClassIds: currentMaterial.classIds,
                                 ),
                               ),
                             );
@@ -1638,43 +1673,54 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                                   trailing: Builder(
                                     builder: (context) {
                                       if (isTeacher) {
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withAlpha(15),
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: AppColors.primary.withAlpha(50)),
-                                          ),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Row(
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary.withAlpha(15),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(color: AppColors.primary.withAlpha(50)),
+                                              ),
+                                              child: Column(
                                                 mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.end,
                                                 children: [
-                                                  const Icon(Icons.groups_outlined, size: 13, color: AppColors.primary),
-                                                  const SizedBox(width: 4),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.groups_outlined, size: 13, color: AppColors.primary),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '${classSubs.length} Kumpul',
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: AppColors.primary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
                                                   Text(
-                                                    '${classSubs.length} Kumpul',
+                                                    '$gradedCount Dinilai',
                                                     style: GoogleFonts.outfit(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppColors.primary,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: gradedCount > 0 ? AppColors.emerald : Colors.grey.shade600,
                                                     ),
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                '$gradedCount Dinilai',
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: gradedCount > 0 ? AppColors.emerald : Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                              tooltip: 'Hapus Tugas Ini',
+                                              onPressed: () => _confirmDeleteAssignment(context, fbService, asg),
+                                            ),
+                                          ],
                                         );
                                       }
 

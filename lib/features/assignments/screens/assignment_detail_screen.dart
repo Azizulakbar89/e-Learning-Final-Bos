@@ -780,6 +780,37 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     );
   }
 
+  void _confirmDeleteAssignment(BuildContext context, FirebaseService fb) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus Tugas?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(
+          'Tugas "${widget.assignment.title}" beserta seluruh data pengumpulan siswa terkait akan dihapus secara permanen.',
+          style: GoogleFonts.outfit(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: GoogleFonts.outfit()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await fb.deleteAssignment(widget.assignment.id);
+              if (context.mounted) {
+                AppSnackBar.success(context, 'Tugas berhasil dihapus.');
+                Navigator.pop(context);
+              }
+            },
+            child: Text('Hapus', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   static final currentUserMock = UserModel(id: '', username: '', fullName: '', role: '');
 
   @override
@@ -935,7 +966,14 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
             ),
           ],
         ),
-        actions: const [], // Logo download di header dihapus sesuai permintaan
+        actions: [
+          if (isTeacher)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              tooltip: 'Hapus Tugas',
+              onPressed: () => _confirmDeleteAssignment(context, fbService),
+            ),
+        ],
       ),
       body: ResponsiveFormWrapper(
         maxWidth: 960,

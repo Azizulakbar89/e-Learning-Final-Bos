@@ -282,8 +282,15 @@ class _MaterialCard extends StatelessWidget {
     final fb = context.watch<FirebaseService>();
     final user = fb.currentUser;
     final assignments = fb.getAssignmentsForMaterial(mat.id);
+    final studentClass = (user?.className ?? user?.classId ?? '').trim().toLowerCase();
+    final applicableAssignments = assignments.where((a) {
+      if (a.classIds.isEmpty) return true;
+      if (studentClass.isEmpty) return true;
+      return a.classIds.any((c) => c.trim().toLowerCase() == studentClass);
+    }).toList();
+
     AssignmentSubmissionModel? mySub;
-    for (final a in assignments) {
+    for (final a in applicableAssignments) {
       final subs = fb.getSubmissionsForAssignment(a.id);
       final found = subs.where((s) => s.submitterId == user?.id || s.memberStudentIds.contains(user?.id)).firstOrNull;
       if (found != null) {
@@ -487,7 +494,7 @@ class _MaterialCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ] else if (assignments.isNotEmpty) ...[
+              ] else if (applicableAssignments.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -502,7 +509,7 @@ class _MaterialCard extends StatelessWidget {
                       const Icon(Icons.assignment_outlined, size: 14, color: AppColors.primaryDark),
                       const SizedBox(width: 4),
                       Text(
-                        'Ada ${assignments.first.assignmentType == "pilihan_ganda" ? "Kuis Pilihan Ganda" : "Tugas"}',
+                        'Ada ${applicableAssignments.first.assignmentType == "pilihan_ganda" ? "Kuis Pilihan Ganda" : "Tugas"}',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

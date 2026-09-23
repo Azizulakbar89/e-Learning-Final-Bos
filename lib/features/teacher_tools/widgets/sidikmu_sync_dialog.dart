@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/excel_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/sidikmu_service.dart';
 
@@ -134,22 +135,23 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
     final cleanMap = <String, num>{};
     widget.studentGradesByNis.forEach((nis, score) {
       if (score != null) {
-        cleanMap[nis] = (score % 1 == 0) ? score.toInt() : score;
+        cleanMap[nis.trim()] = (score % 1 == 0) ? score.toInt() : score;
       }
     });
 
     final jsonGrades = jsonEncode(cleanMap);
     final script = '''javascript:(function(){
   var g = $jsonGrades;
-  var rows = Array.from(document.querySelectorAll("table tbody tr"));
+  var rows = Array.from(document.querySelectorAll("table tbody tr, table tr"));
   var count = 0;
   rows.forEach(function(row){
     var cells = row.querySelectorAll("td");
     if(cells.length < 2) return;
-    var rowText = row.innerText || "";
+    var rowText = (row.innerText || "").replace(/\\s+/g, " ");
     for(var nis in g){
       if(rowText.indexOf(nis) !== -1){
-        var inp = row.querySelector('input[type="number"], input[type="text"]');
+        var inps = row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])');
+        var inp = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
         if(inp){
           inp.value = g[nis];
           inp.dispatchEvent(new Event("input", {bubbles: true}));
@@ -174,13 +176,60 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Skrip Auto-Fill disalin! Tempel di bilah URL / console web SidikMu untuk mengisi semua nilai.',
+                  'Skrip Auto-Fill disalin! Buka web SidikMu -> Tekan F12 -> Console -> Tempel (Paste) & Enter.',
                   style: TextStyle(fontSize: 12),
                 ),
               ),
             ],
           ),
           backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _downloadSidikmuExcel() async {
+    final records = <Map<String, dynamic>>[];
+    widget.studentGradesByNis.forEach((nis, score) {
+      records.add({
+        'nis': nis.trim(),
+        'name': widget.studentNamesByNis[nis] ?? '-',
+        'score': score != null ? ((score % 1 == 0) ? score.toInt() : score) : '',
+      });
+    });
+
+    final excelBytes = ExcelService.generateSidikmuExcel(
+      sheetTitle: 'Nilai_${widget.targetClassName}',
+      records: records,
+    );
+
+    final cleanClass = widget.targetClassName.replaceAll(RegExp(r'[^\w\s\-]'), '').trim().replaceAll(RegExp(r'\s+'), '_');
+    final fileName = 'Nilai_SidikMu_$cleanClass.xlsx';
+
+    await ExcelService.downloadExcel(
+      bytes: excelBytes,
+      fileName: fileName,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.download_done_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'File Excel berhasil diunduh! Klik tombol "Import Excel" di portal SidikMu.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF0284C7),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           duration: const Duration(seconds: 4),
@@ -814,38 +863,38 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
                 ),
                 const SizedBox(height: 8),
 
-                // Tombol Sekunder: Salin Excel & Buka Web
+                // Tombol Sekunder: Unduh Excel & Buka Web
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _copyTsvGrades,
-                        icon: const Icon(Icons.table_chart_outlined, size: 16),
+                      child: ElevatedButton.icon(
+                        onPressed: _downloadSidikmuExcel,
+                        icon: const Icon(Icons.file_download_outlined, size: 16),
                         label: const Text(
-                          'Salin Format Excel',
+                          'Unduh Excel SidikMu',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0284C7),
-                          side: const BorderSide(color: Color(0xFFBAE6FD)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         onPressed: _openSidikmu,
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
                         label: const Text(
                           'Buka Web SidikMu',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7).withAlpha(20),
+                        style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF0284C7),
-                          elevation: 0,
+                          side: const BorderSide(color: Color(0xFFBAE6FD)),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -858,7 +907,7 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
           ),
           const SizedBox(height: 12),
 
-          // Petunjuk Ringkas Auto-Fill
+          // Petunjuk Ringkas Cara Otomatis
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -870,18 +919,22 @@ class _SidikmuSyncDialogState extends State<SidikmuSyncDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '💡 Panduan Cara Pakai Auto-Fill:',
+                  '💡 2 Pilihan Pengisian Otomatis ke SidikMu:',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimaryLight,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  '1. Klik "Salin Skrip Auto-Fill" di atas.\n'
-                  '2. Buka portal SidikMu dan masuk ke tabel input nilai kelas Anda.\n'
-                  '3. Tempel (Paste) skrip di bilah alamat (URL) atau console browser, lalu tekan Enter.',
+                  '1. Cara Paling Praktis (Import Excel SidikMu):\n'
+                  '   • Klik "Unduh Excel SidikMu" di atas.\n'
+                  '   • Di web SidikMu, klik tombol biru "Import Excel" di atas tabel -> Pilih file yang baru diunduh. Nilai langsung masuk otomatis 100%!\n\n'
+                  '2. Cara Skrip Auto-Fill:\n'
+                  '   • Klik "Salin Skrip Auto-Fill".\n'
+                  '   • Di web SidikMu, tekan tombol F12 (atau klik kanan -> Inspect -> tab Console).\n'
+                  '   • Tempel (Paste) lalu tekan Enter.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 10.5,
                     height: 1.4,

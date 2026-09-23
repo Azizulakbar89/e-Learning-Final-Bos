@@ -133,28 +133,64 @@ class AssignmentModel {
   }
 
   factory AssignmentModel.fromMap(Map<String, dynamic> map, {String? id}) {
-    return AssignmentModel(
-      id: id ?? map['id'] ?? '',
-      materialId: map['material_id'] ?? '',
-      subjectId: map['subject_id'] ?? '',
-      teacherId: map['teacher_id'] ?? '',
-      title: map['title'] ?? '',
-      description: map['description'] ?? '',
-      assignmentType: map['assignment_type'] ?? 'individu',
-      classIds: List<String>.from(map['class_ids'] ?? []),
-      isGroup: map['is_group'] ?? false,
-      maxGroupMembers: (map['max_group_members'] as num?)?.toInt() ?? 1,
-      allowedSubmissionTypes: (map['allowed_submission_types'] as List<dynamic>? ?? ['pdf'])
+    final rawClassIds = map['class_ids'] ?? map['classIds'];
+    List<String> parsedClassIds = [];
+    if (rawClassIds is List) {
+      parsedClassIds = rawClassIds.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    } else if (rawClassIds is String && rawClassIds.trim().isNotEmpty) {
+      parsedClassIds = [rawClassIds.trim()];
+    }
+
+    final rawSubmTypes = map['allowed_submission_types'] ?? map['allowedSubmissionTypes'];
+    List<SubmissionType> parsedSubmTypes = [SubmissionType.pdf];
+    if (rawSubmTypes is List && rawSubmTypes.isNotEmpty) {
+      parsedSubmTypes = rawSubmTypes
           .map((item) => SubmissionTypeExtension.fromString(item.toString()))
-          .toList(),
-      codeConfig: map['code_config'] != null ? CodeConfig.fromMap(map['code_config']) : null,
-      questionIds: List<String>.from(map['question_ids'] ?? []),
-      deadline: map['deadline'] != null
-          ? DateTime.tryParse(map['deadline'].toString()) ?? DateTime.now().add(const Duration(days: 7))
-          : DateTime.now().add(const Duration(days: 7)),
-      createdAt: map['created_at'] != null
-          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+          .toList();
+    }
+
+    final rawCodeConfig = map['code_config'] ?? map['codeConfig'];
+    CodeConfig? parsedCodeConfig;
+    if (rawCodeConfig is Map<String, dynamic>) {
+      parsedCodeConfig = CodeConfig.fromMap(rawCodeConfig);
+    } else if (rawCodeConfig is Map) {
+      parsedCodeConfig = CodeConfig.fromMap(Map<String, dynamic>.from(rawCodeConfig));
+    }
+
+    final rawQuestions = map['question_ids'] ?? map['questionIds'];
+    List<String> parsedQuestionIds = [];
+    if (rawQuestions is List) {
+      parsedQuestionIds = rawQuestions.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    }
+
+    final rawDeadline = map['deadline'];
+    DateTime deadline = DateTime.now().add(const Duration(days: 7));
+    if (rawDeadline != null) {
+      deadline = DateTime.tryParse(rawDeadline.toString()) ?? deadline;
+    }
+
+    final rawCreatedAt = map['created_at'] ?? map['createdAt'];
+    DateTime createdAt = DateTime.now();
+    if (rawCreatedAt != null) {
+      createdAt = DateTime.tryParse(rawCreatedAt.toString()) ?? createdAt;
+    }
+
+    return AssignmentModel(
+      id: id ?? map['id']?.toString() ?? '',
+      materialId: (map['material_id'] ?? map['materialId'] ?? '').toString().trim(),
+      subjectId: (map['subject_id'] ?? map['subjectId'] ?? '').toString().trim(),
+      teacherId: (map['teacher_id'] ?? map['teacherId'] ?? '').toString().trim(),
+      title: (map['title'] ?? '').toString().trim(),
+      description: (map['description'] ?? '').toString().trim(),
+      assignmentType: (map['assignment_type'] ?? map['assignmentType'] ?? 'individu').toString(),
+      classIds: parsedClassIds,
+      isGroup: map['is_group'] == true || map['isGroup'] == true,
+      maxGroupMembers: (map['max_group_members'] as num? ?? map['maxGroupMembers'] as num?)?.toInt() ?? 1,
+      allowedSubmissionTypes: parsedSubmTypes,
+      codeConfig: parsedCodeConfig,
+      questionIds: parsedQuestionIds,
+      deadline: deadline,
+      createdAt: createdAt,
     );
   }
 }

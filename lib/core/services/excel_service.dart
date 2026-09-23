@@ -80,6 +80,62 @@ class ExcelService {
     return Uint8List.fromList(bytes ?? []);
   }
 
+  /// Generates standardized Excel format matching SidikMu Import template:
+  /// Columns: No, NIS, Nama Siswa, Nilai
+  static Uint8List generateSidikmuExcel({
+    required String sheetTitle,
+    required List<Map<String, dynamic>> records,
+  }) {
+    final excel = Excel.createExcel();
+    final defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
+    final Sheet sheet = excel[defaultSheet];
+
+    final headerCellStyle = CellStyle(
+      bold: true,
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+      backgroundColorHex: ExcelColor.fromHexString('#0284C7'),
+      fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+    );
+
+    final headers = ['No', 'NIS', 'Nama Siswa', 'Nilai'];
+    for (int col = 0; col < headers.length; col++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+      cell.value = TextCellValue(headers[col]);
+      cell.cellStyle = headerCellStyle;
+    }
+
+    sheet.setColumnWidth(0, 8.0);
+    sheet.setColumnWidth(1, 16.0);
+    sheet.setColumnWidth(2, 35.0);
+    sheet.setColumnWidth(3, 16.0);
+
+    for (int i = 0; i < records.length; i++) {
+      final rIndex = i + 1;
+      final rec = records[i];
+
+      final noCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rIndex));
+      noCell.value = IntCellValue(i + 1);
+      noCell.cellStyle = CellStyle(horizontalAlign: HorizontalAlign.Center);
+
+      final nisCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rIndex));
+      nisCell.value = TextCellValue(rec['nis']?.toString() ?? '');
+      nisCell.cellStyle = CellStyle(horizontalAlign: HorizontalAlign.Center);
+
+      final nameCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: rIndex));
+      nameCell.value = TextCellValue(rec['name']?.toString() ?? '-');
+      nameCell.cellStyle = CellStyle(horizontalAlign: HorizontalAlign.Left);
+
+      final scoreVal = rec['score'];
+      final scoreCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: rIndex));
+      scoreCell.value = TextCellValue(scoreVal != null && scoreVal.toString().isNotEmpty ? scoreVal.toString() : '');
+      scoreCell.cellStyle = CellStyle(horizontalAlign: HorizontalAlign.Center);
+    }
+
+    final bytes = excel.save();
+    return Uint8List.fromList(bytes ?? []);
+  }
+
   /// Generates comprehensive Excel with full columns:
   /// Nama Siswa, Kelas, Nama Kelompok, Nilai, Feedback, Dikumpulkan Oleh
   static Uint8List generateDetailedGradeExcel({

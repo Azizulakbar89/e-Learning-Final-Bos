@@ -1999,7 +1999,9 @@ class FirebaseService extends ChangeNotifier {
   // ==================== ASSIGNMENTS & GROUP SUBMISSION ====================
 
   List<AssignmentModel> getAssignmentsForMaterial(String materialId) {
-    return _assignments.where((a) => a.materialId == materialId).toList();
+    final cleanId = materialId.trim();
+    if (cleanId.isEmpty) return [];
+    return _assignments.where((a) => a.materialId.trim() == cleanId).toList();
   }
 
   Future<void> addAssignment(AssignmentModel assignment) async {
@@ -2009,6 +2011,39 @@ class FirebaseService extends ChangeNotifier {
       await db.collection('assignments').doc(assignment.id).set(assignment.toMap());
     } catch (e) {
       debugPrint('[Firestore] Error adding assignment: $e');
+    }
+  }
+
+  Future<void> updateAssignment(AssignmentModel assignment) async {
+    final idx = _assignments.indexWhere((a) => a.id == assignment.id);
+    if (idx != -1) {
+      _assignments[idx] = assignment;
+    } else {
+      _assignments.insert(0, assignment);
+    }
+    notifyListeners();
+    try {
+      await db.collection('assignments').doc(assignment.id).set(assignment.toMap());
+    } catch (e) {
+      debugPrint('[Firestore] Error updating assignment: $e');
+    }
+  }
+
+  Future<void> deleteAssignment(String assignmentId) async {
+    _assignments.removeWhere((a) => a.id == assignmentId);
+    _submissions.removeWhere((s) => s.assignmentId == assignmentId);
+    notifyListeners();
+    try {
+      await db.collection('assignments').doc(assignmentId).delete();
+      final subSnap = await db
+          .collection('assignment_submissions')
+          .where('assignment_id', isEqualTo: assignmentId)
+          .get();
+      for (final doc in subSnap.docs) {
+        await doc.reference.delete();
+      }
+    } catch (e) {
+      debugPrint('[Firestore] Error deleting assignment: $e');
     }
   }
 

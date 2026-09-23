@@ -12,11 +12,13 @@ import '../../../core/widgets/responsive_layout.dart';
 class AssignmentFormScreen extends StatefulWidget {
   final String materialId;
   final String subjectId;
+  final List<String> initialClassIds;
 
   const AssignmentFormScreen({
     super.key,
     required this.materialId,
     required this.subjectId,
+    this.initialClassIds = const [],
   });
 
   @override
@@ -70,14 +72,20 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       context,
       message: 'Membuat tugas pembelajaran...',
       action: () async {
+        final material = fb.materials.where((m) => m.id == widget.materialId).firstOrNull;
+        final targetClasses = widget.initialClassIds.isNotEmpty
+            ? widget.initialClassIds
+            : (material?.classIds ?? const []);
+
         final newAssignment = AssignmentModel(
           id: _uuid.v4(),
-          materialId: widget.materialId,
-          subjectId: widget.subjectId,
+          materialId: widget.materialId.trim(),
+          subjectId: widget.subjectId.trim(),
           teacherId: fb.currentUser?.id ?? 'teacher_budi',
           title: _titleCtrl.text.trim(),
           description: _descCtrl.text.trim(),
           assignmentType: _assignmentType,
+          classIds: targetClasses,
           isGroup: _assignmentType == 'kelompok',
           maxGroupMembers: _assignmentType == 'kelompok' ? _maxGroupMembers : 1,
           allowedSubmissionTypes: _assignmentType == 'pilihan_ganda'
