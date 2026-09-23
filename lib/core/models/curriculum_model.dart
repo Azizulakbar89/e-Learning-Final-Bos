@@ -90,6 +90,23 @@ class CurriculumCpModel {
       description: map['description'] ?? '',
     );
   }
+  CurriculumCpModel copyWith({
+    String? id,
+    String? subjectId,
+    String? teacherId,
+    String? code,
+    String? title,
+    String? description,
+  }) {
+    return CurriculumCpModel(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      teacherId: teacherId ?? this.teacherId,
+      code: code ?? this.code,
+      title: title ?? this.title,
+      description: description ?? this.description,
+    );
+  }
 }
 
 class CurriculumTpModel {
@@ -128,6 +145,24 @@ class CurriculumTpModel {
       code: map['code'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
+    );
+  }
+
+  CurriculumTpModel copyWith({
+    String? id,
+    String? cpId,
+    String? subjectId,
+    String? code,
+    String? title,
+    String? description,
+  }) {
+    return CurriculumTpModel(
+      id: id ?? this.id,
+      cpId: cpId ?? this.cpId,
+      subjectId: subjectId ?? this.subjectId,
+      code: code ?? this.code,
+      title: title ?? this.title,
+      description: description ?? this.description,
     );
   }
 }

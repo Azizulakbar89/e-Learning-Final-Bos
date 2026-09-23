@@ -19,6 +19,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val INSTALLER_CHANNEL = "www.azizul.com/app_installer"
+    private val SOCIAL_SHARE_CHANNEL = "www.azizul.com/social_share"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +59,93 @@ class MainActivity : FlutterActivity() {
                 }
             } else {
                 result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SOCIAL_SHARE_CHANNEL).setMethodCallHandler { call, result ->
+            val filePath = call.argument<String>("filePath")
+            if (filePath == null) {
+                result.error("INVALID_ARGS", "File path tidak boleh kosong", null)
+                return@setMethodCallHandler
+            }
+            val file = File(filePath)
+            if (!file.exists()) {
+                result.error("FILE_NOT_FOUND", "Berkas gambar tidak ditemukan: $filePath", null)
+                return@setMethodCallHandler
+            }
+            val imageUri: Uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+
+            when (call.method) {
+                "shareToInstagram" -> {
+                    val caption = call.argument<String>("caption") ?: ""
+                    try {
+                        val storyIntent = Intent("com.instagram.share.ADD_TO_STORY").apply {
+                            setDataAndType(imageUri, "image/png")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra("interactive_asset_uri", imageUri)
+                            setPackage("com.instagram.android")
+                        }
+                        if (packageManager.resolveActivity(storyIntent, 0) != null) {
+                            startActivity(storyIntent)
+                            result.success(true)
+                            return@setMethodCallHandler
+                        }
+
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, imageUri)
+                            if (caption.isNotEmpty()) {
+                                putExtra(Intent.EXTRA_TEXT, caption)
+                            }
+                            setPackage("com.instagram.android")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(sendIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("INSTAGRAM_ERROR", e.localizedMessage, null)
+                    }
+                }
+                "shareToWhatsApp" -> {
+                    val text = call.argument<String>("text") ?: ""
+                    try {
+                        val packages = arrayOf("com.whatsapp", "com.whatsapp.w4b")
+                        var launched = false
+                        for (pkg in packages) {
+                            try {
+                                val waIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "image/png"
+                                    putExtra(Intent.EXTRA_STREAM, imageUri)
+                                    if (text.isNotEmpty()) {
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                    }
+                                    setPackage(pkg)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(waIntent)
+                                launched = true
+                                break
+                            } catch (_: Exception) {
+                                // Try next package
+                            }
+                        }
+                        if (launched) {
+                            result.success(true)
+                        } else {
+                            result.error("WHATSAPP_NOT_INSTALLED", "Aplikasi WhatsApp tidak terpasang di perangkat ini.", null)
+                        }
+                    } catch (e: Exception) {
+                        result.error("WHATSAPP_ERROR", e.localizedMessage, null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
     }

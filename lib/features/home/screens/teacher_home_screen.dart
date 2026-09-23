@@ -11,6 +11,7 @@ import '../../../core/models/user_model.dart';
 import '../../../core/services/excel_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/fcm_service.dart';
+import '../../../core/services/sidikmu_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/app_nav_rail.dart';
 import '../../../core/widgets/app_update_dialog.dart';
@@ -3012,6 +3013,204 @@ class _TeacherProfilePage extends StatelessWidget {
     );
   }
 
+  void _showSidikmuAccountDialog(BuildContext context) {
+    if (currentUser == null) return;
+    final urlCtrl = TextEditingController(text: currentUser!.sidikmuUrl ?? SidikmuService.defaultUrl);
+    final userCtrl = TextEditingController(text: currentUser!.sidikmuUsername ?? '');
+    final passCtrl = TextEditingController(text: currentUser!.sidikmuPassword ?? '');
+    final formKey = GlobalKey<FormState>();
+    bool obscure = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isConnected = currentUser!.hasSidikmuAccount;
+          return Container(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withAlpha(30),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.cloud_sync_rounded, color: Color(0xFF0284C7), size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Integrasi Akun SidikMu',
+                                style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                'Tautkan akun SidikMu untuk sinkronisasi nilai otomatis',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    TextFormField(
+                      controller: urlCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'URL Web Portal SidikMu',
+                        hintText: 'https://smpm12gkb.sidikmu.com',
+                        prefixIcon: const Icon(Icons.language_rounded, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'URL tidak boleh kosong' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: userCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Username SidikMu',
+                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Username tidak boleh kosong' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: passCtrl,
+                      obscureText: obscure,
+                      decoration: InputDecoration(
+                        labelText: 'Password SidikMu',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility, size: 20),
+                          onPressed: () => setModalState(() => obscure = !obscure),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Password tidak boleh kosong' : null,
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        if (isConnected) ...[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Putuskan Akun SidikMu?'),
+                                    content: const Text('Kredensial SidikMu akan dihapus dari akun guru ini.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Putuskan', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  await fb.clearTeacherSidikmuCredentials(teacherId: currentUser!.id);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Akun SidikMu berhasil diputuskan.')),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.link_off_rounded, color: Colors.red, size: 18),
+                              label: const Text('Putuskan', style: TextStyle(color: Colors.red)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                side: BorderSide(color: Colors.red.shade200),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if (formKey.currentState?.validate() ?? false) {
+                                final cleanUrl = urlCtrl.text.trim();
+                                final cleanUser = userCtrl.text.trim();
+                                final cleanPass = passCtrl.text.trim();
+                                Navigator.pop(ctx);
+                                await showLoadingDialog(
+                                  context,
+                                  message: 'Menyimpan kredensial SidikMu...',
+                                  action: () => fb.updateTeacherSidikmuCredentials(
+                                    teacherId: currentUser!.id,
+                                    sidikmuUrl: cleanUrl,
+                                    sidikmuUsername: cleanUser,
+                                    sidikmuPassword: cleanPass,
+                                  ),
+                                  successMessage: 'Akun SidikMu berhasil ditautkan!',
+                                  errorMessage: 'Gagal menyimpan akun SidikMu.',
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0284C7),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              'Simpan Akun SidikMu',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
@@ -3334,6 +3533,120 @@ class _TeacherProfilePage extends StatelessWidget {
                                   color: const Color(0xFFD97706),
                                   bg: const Color(0xFFFFFBEB),
                                   border: const Color(0xFFFDE68A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // SidikMu Account Integration Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFF0F9FF),
+                            Colors.white,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0284C7).withAlpha(15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withAlpha(30),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.cloud_sync_rounded,
+                                  color: Color(0xFF0284C7),
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Portal SidikMu',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: (user?.hasSidikmuAccount == true)
+                                                ? const Color(0xFFDCFCE7)
+                                                : Colors.grey.shade200,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: (user?.hasSidikmuAccount == true)
+                                                  ? const Color(0xFF86EFAC)
+                                                  : Colors.grey.shade300,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            (user?.hasSidikmuAccount == true) ? 'Terhubung' : 'Belum Ditautkan',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: (user?.hasSidikmuAccount == true)
+                                                  ? const Color(0xFF15803D)
+                                                  : Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      (user?.hasSidikmuAccount == true)
+                                          ? 'User: ${user?.sidikmuUsername} • Sinkronisasi Siap'
+                                          : 'Tautkan akun untuk sinkronisasi nilai tugas & ujian',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => _showSidikmuAccountDialog(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0284C7),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  elevation: 0,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  (user?.hasSidikmuAccount == true) ? 'Kelola' : 'Tautkan',
+                                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],

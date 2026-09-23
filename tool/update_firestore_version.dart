@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Fitur pilihan bagikan postingan langsung ke Instagram (Story/Feed) & WhatsApp (Status/Chat), serta eksekusi compiler IDE multi-bahasa terintegrasi (Python 3, JavaScript, PHP, C++, Arduino & Live HTML Preview).'
+            '✨ Versi $version: Integrasi otomatis sinkronisasi nilai formatif & sumatif langsung ke web portal SidikMu, serta fitur lengkap kelola edit & hapus Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) bagi guru.'
       },
       'force_update': {'booleanValue': false}
     }

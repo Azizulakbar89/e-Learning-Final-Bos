@@ -22,6 +22,7 @@ import '../../code_compiler/screens/code_playground_screen.dart';
 import '../widgets/student_submission_detail_dialog.dart';
 import '../widgets/submission_image_viewer.dart';
 import '../widgets/submission_pdf_viewer.dart';
+import '../../teacher_tools/widgets/sidikmu_sync_dialog.dart';
 
 class AssignmentDetailScreen extends StatefulWidget {
   final AssignmentModel assignment;
@@ -688,6 +689,87 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     }
   }
 
+  void _openSidikmuSync(BuildContext context, List<AssignmentSubmissionModel> submissions) {
+    final fb = context.read<FirebaseService>();
+    final teacher = fb.currentUser;
+    if (teacher == null || !teacher.hasSidikmuAccount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun SidikMu belum ditautkan. Buka menu Profil untuk menghubungkan.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Determine target class
+    String targetClass = '';
+    if (_submissionClassFilter != 'all') {
+      targetClass = _submissionClassFilter;
+    } else if (widget.assignment.classIds.isNotEmpty) {
+      targetClass = widget.assignment.classIds.first;
+    }
+
+    // Determine subject name
+    final subject = fb.subjects.firstWhere(
+      (s) => s.id == widget.assignment.subjectId,
+      orElse: () => SubjectModel(id: '', name: 'Informatika', code: ''),
+    );
+
+    // Map student NIS to scores
+    final studentGradesByNis = <String, double?>{};
+    final studentNamesByNis = <String, String>{};
+
+    // Include all students in this class from fb.allStudents
+    final classStudents = fb.allStudents.where((s) {
+      final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
+      if (targetClass.isEmpty) return true;
+      return sClass == targetClass.toLowerCase();
+    }).toList();
+
+    for (final s in classStudents) {
+      final nis = (s.nis ?? '').trim();
+      if (nis.isNotEmpty) {
+        studentGradesByNis[nis] = null; // Default null (empty / not submitted)
+        studentNamesByNis[nis] = s.fullName;
+      }
+    }
+
+    // Fill with submission scores
+    for (final sub in submissions) {
+      final student = fb.allStudents.firstWhere(
+        (std) => std.id == sub.submitterId,
+        orElse: () => currentUserMock,
+      );
+      final nis = (student.nis ?? '').trim();
+      if (nis.isNotEmpty) {
+        studentGradesByNis[nis] = sub.score;
+        studentNamesByNis[nis] = student.fullName.isNotEmpty ? student.fullName : sub.submitterName;
+      }
+      // Group members sync
+      for (final memId in sub.memberStudentIds) {
+        final mem = fb.allStudents.firstWhere(
+          (m) => m.id == memId,
+          orElse: () => currentUserMock,
+        );
+        final memNis = (mem.nis ?? '').trim();
+        if (memNis.isNotEmpty) {
+          studentGradesByNis[memNis] = sub.score;
+          studentNamesByNis[memNis] = mem.fullName;
+        }
+      }
+    }
+
+    SidikmuSyncDialog.show(
+      context,
+      isFormatif: true,
+      targetClassName: targetClass.isNotEmpty ? targetClass : 'Semua Kelas',
+      targetSubjectName: subject.name,
+      studentGradesByNis: studentGradesByNis,
+      studentNamesByNis: studentNamesByNis,
+    );
+  }
+
   static final currentUserMock = UserModel(id: '', username: '', fullName: '', role: '');
 
   @override
@@ -1192,13 +1274,33 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
                       style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: _exportExcel,
-                    icon: const Icon(Icons.download, size: 18),
-                    label: Text(
-                      _submissionClassFilter == 'all' ? 'Unduh Excel' : 'Unduh Excel ($_submissionClassFilter)',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _openSidikmuSync(context, filteredSubmissions),
+                        icon: const Icon(Icons.cloud_sync_rounded, size: 16),
+                        label: const Text('Sinkron SidikMu'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      TextButton.icon(
+                        onPressed: _exportExcel,
+                        icon: const Icon(Icons.download, size: 18),
+                        label: Text(
+                          _submissionClassFilter == 'all' ? 'Unduh Excel' : 'Unduh Excel ($_submissionClassFilter)',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

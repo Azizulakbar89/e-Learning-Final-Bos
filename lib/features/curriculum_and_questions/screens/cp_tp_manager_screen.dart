@@ -65,8 +65,116 @@ class _CpTpManagerScreenState extends State<CpTpManagerScreen> {
                 ),
               );
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Capaian Pembelajaran (CP) berhasil ditambahkan'),
+                  backgroundColor: AppColors.emerald,
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
             child: const Text('Simpan CP'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCpDialog(CurriculumCpModel cp) {
+    final codeCtrl = TextEditingController(text: cp.code);
+    final titleCtrl = TextEditingController(text: cp.title);
+    final descCtrl = TextEditingController(text: cp.description);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit Capaian Pembelajaran (CP)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Kode CP', hintText: 'Contoh: CP-WEB-10.2'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Judul CP', hintText: 'Contoh: Arsitektur API Modern'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Deskripsi Capaian'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          FilledButton(
+            onPressed: () {
+              if (titleCtrl.text.trim().isEmpty) return;
+              final fb = context.read<FirebaseService>();
+              fb.updateCp(
+                cp.copyWith(
+                  code: codeCtrl.text.trim(),
+                  title: titleCtrl.text.trim(),
+                  description: descCtrl.text.trim(),
+                ),
+              );
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Capaian Pembelajaran (CP) berhasil diperbarui'),
+                  backgroundColor: AppColors.emerald,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Simpan Perubahan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCp(CurriculumCpModel cp) {
+    final tpsCount = context.read<FirebaseService>().tps.where((t) => t.cpId == cp.id).length;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Hapus CP?'),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus CP "${cp.code}: ${cp.title}"?'
+          '${tpsCount > 0 ? '\n\nPerhatian: Sebanyak $tpsCount Tujuan Pembelajaran (TP) di bawah CP ini juga akan dihapus secara permanen!' : ''}',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              final fb = context.read<FirebaseService>();
+              fb.deleteCp(cp.id);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('CP "${cp.code}" dan seluruh TP terkait berhasil dihapus'),
+                  backgroundColor: Colors.red.shade700,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Hapus CP', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -119,8 +227,114 @@ class _CpTpManagerScreenState extends State<CpTpManagerScreen> {
                 ),
               );
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tujuan Pembelajaran (TP) berhasil ditambahkan'),
+                  backgroundColor: AppColors.emerald,
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
             child: const Text('Simpan TP'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditTpDialog(CurriculumTpModel tp) {
+    final codeCtrl = TextEditingController(text: tp.code);
+    final titleCtrl = TextEditingController(text: tp.title);
+    final descCtrl = TextEditingController(text: tp.description);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit Tujuan Pembelajaran (TP)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Kode TP', hintText: 'Contoh: TP-10.2.1'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Judul TP'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Deskripsi Tujuan'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          FilledButton(
+            onPressed: () {
+              if (titleCtrl.text.trim().isEmpty) return;
+              final fb = context.read<FirebaseService>();
+              fb.updateTp(
+                tp.copyWith(
+                  code: codeCtrl.text.trim(),
+                  title: titleCtrl.text.trim(),
+                  description: descCtrl.text.trim(),
+                ),
+              );
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tujuan Pembelajaran (TP) berhasil diperbarui'),
+                  backgroundColor: AppColors.emerald,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Simpan Perubahan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteTp(CurriculumTpModel tp) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Hapus TP?'),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus TP "${tp.code}: ${tp.title}"?',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              final fb = context.read<FirebaseService>();
+              fb.deleteTp(tp.id);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('TP "${tp.code}" berhasil dihapus'),
+                  backgroundColor: Colors.red.shade700,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Hapus TP', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -283,6 +497,39 @@ class _CpTpManagerScreenState extends State<CpTpManagerScreen> {
                                     icon: const Icon(Icons.add, size: 16),
                                     label: const Text('Tambah TP'),
                                   ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondaryLight),
+                                    tooltip: 'Opsi CP',
+                                    onSelected: (val) {
+                                      if (val == 'edit') {
+                                        _showEditCpDialog(cp);
+                                      } else if (val == 'delete') {
+                                        _confirmDeleteCp(cp);
+                                      }
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
+                                            SizedBox(width: 8),
+                                            Text('Edit CP', style: TextStyle(fontSize: 13)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('Hapus CP', style: TextStyle(fontSize: 13, color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 6),
@@ -292,26 +539,96 @@ class _CpTpManagerScreenState extends State<CpTpManagerScreen> {
                               ),
                               const SizedBox(height: 12),
                               const Divider(),
-                              const Text('Daftar Tujuan Pembelajaran (TP):',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Daftar Tujuan Pembelajaran (TP) • ${tps.length}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
                               if (tps.isEmpty)
                                 const Text('Belum ada TP terdaftar.',
                                     style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey))
                               else
                                 ...tps.map(
-                                  (tp) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                  (tp) => Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.backgroundLight,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppColors.borderLight.withAlpha(153)),
+                                    ),
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        const Icon(Icons.check_circle_outline, size: 16, color: AppColors.emerald),
-                                        const SizedBox(width: 6),
+                                        const Icon(Icons.check_circle_outline, size: 18, color: AppColors.emerald),
+                                        const SizedBox(width: 8),
                                         Expanded(
-                                          child: Text(
-                                            '${tp.code}: ${tp.title}',
-                                            style: const TextStyle(fontSize: 13),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: AppColors.borderLight),
+                                                    ),
+                                                    child: Text(
+                                                      tp.code,
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: AppColors.textPrimaryLight,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      tp.title,
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              if (tp.description.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  tp.description,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: AppColors.textSecondaryLight,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                                          tooltip: 'Edit TP',
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.all(4),
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          onPressed: () => _showEditTpDialog(tp),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                          tooltip: 'Hapus TP',
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.all(4),
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          onPressed: () => _confirmDeleteTp(tp),
                                         ),
                                       ],
                                     ),

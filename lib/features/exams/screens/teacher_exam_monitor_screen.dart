@@ -11,6 +11,7 @@ import '../../../core/widgets/curved_header_card.dart';
 import '../widgets/duplicate_exam_dialog.dart';
 import 'essay_grading_screen.dart';
 import 'exam_form_screen.dart';
+import '../../teacher_tools/widgets/sidikmu_sync_dialog.dart';
 
 class TeacherExamMonitorScreen extends StatefulWidget {
   final ExamModel exam;
@@ -157,6 +158,79 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     );
   }
 
+  void _openSidikmuSumatifSync(
+    BuildContext context,
+    ExamModel currentExam,
+    List<ExamSessionModel> sessions,
+  ) {
+    final fb = context.read<FirebaseService>();
+    final teacher = fb.currentUser;
+    if (teacher == null || !teacher.hasSidikmuAccount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun SidikMu belum ditautkan. Buka menu Profil untuk menghubungkan.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Determine target class
+    String targetClass = '';
+    if (_selectedClassFilter != 'all') {
+      targetClass = _selectedClassFilter;
+    } else if (currentExam.classIds.isNotEmpty) {
+      targetClass = currentExam.classIds.first;
+    }
+
+    // Determine subject
+    final subject = fb.subjects.where((s) => s.id == currentExam.subjectId).firstOrNull;
+    final subjectName = subject?.name ?? 'Informatika';
+
+    // Map student NIS to scores
+    final studentGradesByNis = <String, double?>{};
+    final studentNamesByNis = <String, String>{};
+
+    // Pre-populate with all students in this class so missing ones are properly tracked
+    final classStudents = fb.allStudents.where((s) {
+      final sClass = (s.className ?? s.classId ?? '').trim().toLowerCase();
+      if (targetClass.isEmpty) return true;
+      return sClass == targetClass.toLowerCase();
+    }).toList();
+
+    for (final s in classStudents) {
+      final nis = (s.nis ?? '').trim();
+      if (nis.isNotEmpty) {
+        studentGradesByNis[nis] = null;
+        studentNamesByNis[nis] = s.fullName;
+      }
+    }
+
+    // Fill with exam session scores
+    for (final session in sessions) {
+      if (_selectedClassFilter != 'all' &&
+          session.studentClass.trim().toLowerCase() != _selectedClassFilter.trim().toLowerCase()) {
+        continue;
+      }
+      final nis = session.studentNis.trim();
+      if (nis.isNotEmpty) {
+        final score = session.finalScore ?? session.nonEssayScore;
+        studentGradesByNis[nis] = score;
+        studentNamesByNis[nis] = session.studentName;
+      }
+    }
+
+    SidikmuSyncDialog.show(
+      context,
+      isFormatif: false,
+      targetClassName: targetClass.isNotEmpty ? targetClass : 'Semua Kelas',
+      targetSubjectName: subjectName,
+      examTitle: currentExam.title,
+      studentGradesByNis: studentGradesByNis,
+      studentNamesByNis: studentNamesByNis,
+    );
+  }
+
   void _confirmDeleteExam(BuildContext context, FirebaseService fb, ExamModel currentExam) {
     showDialog(
       context: context,
@@ -281,6 +355,11 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
               title: 'Ruang Pantau: ${currentExam.title}',
               subtitle: 'Pantau Nilai, Integritas, dan Sesi Live Ujian',
               actions: [
+                IconButton(
+                  tooltip: 'Sinkronkan Nilai ke SidikMu (Sumatif)',
+                  icon: const Icon(Icons.cloud_sync_rounded, color: Color(0xFF38BDF8), size: 22),
+                  onPressed: () => _openSidikmuSumatifSync(context, currentExam, allSessions),
+                ),
                 IconButton(
                   tooltip: 'Download Excel Nilai Ujian (Pilihan Per Kelas)',
                   icon: const Icon(Icons.file_download_outlined, color: Colors.white, size: 20),

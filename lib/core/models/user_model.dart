@@ -12,6 +12,10 @@ class UserModel {
   final List<String> classIds; // For teachers (classes taught)
   final int totalPoints;
   final String? fcmToken;
+  final String? sidikmuUrl;
+  final String? sidikmuUsername;
+  final String? sidikmuPassword;
+  final DateTime? sidikmuLastSyncedAt;
 
   UserModel({
     required this.id,
@@ -27,11 +31,18 @@ class UserModel {
     this.classIds = const [],
     this.totalPoints = 0,
     this.fcmToken,
+    this.sidikmuUrl = 'https://smpm12gkb.sidikmu.com',
+    this.sidikmuUsername,
+    this.sidikmuPassword,
+    this.sidikmuLastSyncedAt,
   });
 
   bool get isSiswa => role == 'siswa';
   bool get isGuru => role == 'guru';
   bool get isAdmin => role == 'admin';
+  bool get hasSidikmuAccount =>
+      (sidikmuUsername != null && sidikmuUsername!.trim().isNotEmpty) &&
+      (sidikmuPassword != null && sidikmuPassword!.isNotEmpty);
 
   Map<String, dynamic> toMap() {
     return {
@@ -48,6 +59,10 @@ class UserModel {
       'class_ids': classIds,
       'total_points': totalPoints,
       'fcm_token': fcmToken,
+      'sidikmu_url': sidikmuUrl,
+      'sidikmu_username': sidikmuUsername,
+      'sidikmu_password': sidikmuPassword,
+      'sidikmu_last_synced_at': sidikmuLastSyncedAt?.toIso8601String(),
     };
   }
 
@@ -87,6 +102,12 @@ class UserModel {
       classIds: parsedClasses,
       totalPoints: (map['total_points'] as num?)?.toInt() ?? 0,
       fcmToken: map['fcm_token'],
+      sidikmuUrl: map['sidikmu_url'] as String? ?? 'https://smpm12gkb.sidikmu.com',
+      sidikmuUsername: map['sidikmu_username'] as String?,
+      sidikmuPassword: map['sidikmu_password'] as String?,
+      sidikmuLastSyncedAt: map['sidikmu_last_synced_at'] != null
+          ? DateTime.tryParse(map['sidikmu_last_synced_at'].toString())
+          : null,
     );
   }
 
@@ -104,6 +125,10 @@ class UserModel {
     List<String>? classIds,
     int? totalPoints,
     String? fcmToken,
+    String? sidikmuUrl,
+    String? sidikmuUsername,
+    String? sidikmuPassword,
+    DateTime? sidikmuLastSyncedAt,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -119,6 +144,10 @@ class UserModel {
       classIds: classIds ?? this.classIds,
       totalPoints: totalPoints ?? this.totalPoints,
       fcmToken: fcmToken ?? this.fcmToken,
+      sidikmuUrl: sidikmuUrl ?? this.sidikmuUrl,
+      sidikmuUsername: sidikmuUsername ?? this.sidikmuUsername,
+      sidikmuPassword: sidikmuPassword ?? this.sidikmuPassword,
+      sidikmuLastSyncedAt: sidikmuLastSyncedAt ?? this.sidikmuLastSyncedAt,
     );
   }
 

@@ -2663,6 +2663,36 @@ class FirebaseService extends ChangeNotifier {
     }
   }
 
+  Future<void> updateCp(CurriculumCpModel cp) async {
+    final idx = _cps.indexWhere((c) => c.id == cp.id);
+    if (idx != -1) {
+      _cps[idx] = cp;
+      notifyListeners();
+    }
+    try {
+      await db.collection('cps').doc(cp.id).set(cp.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('[Firestore] Error updating cp: $e');
+    }
+  }
+
+  Future<void> deleteCp(String cpId) async {
+    _cps.removeWhere((c) => c.id == cpId);
+    final relatedTps = _tps.where((t) => t.cpId == cpId).toList();
+    _tps.removeWhere((t) => t.cpId == cpId);
+    notifyListeners();
+    try {
+      final batch = db.batch();
+      batch.delete(db.collection('cps').doc(cpId));
+      for (final tp in relatedTps) {
+        batch.delete(db.collection('tps').doc(tp.id));
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('[Firestore] Error deleting cp: $e');
+    }
+  }
+
   Future<void> addTp(CurriculumTpModel tp) async {
     _tps.add(tp);
     notifyListeners();
@@ -2670,6 +2700,29 @@ class FirebaseService extends ChangeNotifier {
       await db.collection('tps').doc(tp.id).set(tp.toMap());
     } catch (e) {
       debugPrint('[Firestore] Error adding tp: $e');
+    }
+  }
+
+  Future<void> updateTp(CurriculumTpModel tp) async {
+    final idx = _tps.indexWhere((t) => t.id == tp.id);
+    if (idx != -1) {
+      _tps[idx] = tp;
+      notifyListeners();
+    }
+    try {
+      await db.collection('tps').doc(tp.id).set(tp.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('[Firestore] Error updating tp: $e');
+    }
+  }
+
+  Future<void> deleteTp(String tpId) async {
+    _tps.removeWhere((t) => t.id == tpId);
+    notifyListeners();
+    try {
+      await db.collection('tps').doc(tpId).delete();
+    } catch (e) {
+      debugPrint('[Firestore] Error deleting tp: $e');
     }
   }
 
@@ -4209,6 +4262,82 @@ class FirebaseService extends ChangeNotifier {
       } catch (e) {
         debugPrint('[Firestore] updateTeacherProfile error: $e');
       }
+    }
+  }
+
+  /// Update teacher SidikMu credentials
+  Future<void> updateTeacherSidikmuCredentials({
+    required String teacherId,
+    required String sidikmuUrl,
+    required String sidikmuUsername,
+    required String sidikmuPassword,
+  }) async {
+    final cleanUrl = sidikmuUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final cleanUser = sidikmuUsername.trim();
+    final cleanPass = sidikmuPassword.trim();
+
+    if (_currentUser?.id == teacherId) {
+      _currentUser = _currentUser!.copyWith(
+        sidikmuUrl: cleanUrl,
+        sidikmuUsername: cleanUser,
+        sidikmuPassword: cleanPass,
+      );
+      notifyListeners();
+    }
+
+    try {
+      await db.collection('users').doc(teacherId).update({
+        'sidikmu_url': cleanUrl,
+        'sidikmu_username': cleanUser,
+        'sidikmu_password': cleanPass,
+      });
+    } catch (e) {
+      debugPrint('[Firestore] updateTeacherSidikmuCredentials error: $e');
+      rethrow;
+    }
+  }
+
+  /// Clear teacher SidikMu credentials
+  Future<void> clearTeacherSidikmuCredentials({
+    required String teacherId,
+  }) async {
+    if (_currentUser?.id == teacherId) {
+      _currentUser = _currentUser!.copyWith(
+        sidikmuUsername: '',
+        sidikmuPassword: '',
+      );
+      notifyListeners();
+    }
+
+    try {
+      await db.collection('users').doc(teacherId).update({
+        'sidikmu_username': '',
+        'sidikmu_password': '',
+      });
+    } catch (e) {
+      debugPrint('[Firestore] clearTeacherSidikmuCredentials error: $e');
+      rethrow;
+    }
+  }
+
+  /// Update teacher SidikMu last sync timestamp
+  Future<void> updateTeacherSidikmuLastSynced({
+    required String teacherId,
+  }) async {
+    final now = DateTime.now();
+    if (_currentUser?.id == teacherId) {
+      _currentUser = _currentUser!.copyWith(
+        sidikmuLastSyncedAt: now,
+      );
+      notifyListeners();
+    }
+
+    try {
+      await db.collection('users').doc(teacherId).update({
+        'sidikmu_last_synced_at': now.toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[Firestore] updateTeacherSidikmuLastSynced error: $e');
     }
   }
 
