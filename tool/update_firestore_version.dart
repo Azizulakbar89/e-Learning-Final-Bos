@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Perbaikan tampilan teks chat & spacing, edit anggota & hapus grup chat, filter pesan sendiri, notifikasi pengumpulan & penilaian tugas, dan fitur TikTok-style bagikan streak belajar ke WhatsApp & Instagram Story.'
+            '✨ Versi $version: Fitur pilihan bagikan postingan langsung ke Instagram (Story/Feed) & WhatsApp (Status/Chat), serta eksekusi compiler IDE multi-bahasa terintegrasi (Python 3, JavaScript, PHP, C++, Arduino & Live HTML Preview).'
       },
       'force_update': {'booleanValue': false}
     }

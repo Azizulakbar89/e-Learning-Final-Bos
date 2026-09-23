@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/compiler_service.dart';
 import '../../../core/services/firebase_service.dart';
@@ -31,8 +34,22 @@ class _CodePlaygroundScreenState extends State<CodePlaygroundScreen> {
   CompileResult? _compileResult;
   bool _showPreview = false;
   bool _isDarkEditor = true;
+  bool _htmlViewLive = true;
+  WebViewController? _webViewController;
 
   final Map<String, String> _sampleTemplates = {
+    'python': '''# Python 3 - Algoritma & Perhitungan
+def hitung_luas_lingkaran(r):
+    pi = 3.14159
+    return pi * (r ** 2)
+
+print("=== PROGRAM PYTHON SISWA ===")
+for r in [7, 14, 21]:
+    luas = hitung_luas_lingkaran(r)
+    print(f"Jari-jari: {r} cm -> Luas: {luas:.2f} cm²")
+
+print("Status: Program Python berhasil dijalankan!")
+''',
     'html': '''<!DOCTYPE html>
 <html>
 <head>
@@ -70,6 +87,18 @@ function sambutSiswa(\$nama, \$kelas) {
 echo sambutSiswa("Ahmad Fauzan", "X-RPL-1") . "\\n";
 echo "Waktu Server: " . date("Y-m-d H:i:s") . "\\n";
 echo "[PHP SUCCESS] Kompilasi script PHP selesai tanpa error.";
+''',
+    'cpp': '''#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "=== PROGRAM C++ ===" << endl;
+    int a = 15;
+    int b = 25;
+    cout << "Hasil penjumlahan " << a << " + " << b << " = " << (a + b) << endl;
+    cout << "Kompilasi C++ Sukses!" << endl;
+    return 0;
+}
 ''',
     'arduino': '''// Program Arduino IDE: Blink & Sensor Suhu
 const int ledPin = 13;
@@ -123,6 +152,19 @@ void loop() {
     );
 
     if (mounted) {
+      if (_selectedLanguage == 'html') {
+        try {
+          if (!kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
+            _webViewController = WebViewController()
+              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+              ..setBackgroundColor(Colors.white)
+              ..loadHtmlString(_codeController.text);
+          }
+        } catch (e) {
+          debugPrint('[CodePlayground] Webview load error: $e');
+        }
+      }
+
       setState(() {
         _compileResult = result;
         _isCompiling = false;
@@ -146,6 +188,7 @@ void loop() {
       _codeController.text = _sampleTemplates[newLang] ?? '';
       _compileResult = null;
       _showPreview = false;
+      _webViewController = null;
     });
   }
 
@@ -178,6 +221,7 @@ void loop() {
                 _codeController.text = _sampleTemplates[_selectedLanguage] ?? '';
                 _compileResult = null;
                 _showPreview = false;
+                _webViewController = null;
               });
             },
             child: const Text('Reset'),
@@ -197,12 +241,16 @@ void loop() {
 
   String _getFileExtensionName() {
     switch (_selectedLanguage) {
+      case 'python':
+        return 'main.py';
       case 'html':
         return 'index.html';
       case 'javascript':
         return 'main.js';
       case 'php':
         return 'script.php';
+      case 'cpp':
+        return 'main.cpp';
       case 'arduino':
         return 'sketch.ino';
       default:
@@ -297,6 +345,17 @@ void loop() {
                         ),
                         items: const [
                           DropdownMenuItem(
+                            value: 'python',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.code_rounded, color: Colors.lightGreenAccent, size: 16),
+                                SizedBox(width: 6),
+                                Text('Python 3 Sandbox'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
                             value: 'html',
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -325,7 +384,18 @@ void loop() {
                               children: [
                                 Icon(Icons.php_rounded, color: Colors.lightBlueAccent, size: 16),
                                 SizedBox(width: 6),
-                                Text('PHP 8.2 Script'),
+                                Text('PHP 8.3 Script'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'cpp',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.terminal_rounded, color: Colors.cyanAccent, size: 16),
+                                SizedBox(width: 6),
+                                Text('C++ (GCC 9.2)'),
                               ],
                             ),
                           ),
@@ -539,7 +609,7 @@ void loop() {
             // ── TERMINAL / CONSOLE PREVIEW PANEL ──
             if (_showPreview)
               Expanded(
-                flex: 2,
+                flex: _selectedLanguage == 'html' && _htmlViewLive ? 4 : 2,
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                   decoration: BoxDecoration(
@@ -590,7 +660,7 @@ void loop() {
                             const SizedBox(width: 8),
                             Text(
                               _selectedLanguage == 'html'
-                                  ? 'Hasil Pratinjau Sandbox'
+                                  ? 'Pratinjau HTML / CSS'
                                   : 'Konsol Terminal Kompilasi',
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
@@ -612,7 +682,76 @@ void loop() {
                                 ),
                               ),
                             ],
+                            if (_compileResult?.memoryUsage != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _compileResult!.memoryUsage!,
+                                  style: GoogleFonts.firaCode(fontSize: 10, color: Colors.white70),
+                                ),
+                              ),
+                            ],
                             const Spacer(),
+                            if (_selectedLanguage == 'html') ...[
+                              InkWell(
+                                onTap: () => setState(() => _htmlViewLive = true),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: _htmlViewLive ? AppColors.emerald : Colors.white10,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Web Live',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: _htmlViewLive ? Colors.white : Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () => setState(() => _htmlViewLive = false),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: !_htmlViewLive ? AppColors.emerald : Colors.white10,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Log',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: !_htmlViewLive ? Colors.white : Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white70),
+                              tooltip: 'Salin Output Konsol',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: _compileResult?.output ?? ''));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Output berhasil disalin!'), duration: Duration(seconds: 1)),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 8),
                             IconButton(
                               icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white70),
                               padding: EdgeInsets.zero,
@@ -624,23 +763,28 @@ void loop() {
                       ),
                       // Output Body
                       Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: SelectableText(
-                            _compileResult != null
-                                ? (_compileResult!.error != null
-                                    ? '❌ KESALAHAN EKSEKUSI:\n${_compileResult!.error}\n\n📄 OUTPUT:\n${_compileResult!.output}'
-                                    : _compileResult!.output)
-                                : 'Menunggu eksekusi kode...',
-                            style: GoogleFonts.firaCode(
-                              fontSize: 12,
-                              color: _compileResult?.success == true
-                                  ? const Color(0xFF34D399)
-                                  : const Color(0xFFF87171),
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
+                        child: (_selectedLanguage == 'html' && _htmlViewLive && _webViewController != null)
+                            ? ClipRRect(
+                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(13)),
+                                child: WebViewWidget(controller: _webViewController!),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(12),
+                                child: SelectableText(
+                                  _compileResult != null
+                                      ? (_compileResult!.error != null && !_compileResult!.output.contains(_compileResult!.error!)
+                                          ? '❌ KESALAHAN EKSEKUSI:\n${_compileResult!.error}\n\n📄 OUTPUT:\n${_compileResult!.output}'
+                                          : _compileResult!.output)
+                                      : 'Menunggu eksekusi kode...',
+                                  style: GoogleFonts.firaCode(
+                                    fontSize: 12,
+                                    color: _compileResult?.success == true
+                                        ? const Color(0xFF34D399)
+                                        : const Color(0xFFF87171),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
                       ),
                     ],
                   ),

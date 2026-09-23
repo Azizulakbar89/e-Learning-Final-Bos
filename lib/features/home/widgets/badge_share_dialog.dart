@@ -4,11 +4,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/gamification_model.dart';
 import '../../../core/models/user_model.dart';
+import '../../../core/services/social_share_service.dart';
 
 /// Dialog perayaan badge baru siswa.
 /// Muncul otomatis saat profil dibuka untuk setiap badge yang baru diraih.
@@ -89,7 +89,7 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
     super.dispose();
   }
 
-  Future<void> _dismiss({bool share = false}) async {
+  Future<void> _dismiss() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(
       BadgeShareDialog._prefKey(widget.badge.id, widget.student.id),
@@ -97,10 +97,6 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
     );
     if (!mounted) return;
     Navigator.of(context).pop();
-    if (share) {
-      await Future.delayed(const Duration(milliseconds: 200));
-      await _doShare();
-    }
   }
 
   Future<Uint8List?> _captureCard() async {
@@ -112,33 +108,38 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
-      debugPrint('[BadgeShare] Capture error: \$e');
+      debugPrint('[BadgeShare] Capture error: $e');
       return null;
     }
   }
 
-  Future<void> _doShare() async {
+  Future<void> _handleShare() async {
     if (_isSharing) return;
     if (mounted) setState(() => _isSharing = true);
     try {
       final bytes = await _captureCard();
-      if (bytes == null) {
-        if (mounted) setState(() => _isSharing = false);
-        return;
-      }
-      final xFile = XFile.fromData(bytes,
-          mimeType: 'image/png', name: 'badge_${widget.badge.id}.png');
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [xFile],
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        BadgeShareDialog._prefKey(widget.badge.id, widget.student.id),
+        true,
+      );
+      if (!mounted) return;
+      final navContext = Navigator.of(context).context;
+      Navigator.of(context).pop();
+      if (bytes != null && navContext.mounted) {
+        await SocialShareService.showShareChooser(
+          context: navContext,
+          imageBytes: bytes,
+          fileName: 'badge_${widget.badge.id}.png',
           text: '${widget.badge.icon} Aku baru saja mendapatkan lencana '
               '"${widget.badge.title}"!\n'
               '${widget.badge.description}\n\n'
               '#eLearning #Spemdalas #Lencana #BelajarTerus',
-        ),
-      );
+          title: 'Bagikan Lencana Prestasi 🎖️',
+        );
+      }
     } catch (e) {
-      debugPrint('[BadgeShare] Share error: \$e');
+      debugPrint('[BadgeShare] Share error: $e');
     }
     if (mounted) setState(() => _isSharing = false);
   }
@@ -360,9 +361,7 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
                         Expanded(
                           flex: 2,
                           child: ElevatedButton.icon(
-                            onPressed: _isSharing
-                                ? null
-                                : () => _dismiss(share: true),
+                            onPressed: _isSharing ? null : _handleShare,
                             icon: _isSharing
                                 ? const SizedBox(
                                     width: 16,
@@ -394,7 +393,7 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
                           child: OutlinedButton(
                             onPressed: _isSharing
                                 ? null
-                                : () => _dismiss(share: false),
+                                : () => _dismiss(),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                   vertical: 13),

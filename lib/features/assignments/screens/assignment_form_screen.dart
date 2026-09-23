@@ -365,6 +365,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                     Wrap(
                       spacing: 8,
                       children: [
+                        {'id': 'python', 'name': 'Python 3'},
                         {'id': 'html', 'name': 'HTML'},
                         {'id': 'css', 'name': 'CSS'},
                         {'id': 'js', 'name': 'JavaScript'},

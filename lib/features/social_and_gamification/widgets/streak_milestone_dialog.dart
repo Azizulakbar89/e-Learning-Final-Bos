@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../core/services/social_share_service.dart';
 
 
 /// Dialog perayaan ala TikTok — muncul setiap kelipatan 10 streak
@@ -112,20 +112,16 @@ class _StreakMilestoneDialogState extends State<StreakMilestoneDialog>
         setState(() => _isSharing = false);
         return;
       }
-      final xFile = XFile.fromData(
-        bytes,
-        mimeType: 'image/png',
-        name: 'streak_${widget.streakCount}_hari.png',
-      );
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [xFile],
-          text:
-              '🔥 ${widget.streakCount} Hari Streak Belajar!\n${_getMilestoneQuote(widget.streakCount)}\n\n#eLearning #BelajarTerus #StreakBelajar',
-        ),
+      await SocialShareService.showShareChooser(
+        context: context,
+        imageBytes: bytes,
+        fileName: 'streak_${widget.streakCount}_hari.png',
+        text:
+            '🔥 ${widget.streakCount} Hari Streak Belajar!\n${_getMilestoneQuote(widget.streakCount)}\n\n#eLearning #BelajarTerus #StreakBelajar',
+        title: 'Bagikan Streak Belajar 🔥',
       );
     } catch (e) {
-      debugPrint('[StreakShare] Error sharing: \$e');
+      debugPrint('[StreakShare] Error sharing: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Gagal membagikan. Coba lagi.')),
