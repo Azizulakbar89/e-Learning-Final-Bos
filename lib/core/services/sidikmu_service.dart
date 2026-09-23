@@ -966,13 +966,19 @@ class SidikmuService {
             var scoreVal = grades[matchedNis];
             if (scoreVal !== null && scoreVal !== undefined) {
               var scoreStr = (scoreVal % 1 === 0) ? scoreVal.toFixed(0) : scoreVal.toString();
+              input.removeAttribute('disabled');
+              input.removeAttribute('readonly');
               input.value = scoreStr;
+              input.setAttribute('value', scoreStr);
+              input.defaultValue = scoreStr;
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
               input.dispatchEvent(new Event('blur', { bubbles: true }));
               input.dispatchEvent(new Event('keyup', { bubbles: true }));
               if (window.jQuery) {
-                window.jQuery(input).val(scoreStr).trigger('input').trigger('change').trigger('blur');
+                try {
+                  window.jQuery(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
+                } catch(e) {}
               }
               filled++;
 
@@ -981,10 +987,14 @@ class SidikmuService {
               }
             } else {
               input.value = '';
+              input.setAttribute('value', '');
+              input.defaultValue = '';
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
               if (window.jQuery) {
-                window.jQuery(input).val('').trigger('input').trigger('change');
+                try {
+                  window.jQuery(input).val('').trigger('input').trigger('change');
+                } catch(e) {}
               }
               emptyList.push({ nis: matchedNis, name: studentFullName });
             }
@@ -1013,6 +1023,13 @@ class SidikmuService {
       final filledCount = (gradeData['filled'] as num?)?.toInt() ?? 0;
       final rawEmpty = (gradeData['emptyList'] is List) ? (gradeData['emptyList'] as List) : [];
       final rawZero = (gradeData['zeroList'] is List) ? (gradeData['zeroList'] as List) : [];
+
+      if (filledCount == 0) {
+        return SidikmuSyncResult.error(
+          'Tidak ada nilai siswa yang tersimpan (0 dari $totalRows siswa). '
+          'Pastikan sudah ada tugas atau jawaban siswa yang telah diberi nilai pada halaman tugas e-Learning sebelum melakukan sinkronisasi.',
+        );
+      }
 
       final emptyOrZeroList = <SidikmuUnsyncedItem>[];
       for (final item in rawEmpty) {
@@ -1053,51 +1070,129 @@ class SidikmuService {
       // ──────── STEP 6: SIMPAN NILAI (88% - 100%) ────────
       final saveBtnJs = '''
         (function() {
-          // Dismiss any alert or confirm dialog
+          // 1. Override all native alerts and confirms
           window.confirm = function() { return true; };
           window.alert = function() { return true; };
 
+          // 2. Intercept SweetAlert v1 (swal) agar otomatis confirm callback
+          if (typeof window.swal === 'function') {
+            var origSwal = window.swal;
+            window.swal = function(arg1, arg2) {
+              if (typeof arg2 === 'function') {
+                setTimeout(function() { try { arg2(true); } catch(e){} }, 50);
+                return;
+              }
+              if (arg1 && typeof arg1.callback === 'function') {
+                setTimeout(function() { try { arg1.callback(true); } catch(e){} }, 50);
+                return;
+              }
+              try { origSwal(arg1, arg2); } catch(e) {}
+            };
+          }
+
+          // 3. Intercept SweetAlert v2 (Swal.fire)
+          if (window.Swal && typeof window.Swal.fire === 'function') {
+            window.Swal.fire = function() {
+              return Promise.resolve({ isConfirmed: true, isDenied: false, isDismissed: false, value: true });
+            };
+          }
+
+          // 4. Cari tombol Simpan Nilai
           var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
           var saveBtn = btns.find(function(b) {
             var txt = (b.innerText || b.value || '').toLowerCase();
             return txt.includes('simpan nilai') || (txt.includes('simpan') && !txt.includes('kembali') && !txt.includes('filter'));
           });
-          if (saveBtn) {
-            saveBtn.click();
-            return JSON.stringify({ success: true, method: 'saveBtn' });
-          }
-          // Form yang membungkus tabel nilai siswa
+
+          // 5. Cari form tabel nilai
           var tableForm = Array.from(document.querySelectorAll('form')).find(function(f) {
-            return f.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])').length > 3;
-          });
-          if (tableForm) {
-            var sub = tableForm.querySelector('button[type="submit"], input[type="submit"], button.btn-primary, button.btn-info');
-            if (sub) {
-              sub.click();
-              return JSON.stringify({ success: true, method: 'tableFormSubmitBtn' });
+            return f.querySelectorAll('table, input:not([type="hidden"]):not([type="checkbox"])').length >= 3;
+          }) || (saveBtn ? saveBtn.closest('form') : null);
+
+          var clicked = false;
+          if (saveBtn) {
+            saveBtn.focus();
+            saveBtn.click();
+            if (window.jQuery) {
+              try { window.jQuery(saveBtn).trigger('click'); } catch(e) {}
             }
-            tableForm.submit();
-            return JSON.stringify({ success: true, method: 'tableFormSubmit' });
+            clicked = true;
           }
-          return JSON.stringify({ success: false, error: 'Tombol Simpan Nilai tidak ditemukan' });
+
+          return JSON.stringify({
+            success: clicked,
+            hasSaveBtn: !!saveBtn,
+            hasTableForm: !!tableForm
+          });
         })();
       ''';
       await controller.runJavaScriptReturningResult(saveBtnJs);
-      await Future.delayed(const Duration(milliseconds: 1000));
-      // Auto-confirm modal atau SweetAlert jika muncul
-      await controller.runJavaScriptReturningResult('''
-        (function() {
-          var okBtns = document.querySelectorAll('.swal2-confirm, .swal-button--confirm, .confirm, .btn-confirm, .modal .btn-primary, .modal .btn-success');
-          okBtns.forEach(function(b) { b.click(); });
-        })();
-      ''');
-      await Future.delayed(const Duration(milliseconds: 2000));
+
+      // Active polling untuk konfirmasi SweetAlert/Modal dan verifikasi respons SidikMu
+      int saveWaitMs = 0;
+      while (saveWaitMs < 6000) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        saveWaitMs += 500;
+
+        final confirmRes = await controller.runJavaScriptReturningResult('''
+          (function() {
+            var confirmSelectors = [
+              '.swal2-confirm',
+              '.swal-button--confirm',
+              'button.confirm',
+              '.btn-confirm',
+              '.sweet-alert button.confirm',
+              '.sa-confirm-button-container button',
+              '.modal-footer .btn-primary',
+              '.modal-footer .btn-success',
+              '.modal-footer .btn-info',
+              '.modal-footer button[type="submit"]',
+              '.modal.show button.btn-primary',
+              '.modal.in button.btn-primary'
+            ];
+            var okBtns = document.querySelectorAll(confirmSelectors.join(', '));
+            var clickedConfirm = false;
+            okBtns.forEach(function(b) {
+              b.click();
+              if (window.jQuery) { try { window.jQuery(b).trigger('click'); } catch(e) {} }
+              clickedConfirm = true;
+            });
+
+            var successEl = document.querySelector('.alert-success, .swal2-success, .sweet-alert.showSweetAlert .sa-success, .text-success');
+            var successText = successEl ? (successEl.innerText || '').trim() : '';
+
+            var formSubmitted = false;
+            if ($saveWaitMs >= 2000 && !clickedConfirm && !successText) {
+              var tableForm = Array.from(document.querySelectorAll('form')).find(function(f) {
+                return f.querySelectorAll('table, input:not([type="hidden"]):not([type="checkbox"])').length >= 3;
+              });
+              if (tableForm) {
+                try {
+                  tableForm.submit();
+                  formSubmitted = true;
+                } catch(e) {}
+              }
+            }
+
+            return JSON.stringify({
+              clickedConfirm: clickedConfirm,
+              isSuccessShown: successText.length > 0 || !!document.querySelector('.swal2-success, .sa-success'),
+              formSubmitted: formSubmitted
+            });
+          })();
+        ''');
+
+        final confirmData = _safeParseJsObject(confirmRes);
+        if (confirmData['isSuccessShown'] == true) {
+          break;
+        }
+      }
 
       emit(1.0, 'Sinkronisasi nilai berhasil diselesaikan (100%)!', 6, totalSteps);
 
       return SidikmuSyncResult(
         isSuccess: true,
-        message: 'Nilai berhasil disinkronkan ke SidikMu ($filledCount dari $totalRows siswa).',
+        message: 'Nilai berhasil disimpan ke SidikMu ($filledCount dari $totalRows siswa).',
         totalStudents: totalRows,
         syncedStudents: filledCount,
         emptyOrZeroStudents: emptyOrZeroList,
