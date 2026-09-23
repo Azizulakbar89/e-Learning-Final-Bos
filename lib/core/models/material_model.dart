@@ -61,6 +61,8 @@ class MaterialModel {
   final String? assignmentType; // null | 'individu' | 'kelompok' | 'pilihan_ganda'
   final String? aiContextSummary; // Pre-extracted text for AI grounding
   final String? babyLanguageExplanation; // Pre-cached ELI5 explanation
+  final String? cpId;
+  final String? tpId;
   final DateTime createdAt;
 
   MaterialModel({
@@ -76,6 +78,8 @@ class MaterialModel {
     this.assignmentType,
     this.aiContextSummary,
     this.babyLanguageExplanation,
+    this.cpId,
+    this.tpId,
     required this.createdAt,
   });
 
@@ -97,6 +101,8 @@ class MaterialModel {
       'assignment_type': assignmentType,
       'ai_context_summary': aiContextSummary,
       'baby_language_explanation': babyLanguageExplanation,
+      'cp_id': cpId,
+      'tp_id': tpId,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -135,7 +141,45 @@ class MaterialModel {
       assignmentType: (map['assignment_type'] ?? map['assignmentType'])?.toString(),
       aiContextSummary: (map['ai_context_summary'] ?? map['aiContextSummary'])?.toString(),
       babyLanguageExplanation: (map['baby_language_explanation'] ?? map['babyLanguageExplanation'])?.toString(),
+      cpId: (map['cp_id'] ?? map['cpId'])?.toString(),
+      tpId: (map['tp_id'] ?? map['tpId'])?.toString(),
       createdAt: createdAt,
+    );
+  }
+
+  MaterialModel copyWith({
+    String? id,
+    String? subjectId,
+    String? teacherId,
+    String? title,
+    String? description,
+    String? contentType,
+    String? mediaUrl,
+    List<String>? classIds,
+    DateTime? scheduledOpenAt,
+    String? assignmentType,
+    String? aiContextSummary,
+    String? babyLanguageExplanation,
+    String? cpId,
+    String? tpId,
+    DateTime? createdAt,
+  }) {
+    return MaterialModel(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      teacherId: teacherId ?? this.teacherId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      contentType: contentType ?? this.contentType,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      classIds: classIds ?? this.classIds,
+      scheduledOpenAt: scheduledOpenAt ?? this.scheduledOpenAt,
+      assignmentType: assignmentType ?? this.assignmentType,
+      aiContextSummary: aiContextSummary ?? this.aiContextSummary,
+      babyLanguageExplanation: babyLanguageExplanation ?? this.babyLanguageExplanation,
+      cpId: cpId ?? this.cpId,
+      tpId: tpId ?? this.tpId,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

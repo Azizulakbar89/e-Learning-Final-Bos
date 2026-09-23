@@ -33,8 +33,10 @@ class MaterialFormScreen extends StatefulWidget {
 class _MaterialFormScreenState extends State<MaterialFormScreen> {
   final _uuid = const Uuid();
 
-  // Subject selection
+  // Subject & Curriculum selection
   String? _selectedSubjectId;
+  String? _selectedCpId;
+  String? _selectedTpId;
   String _getSubjectId() => _selectedSubjectId ?? widget.subjectId ?? '';
 
   @override
@@ -43,6 +45,8 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
     _selectedSubjectId = widget.existingMaterial?.subjectId ?? widget.subjectId;
     if (widget.existingMaterial != null) {
       final m = widget.existingMaterial!;
+      _selectedCpId = m.cpId;
+      _selectedTpId = m.tpId;
       _titleCtrl.text = m.title;
       _descCtrl.text = m.description;
       _mediaUrlCtrl.text = m.mediaUrl;
@@ -188,6 +192,8 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
           scheduledOpenAt: _scheduledOpenAt,
           assignmentType: _assignmentType == 'none' ? null : _assignmentType,
           aiContextSummary: _aiSummaryCtrl.text.trim().isNotEmpty ? _aiSummaryCtrl.text.trim() : null,
+          cpId: _selectedCpId,
+          tpId: _selectedTpId,
           createdAt: isEdit2 ? widget.existingMaterial!.createdAt : DateTime.now(),
         );
 
@@ -405,7 +411,170 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
                   );
                 }).toList(),
                 onChanged: (val) {
-                  setState(() => _selectedSubjectId = val);
+                  setState(() {
+                    _selectedSubjectId = val;
+                    _selectedCpId = null;
+                    _selectedTpId = null;
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // ── Capaian Pembelajaran (CP) ──
+              _label('Capaian Pembelajaran (CP)'),
+              const SizedBox(height: 6),
+              Builder(
+                builder: (context) {
+                  final activeSubjId = _getSubjectId();
+                  final availableCps = fb.cps.where((c) => c.subjectId == activeSubjId).toList();
+
+                  if (activeSubjId.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Pilih mata pelajaran terlebih dahulu untuk memilih CP',
+                        style: GoogleFonts.outfit(color: Colors.grey.shade500, fontSize: 13),
+                      ),
+                    );
+                  }
+
+                  if (availableCps.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Belum ada CP untuk mapel ini. Buat terlebih dahulu di menu CP & TP.',
+                              style: GoogleFonts.outfit(color: const Color(0xFF92400E), fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return DropdownButtonFormField<String>(
+                    key: ValueKey('cp_${activeSubjId}_$_selectedCpId'),
+                    initialValue: (_selectedCpId != null && availableCps.any((c) => c.id == _selectedCpId))
+                        ? _selectedCpId
+                        : null,
+                    isExpanded: true,
+                    decoration: _dec('Pilih Capaian Pembelajaran (CP)'),
+                    hint: Text('-- Pilih Capaian Pembelajaran (CP) --',
+                        style: GoogleFonts.outfit(color: Colors.grey.shade500, fontSize: 13)),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('-- Tidak Terikat CP Khusus --',
+                            style: GoogleFonts.outfit(fontSize: 13, fontStyle: FontStyle.italic)),
+                      ),
+                      ...availableCps.map((cp) {
+                        return DropdownMenuItem<String>(
+                          value: cp.id,
+                          child: Text(
+                            '${cp.code} - ${cp.title}',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedCpId = val;
+                        _selectedTpId = null;
+                      });
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // ── Tujuan Pembelajaran (TP) ──
+              _label('Tujuan Pembelajaran (TP)'),
+              const SizedBox(height: 6),
+              Builder(
+                builder: (context) {
+                  if (_selectedCpId == null || _selectedCpId!.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Pilih CP di atas terlebih dahulu untuk memilih TP',
+                        style: GoogleFonts.outfit(color: Colors.grey.shade500, fontSize: 13),
+                      ),
+                    );
+                  }
+
+                  final availableTps = fb.tps.where((t) => t.cpId == _selectedCpId).toList();
+                  if (availableTps.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(
+                        'Belum ada TP terdaftar di bawah CP ini.',
+                        style: GoogleFonts.outfit(color: const Color(0xFF92400E), fontSize: 12),
+                      ),
+                    );
+                  }
+
+                  return DropdownButtonFormField<String>(
+                    key: ValueKey('tp_${_selectedCpId}_$_selectedTpId'),
+                    initialValue: (_selectedTpId != null && availableTps.any((t) => t.id == _selectedTpId))
+                        ? _selectedTpId
+                        : null,
+                    isExpanded: true,
+                    decoration: _dec('Pilih Tujuan Pembelajaran (TP)'),
+                    hint: Text('-- Pilih Tujuan Pembelajaran (TP) --',
+                        style: GoogleFonts.outfit(color: Colors.grey.shade500, fontSize: 13)),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('-- Semua / Tanpa TP Khusus --',
+                            style: GoogleFonts.outfit(fontSize: 13, fontStyle: FontStyle.italic)),
+                      ),
+                      ...availableTps.map((tp) {
+                        return DropdownMenuItem<String>(
+                          value: tp.id,
+                          child: Text(
+                            '${tp.code}: ${tp.title}',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedTpId = val);
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 14),

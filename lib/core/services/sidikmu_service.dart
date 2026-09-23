@@ -241,7 +241,7 @@ class SidikmuService {
       ''';
 
       final checkRes = await controller.runJavaScriptReturningResult(checkJs);
-      final decoded = jsonDecode(checkRes.toString());
+      final decoded = _safeParseJsObject(checkRes);
       final isLogged = decoded['loggedIn'] == true;
       completer.complete(isLogged);
     } catch (e) {
@@ -250,6 +250,26 @@ class SidikmuService {
     }
 
     return completer.future;
+  }
+
+  /// Safe helper to parse JS returned JSON object from runJavaScriptReturningResult
+  static Map<String, dynamic> _safeParseJsObject(dynamic result) {
+    if (result == null) return {};
+    if (result is Map) {
+      return Map<String, dynamic>.from(result);
+    }
+    dynamic decoded = result;
+    for (int i = 0; i < 4 && decoded is String; i++) {
+      try {
+        decoded = jsonDecode(decoded);
+      } catch (_) {
+        break;
+      }
+    }
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+    return {};
   }
 
   /// 6. Automasi Utama Sinkronisasi Nilai Formatif & Sumatif
@@ -334,7 +354,7 @@ class SidikmuService {
         })();
       ''';
       final verifyRes = await controller.runJavaScriptReturningResult(verifyLoginJs);
-      final verifyData = jsonDecode(verifyRes.toString());
+      final verifyData = _safeParseJsObject(verifyRes);
       if (verifyData['ok'] != true) {
         return SidikmuSyncResult.error(
           verifyData['error']?.toString() ?? 'Gagal login ke SidikMu. Periksa kredensial di Profil Guru.',
@@ -604,7 +624,7 @@ class SidikmuService {
       ''';
 
       final gradeRes = await controller.runJavaScriptReturningResult(populateGradesJs);
-      final gradeData = jsonDecode(gradeRes.toString());
+      final gradeData = _safeParseJsObject(gradeRes);
 
       if (gradeData['success'] != true) {
         return SidikmuSyncResult.error(
@@ -614,24 +634,41 @@ class SidikmuService {
 
       final totalRows = (gradeData['totalRows'] as num?)?.toInt() ?? 0;
       final filledCount = (gradeData['filled'] as num?)?.toInt() ?? 0;
-      final rawEmpty = (gradeData['emptyList'] as List<dynamic>? ?? []);
-      final rawZero = (gradeData['zeroList'] as List<dynamic>? ?? []);
+      final rawEmpty = (gradeData['emptyList'] is List) ? (gradeData['emptyList'] as List) : [];
+      final rawZero = (gradeData['zeroList'] is List) ? (gradeData['zeroList'] as List) : [];
 
       final emptyOrZeroList = <SidikmuUnsyncedItem>[];
       for (final item in rawEmpty) {
-        emptyOrZeroList.add(SidikmuUnsyncedItem(
-          nis: item['nis']?.toString() ?? '',
-          studentName: item['name']?.toString() ?? '',
-          reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
-        ));
+        if (item is Map) {
+          emptyOrZeroList.add(SidikmuUnsyncedItem(
+            nis: item['nis']?.toString() ?? '',
+            studentName: item['name']?.toString() ?? '',
+            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
+          ));
+        } else {
+          emptyOrZeroList.add(SidikmuUnsyncedItem(
+            nis: item?.toString() ?? '',
+            studentName: '',
+            reason: 'Nilai Kosong / Siswa Belum Mengumpulkan',
+          ));
+        }
       }
       for (final item in rawZero) {
-        emptyOrZeroList.add(SidikmuUnsyncedItem(
-          nis: item['nis']?.toString() ?? '',
-          studentName: item['name']?.toString() ?? '',
-          reason: 'Nilai Siswa adalah 0',
-          score: 0.0,
-        ));
+        if (item is Map) {
+          emptyOrZeroList.add(SidikmuUnsyncedItem(
+            nis: item['nis']?.toString() ?? '',
+            studentName: item['name']?.toString() ?? '',
+            reason: 'Nilai Siswa adalah 0',
+            score: 0.0,
+          ));
+        } else {
+          emptyOrZeroList.add(SidikmuUnsyncedItem(
+            nis: item?.toString() ?? '',
+            studentName: '',
+            reason: 'Nilai Siswa adalah 0',
+            score: 0.0,
+          ));
+        }
       }
 
       emit(0.85, 'Menyimpan nilai ke sistem SidikMu...', 5, totalSteps);

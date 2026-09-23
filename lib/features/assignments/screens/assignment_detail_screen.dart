@@ -760,11 +760,21 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
       }
     }
 
+    final material = fb.materials.where((m) => m.id == widget.assignment.materialId).firstOrNull;
+    final cp = (material?.cpId != null && material!.cpId!.isNotEmpty)
+        ? fb.cps.where((c) => c.id == material.cpId).firstOrNull
+        : null;
+    final tp = (material?.tpId != null && material!.tpId!.isNotEmpty)
+        ? fb.tps.where((t) => t.id == material.tpId).firstOrNull
+        : null;
+
     SidikmuSyncDialog.show(
       context,
       isFormatif: true,
       targetClassName: targetClass.isNotEmpty ? targetClass : 'Semua Kelas',
       targetSubjectName: subject.name,
+      targetCpCode: cp?.code,
+      targetTpCode: tp?.code,
       studentGradesByNis: studentGradesByNis,
       studentNamesByNis: studentNamesByNis,
     );
@@ -1265,42 +1275,146 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
 
             // IF TEACHER: Show list of submissions to review & grade
             if (isTeacher) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Daftar Pengumpulan (${filteredSubmissions.length} Siswa/Kelompok)',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: () => _openSidikmuSync(context, filteredSubmissions),
-                        icon: const Icon(Icons.cloud_sync_rounded, size: 16),
-                        label: const Text('Sinkron SidikMu'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      TextButton.icon(
-                        onPressed: _exportExcel,
-                        icon: const Icon(Icons.download, size: 18),
-                        label: Text(
-                          _submissionClassFilter == 'all' ? 'Unduh Excel' : 'Unduh Excel ($_submissionClassFilter)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Daftar Pengumpulan',
+                              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${filteredSubmissions.length} Siswa/Kelompok terdata',
+                              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondaryLight),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Eye-catching Action Button Bar
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.borderLight),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(6),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        // Button 1: Sinkron SidikMu (Sky Blue Gradient)
+                        Expanded(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _openSidikmuSync(context, filteredSubmissions),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0284C7).withAlpha(50),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 18),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Sinkron SidikMu',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Button 2: Unduh Excel (Emerald Gradient)
+                        Expanded(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _exportExcel,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF059669), Color(0xFF047857)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF059669).withAlpha(50),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.file_download_rounded, color: Colors.white, size: 18),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        _submissionClassFilter == 'all'
+                                            ? 'Unduh Excel'
+                                            : 'Excel (${_submissionClassFilter.toUpperCase()})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
