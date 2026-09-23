@@ -49,7 +49,7 @@ void main() async {
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Integrasi otomatis sinkronisasi nilai formatif & sumatif langsung ke web portal SidikMu, serta fitur lengkap kelola edit & hapus Capaian Pembelajaran (CP) dan Tujuan Pembelajaran (TP) bagi guru.'
+            '✨ Versi $version: Perbaikan tuntas deteksi tabel nilai siswa SidikMu dengan Dynamic Polling hingga 20 detik, pencocokan ganda NIS + Nama, form Nilai Ke, dan integrasi kurikulum CP/TP.'
       },
       'force_update': {'booleanValue': false}
     }
