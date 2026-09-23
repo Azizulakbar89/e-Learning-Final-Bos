@@ -748,7 +748,7 @@ class SidikmuService {
         emit(0.55, 'Membuka tabel nilai siswa (Proses Selanjutnya)...', 4, totalSteps);
         final nextBtnJs = '''
           (function() {
-            if (document.querySelector('table tbody tr input, table tr input')) {
+            if (document.querySelector('table tbody tr input, table tr input, input[name*="nilai"]')) {
               return JSON.stringify({ success: true, tableAlreadyVisible: true });
             }
 
@@ -759,7 +759,15 @@ class SidikmuService {
               return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
             });
             if (nextBtn) {
+              nextBtn.focus();
               nextBtn.click();
+              if (window.jQuery) {
+                try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
+              }
+              var form = nextBtn.closest('form');
+              if (form) {
+                try { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); } catch(e) {}
+              }
               return JSON.stringify({ success: true, method: 'nextBtn' });
             }
 
@@ -789,22 +797,39 @@ class SidikmuService {
       int waitedMs = 0;
       int detectedRows = 0;
       int detectedInputs = 0;
+      String lastDetectedAlertText = '';
 
       while (waitedMs < 25000) {
         final pollRes = await controller.runJavaScriptReturningResult('''
           (function() {
-            var inps = document.querySelectorAll('table tbody tr input:not([type="hidden"]):not([type="checkbox"]), table tr input:not([type="hidden"]):not([type="checkbox"]), table td input:not([type="hidden"]):not([type="checkbox"])');
+            var inps = document.querySelectorAll(
+              'table tbody tr input:not([type="hidden"]):not([type="checkbox"]), ' +
+              'table tr input:not([type="hidden"]):not([type="checkbox"]), ' +
+              'table td input:not([type="hidden"]):not([type="checkbox"]), ' +
+              'input[name*="nilai"], input[type="number"]'
+            );
             var rows = document.querySelectorAll('table tbody tr, table tr');
             var validRows = Array.from(rows).filter(function(r) {
               return r.querySelectorAll('td').length >= 2;
             });
+
+            // Cek apakah tombol Simpan Nilai sudah ada di DOM (tanda valid tabel nilai sudah terbuka)
+            var btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, a'));
+            var hasSaveBtn = btns.some(function(b) {
+              var txt = (b.innerText || b.value || '').toLowerCase();
+              return txt.includes('simpan nilai') || (txt.includes('simpan') && !txt.includes('kembali') && !txt.includes('filter'));
+            });
+
             var alertEl = document.querySelector('.alert-danger, .alert-warning, .invalid-feedback, .text-danger, .modal-body');
             var alertText = alertEl ? (alertEl.innerText || '').trim() : '';
 
+            var ready = (validRows.length > 0 && inps.length > 0) || (hasSaveBtn && (validRows.length > 0 || inps.length > 0));
+
             return JSON.stringify({
-              found: validRows.length > 0 && inps.length > 0,
+              found: ready,
               rowCount: validRows.length,
               inputCount: inps.length,
+              hasSaveBtn: hasSaveBtn,
               alertText: alertText
             });
           })();
@@ -813,30 +838,63 @@ class SidikmuService {
         final pollData = _safeParseJsObject(pollRes);
         detectedRows = (pollData['rowCount'] as num?)?.toInt() ?? 0;
         detectedInputs = (pollData['inputCount'] as num?)?.toInt() ?? 0;
+        final alertText = pollData['alertText']?.toString() ?? '';
+        if (alertText.isNotEmpty) {
+          lastDetectedAlertText = alertText;
+        }
 
         if (pollData['found'] == true || (detectedRows > 0 && detectedInputs > 0)) {
           isTableDetected = true;
           break;
         }
 
-        // Cek jika ada alert validasi SidikMu
-        final alertText = pollData['alertText']?.toString() ?? '';
-        if (alertText.isNotEmpty && alertText.length > 5 && waitedMs > 5000) {
-          return SidikmuSyncResult.error('SidikMu menampilkan peringatan: "$alertText". Pastikan jadwal/kelas sesuai.');
+        // Retry klik 'Proses Selanjutnya' pada detik ke-3.5 jika tabel belum muncul sama sekali
+        if (waitedMs == 3500 && detectedRows == 0) {
+          await controller.runJavaScriptReturningResult('''
+            (function() {
+              var btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+              var nextBtn = btns.find(function(b) {
+                var txt = (b.innerText || b.value || '').toLowerCase().trim();
+                return txt.includes('proses selanjutnya') || txt.includes('selanjutnya') || txt.includes('tampilkan');
+              });
+              if (nextBtn) {
+                nextBtn.click();
+                if (window.jQuery) {
+                  try { window.jQuery(nextBtn).trigger('click'); } catch(e) {}
+                }
+              }
+            })();
+          ''');
         }
+
+        // PERHATIAN: JANGAN pernah abort di tengah polling hanya karena ada notice/banner!
+        // Banner seperti "Ada inputan nilai baru..." adalah notifikasi standar SidikMu, BUKAN error fatal.
+        // Polling harus tetap berjalan sampai timeout penuh agar tabel nilai selesai dimuat.
 
         await Future.delayed(const Duration(milliseconds: 500));
         waitedMs += 500;
         final elapsedSec = waitedMs ~/ 1000;
-        final pct = 0.60 + (waitedMs / 20000) * 0.10;
+        final pct = 0.60 + (waitedMs / 25000) * 0.10;
         emit(pct, 'Mendeteksi tabel nilai siswa di halaman (${elapsedSec}d)...', 4, totalSteps);
       }
 
       if (!isTableDetected && detectedRows == 0) {
+        final alert = lastDetectedAlertText.trim();
+        final isBenignNotice = alert.toLowerCase().contains('inputan nilai baru') ||
+            alert.toLowerCase().contains('generate nilai ulang') ||
+            alert.toLowerCase().contains('deskripsi raport') ||
+            alert.toLowerCase().contains('import excel') ||
+            alert.toLowerCase().contains('download template');
+
+        if (alert.isNotEmpty && !isBenignNotice) {
+          return SidikmuSyncResult.error(
+            'SidikMu menampilkan peringatan: "$alert". Pastikan jadwal mengajar dan kelas sudah sesuai.',
+          );
+        }
+
         return SidikmuSyncResult.error(
-          'Tabel nilai siswa tidak ditemukan di halaman SidikMu setelah menunggu 20 detik. '
-          'Pastikan kelas "$targetClassName" dan mapel "$targetSubjectName" sudah memiliki data penilaian di SidikMu, '
-          'atau gunakan tombol "Salin Skrip Auto-Fill" jika Anda sudah membuka halaman tabel di browser.',
+          'Tabel nilai siswa tidak ditemukan di halaman SidikMu setelah menunggu 25 detik. '
+          'Pastikan kelas "$targetClassName" dan mapel "$targetSubjectName" sudah memiliki jadwal penilaian di SidikMu.',
         );
       }
 
@@ -1025,7 +1083,15 @@ class SidikmuService {
         })();
       ''';
       await controller.runJavaScriptReturningResult(saveBtnJs);
-      await Future.delayed(const Duration(milliseconds: 3000));
+      await Future.delayed(const Duration(milliseconds: 1000));
+      // Auto-confirm modal atau SweetAlert jika muncul
+      await controller.runJavaScriptReturningResult('''
+        (function() {
+          var okBtns = document.querySelectorAll('.swal2-confirm, .swal-button--confirm, .confirm, .btn-confirm, .modal .btn-primary, .modal .btn-success');
+          okBtns.forEach(function(b) { b.click(); });
+        })();
+      ''');
+      await Future.delayed(const Duration(milliseconds: 2000));
 
       emit(1.0, 'Sinkronisasi nilai berhasil diselesaikan (100%)!', 6, totalSteps);
 
