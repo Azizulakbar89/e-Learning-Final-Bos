@@ -23,30 +23,79 @@ class BadgeShareDialog extends StatefulWidget {
     required this.student,
   });
 
+  static String _seenKey(String studentId) => 'known_earned_badges_$studentId';
   static String _prefKey(String badgeId, String studentId) =>
       'badge_share_dismissed_${studentId}_$badgeId';
 
-  /// Cek semua badge earned dan tampilkan satu per satu yang belum pernah di-dismiss
+  /// Membuka dialog perayaan untuk satu lencana secara eksplisit
+  /// (misal saat siswa menekan tombol "Bagikan" di halaman Profil).
+  static Future<void> showSingleBadge({
+    required BuildContext context,
+    required BadgeModel badge,
+    required UserModel student,
+  }) async {
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withAlpha(180),
+      builder: (_) => BadgeShareDialog(badge: badge, student: student),
+    );
+  }
+
+  /// Sinkronisasi lencana yang sudah ada sebelumnya ke memori lokal.
+  /// Memastikan lencana yang sudah diraih di masa lalu TIDAK PERNAH memicu pop up saat buka aplikasi/login.
+  static Future<void> syncExistingBadges({
+    required List<BadgeModel> badges,
+    required UserModel student,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _seenKey(student.id);
+    final earnedIds = badges.where((b) => b.isEarned).map((b) => b.id).toSet();
+    final existing = (prefs.getStringList(key) ?? []).toSet();
+    existing.addAll(earnedIds);
+    await prefs.setStringList(key, existing.toList());
+  }
+
+  /// HANYA memunculkan dialog jika suatu lencana BENAR-BENAR BARU didapatkan
+  /// dalam aksi terbaru (kuis/tugas/materi).
+  /// Dijamin TIDAK AKAN PERNAH muncul saat membuka aplikasi atau saat login.
   static Future<void> checkAndShowNewBadges({
     required BuildContext context,
     required List<BadgeModel> badges,
     required UserModel student,
   }) async {
-    final earned = badges.where((b) => b.isEarned).toList();
-    for (final badge in earned) {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _seenKey(student.id);
+    final knownList = prefs.getStringList(key);
+
+    final currentEarned = badges.where((b) => b.isEarned).toList();
+
+    // Jika ini pertama kali dibuka, catat semua badge saat ini sebagai lencana yang sudah diketahui
+    // dan JANGAN munculkan pop up sama sekali.
+    if (knownList == null) {
+      await prefs.setStringList(key, currentEarned.map((b) => b.id).toList());
+      return;
+    }
+
+    final knownSet = knownList.toSet();
+    final newlyEarned = currentEarned.where((b) => !knownSet.contains(b.id)).toList();
+
+    if (newlyEarned.isEmpty) return;
+
+    // Catat lencana baru ini agar tidak muncul berulang kali
+    knownSet.addAll(newlyEarned.map((b) => b.id));
+    await prefs.setStringList(key, knownSet.toList());
+
+    for (final badge in newlyEarned) {
       if (!context.mounted) break;
-      final prefs = await SharedPreferences.getInstance();
-      if (!context.mounted) break;
-      final dismissed = prefs.getBool(_prefKey(badge.id, student.id)) ?? false;
-      if (!dismissed) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          barrierColor: Colors.black.withAlpha(180),
-          builder: (_) => BadgeShareDialog(badge: badge, student: student),
-        );
-        await Future.delayed(const Duration(milliseconds: 350));
-      }
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withAlpha(180),
+        builder: (_) => BadgeShareDialog(badge: badge, student: student),
+      );
+      await Future.delayed(const Duration(milliseconds: 350));
     }
   }
 
@@ -91,6 +140,10 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
 
   Future<void> _dismiss() async {
     final prefs = await SharedPreferences.getInstance();
+    final key = BadgeShareDialog._seenKey(widget.student.id);
+    final known = (prefs.getStringList(key) ?? []).toSet();
+    known.add(widget.badge.id);
+    await prefs.setStringList(key, known.toList());
     await prefs.setBool(
       BadgeShareDialog._prefKey(widget.badge.id, widget.student.id),
       true,
@@ -119,6 +172,10 @@ class _BadgeShareDialogState extends State<BadgeShareDialog>
     try {
       final bytes = await _captureCard();
       final prefs = await SharedPreferences.getInstance();
+      final key = BadgeShareDialog._seenKey(widget.student.id);
+      final known = (prefs.getStringList(key) ?? []).toSet();
+      known.add(widget.badge.id);
+      await prefs.setStringList(key, known.toList());
       await prefs.setBool(
         BadgeShareDialog._prefKey(widget.badge.id, widget.student.id),
         true,

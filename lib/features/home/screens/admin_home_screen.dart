@@ -13,7 +13,6 @@ import '../../../core/services/ai_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/app_nav_rail.dart';
-import '../../../core/widgets/app_update_dialog.dart';
 import '../../../core/widgets/curved_header_card.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../social_and_gamification/screens/chat_conversation_screen.dart';
@@ -2042,19 +2041,30 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
               showBackButton: false,
               actions: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(30),
+                    color: Colors.white.withAlpha(28),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withAlpha(50)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       dropdownColor: const Color(0xFF0F172A),
+                      isDense: true,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
                       value: availableClasses.contains(_selectedClass) ? _selectedClass : 'Semua Kelas',
                       items: availableClasses
                           .map((c) => DropdownMenuItem(
                                 value: c,
-                                child: Text(c, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                child: Text(
+                                  c,
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ))
                           .toList(),
                       onChanged: (v) {
@@ -2066,21 +2076,38 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
               ],
             ),
 
-            // Tab bar
+            // Tab bar with horizontal scrollable styling
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              height: 44,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.borderLight),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x060F172A),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
               child: TabBar(
                 controller: _tabController,
-                labelColor: const Color(0xFF1E3A8A),
-                unselectedLabelColor: Colors.grey.shade500,
-                indicatorColor: Colors.orange.shade700,
-                indicatorWeight: 3,
-                labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11),
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                labelColor: const Color(0xFF0F172A),
+                unselectedLabelColor: const Color(0xFF64748B),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                dividerColor: Colors.transparent,
+                labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12),
+                unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 12),
                 tabs: const [
                   Tab(text: 'Diskusi Materi'),
                   Tab(text: 'Chat Siswa - Guru'),
@@ -2133,9 +2160,16 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
 
     if (allForumMessages.isEmpty) {
       return Center(
-        child: Text(
-          'Belum ada pesan diskusi materi untuk filter ini.',
-          style: TextStyle(color: Colors.grey.shade600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.forum_outlined, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 8),
+            Text(
+              'Belum ada pesan diskusi materi untuk filter ini.',
+              style: GoogleFonts.outfit(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ],
         ),
       );
     }
@@ -2151,12 +2185,19 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
         final isGuru = msg.senderRole == 'guru';
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x080F172A),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2165,56 +2206,68 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
                     child: Text(
                       '${mat.title} • Kelas $cid',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF1D4ED8)),
                     ),
                   ),
                   Text(
                     DateFormat('dd MMM, HH:mm').format(msg.createdAt),
-                    style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+                    style: GoogleFonts.outfit(fontSize: 10.5, color: const Color(0xFF94A3B8)),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 12,
-                    backgroundColor: isGuru ? Colors.teal.shade100 : Colors.orange.shade100,
+                    radius: 14,
+                    backgroundColor: isGuru ? const Color(0xFFCCFBF1) : const Color(0xFFFFEDD5),
                     child: Text(
                       msg.senderName.isNotEmpty ? msg.senderName[0].toUpperCase() : 'U',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isGuru ? Colors.teal : Colors.orange.shade800),
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isGuru ? const Color(0xFF0F766E) : const Color(0xFFC2410C),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    msg.senderName,
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  Expanded(
+                    child: Text(
+                      msg.senderName,
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: const Color(0xFF0F172A)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isGuru ? Colors.teal.shade50 : Colors.orange.shade50,
+                      color: isGuru ? const Color(0xFFCCFBF1) : const Color(0xFFFFEDD5),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       isGuru ? 'GURU' : 'SISWA',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isGuru ? Colors.teal : Colors.orange.shade800),
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: isGuru ? const Color(0xFF0F766E) : const Color(0xFFC2410C),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 msg.message,
-                style: const TextStyle(fontSize: 12.5, height: 1.3),
+                style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF334155), height: 1.35),
               ),
             ],
           ),
@@ -2239,13 +2292,34 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
   }
 
   Widget _buildStreakList(StreakType type) {
-    final streaks = widget.fb.streaks.where((s) => s.type == type).toList();
+    final streaks = widget.fb.streaks.where((s) {
+      if (s.type != type) return false;
+      if (_selectedClass != 'Semua Kelas') {
+        final targetClass = _selectedClass.trim().toLowerCase();
+        if (s.title.toLowerCase().contains(targetClass)) return true;
+        final hasStudentInClass = s.participantIds.any((pid) {
+          final student = widget.fb.allStudents.where((u) => u.id == pid).firstOrNull;
+          final sClass = (student?.className ?? student?.classId ?? '').trim().toLowerCase();
+          return sClass == targetClass;
+        });
+        if (hasStudentInClass) return true;
+        return false;
+      }
+      return true;
+    }).toList();
 
     if (streaks.isEmpty) {
       return Center(
-        child: Text(
-          'Tidak ada riwayat percakapan pada kategori ini.',
-          style: TextStyle(color: Colors.grey.shade600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 8),
+            Text(
+              'Tidak ada riwayat percakapan pada kategori ini.',
+              style: GoogleFonts.outfit(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ],
         ),
       );
     }
@@ -2259,60 +2333,193 @@ class _AdminChatMonitoringPageState extends State<_AdminChatMonitoringPage>
           ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
         final lastMsg = messages.firstOrNull;
 
+        // Resolve detailed participant info for Admin display
+        String chatDisplayTitle = st.title;
+        String? subtitleClassTag;
+
+        if (type == StreakType.teacher) {
+          UserModel? studentUser;
+          UserModel? teacherUser;
+          for (final pid in st.participantIds) {
+            final s = widget.fb.allStudents.where((u) => u.id == pid).firstOrNull;
+            if (s != null) studentUser = s;
+            final t = widget.fb.allTeachers.where((u) => u.id == pid).firstOrNull;
+            if (t != null) teacherUser = t;
+          }
+          final sName = studentUser?.fullName ?? (st.participantNames.isNotEmpty ? st.participantNames.first : 'Siswa');
+          final tName = teacherUser?.fullName ?? (st.participantNames.length > 1 ? st.participantNames[1] : 'Guru');
+          chatDisplayTitle = '$sName ⇄ $tName';
+          if (studentUser?.className != null && studentUser!.className!.isNotEmpty) {
+            subtitleClassTag = 'Kelas ${studentUser.className}';
+          }
+        } else if (type == StreakType.peer) {
+          final pNames = <String>[];
+          for (final pid in st.participantIds) {
+            final s = widget.fb.allStudents.where((u) => u.id == pid).firstOrNull;
+            if (s != null) {
+              pNames.add(s.fullName);
+              if (subtitleClassTag == null && s.className != null && s.className!.isNotEmpty) {
+                subtitleClassTag = 'Kelas ${s.className}';
+              }
+            }
+          }
+          if (pNames.length >= 2) {
+            chatDisplayTitle = '${pNames[0]} ⇄ ${pNames[1]}';
+          } else if (st.participantNames.length >= 2) {
+            chatDisplayTitle = '${st.participantNames[0]} ⇄ ${st.participantNames[1]}';
+          }
+        } else if (type == StreakType.group) {
+          chatDisplayTitle = st.title;
+          subtitleClassTag = '${st.participantIds.length} Anggota';
+        }
+
+        final Color avatarBgColor = type == StreakType.teacher
+            ? const Color(0xFFCCFBF1)
+            : (type == StreakType.peer ? const Color(0xFFE0E7FF) : const Color(0xFFFEF3C7));
+        final Color avatarIconColor = type == StreakType.teacher
+            ? const Color(0xFF0F766E)
+            : (type == StreakType.peer ? const Color(0xFF4338CA) : const Color(0xFFD97706));
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x080F172A),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: type == StreakType.teacher
-                  ? Colors.teal.shade100
-                  : (type == StreakType.peer ? Colors.indigo.shade100 : Colors.amber.shade100),
-              child: Icon(
-                type == StreakType.teacher
-                    ? Icons.school_rounded
-                    : (type == StreakType.peer ? Icons.people_rounded : Icons.groups_rounded),
-                size: 20,
-                color: type == StreakType.teacher
-                    ? Colors.teal
-                    : (type == StreakType.peer ? Colors.indigo : Colors.amber.shade800),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatConversationScreen(streak: st),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: avatarBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          type == StreakType.teacher
+                              ? Icons.school_rounded
+                              : (type == StreakType.peer ? Icons.people_rounded : Icons.groups_rounded),
+                          size: 22,
+                          color: avatarIconColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  chatDisplayTitle,
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (subtitleClassTag != null) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    subtitleClassTag,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            lastMsg != null
+                                ? '${lastMsg.senderName}: ${lastMsg.message}'
+                                : 'Belum ada pesan terkirim.',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: Text(
+                            '${messages.length} pesan',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                        if (lastMsg != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            DateFormat('HH:mm').format(lastMsg.sentAt),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                  ],
+                ),
               ),
             ),
-            title: Text(
-              st.title,
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
-            ),
-            subtitle: Text(
-              lastMsg != null
-                  ? '${lastMsg.senderName}: ${lastMsg.message}'
-                  : 'Belum ada pesan terkirim.',
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${messages.length} pesan',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue),
-                ),
-                const SizedBox(height: 2),
-                const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-              ],
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatConversationScreen(streak: st),
-                ),
-              );
-            },
           ),
         );
       },
@@ -2413,22 +2620,44 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
 
             // Class and Subject Filters
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               child: Row(
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.borderLight),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x080F172A),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
+                          isExpanded: true,
+                          isDense: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
                           value: classes.contains(_selectedClass) ? _selectedClass : 'Semua Kelas',
                           items: classes
-                              .map((c) => DropdownMenuItem(value: c, child: Text('Kelas: $c', style: const TextStyle(fontSize: 12))))
+                              .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(
+                                      'Kelas: $c',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF334155),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ))
                               .toList(),
                           onChanged: (v) {
                             if (v != null) setState(() => _selectedClass = v);
@@ -2437,22 +2666,63 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.borderLight),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x080F172A),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String?>(
+                          isExpanded: true,
+                          isDense: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
                           value: _selectedSubjectId,
-                          hint: const Text('Semua Mapel', style: TextStyle(fontSize: 12)),
+                          hint: Text(
+                            'Semua Mapel',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF334155),
+                            ),
+                          ),
                           items: [
-                            const DropdownMenuItem(value: null, child: Text('Semua Mapel', style: TextStyle(fontSize: 12))),
-                            ...subjects.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))),
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text(
+                                'Semua Mapel',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                            ...subjects.map(
+                              (s) => DropdownMenuItem(
+                                value: s.id,
+                                child: Text(
+                                  s.name,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
                           ],
                           onChanged: (v) => setState(() => _selectedSubjectId = v),
                         ),
@@ -2463,21 +2733,38 @@ class _AdminAcademicMonitoringPageState extends State<_AdminAcademicMonitoringPa
               ),
             ),
 
-            // Tab bar with "Grafik & Rekap Siswa" as the primary view
+            // Tab bar with horizontal scrollable styling
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              height: 44,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.borderLight),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x060F172A),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
               child: TabBar(
                 controller: _tabController,
-                labelColor: const Color(0xFF1E3A8A),
-                unselectedLabelColor: Colors.grey.shade500,
-                indicatorColor: Colors.orange.shade700,
-                indicatorWeight: 3,
-                labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11),
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                labelColor: const Color(0xFF0F172A),
+                unselectedLabelColor: const Color(0xFF64748B),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                dividerColor: Colors.transparent,
+                labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12),
+                unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 12),
                 tabs: const [
                   Tab(text: 'Grafik & Rekap Siswa'),
                   Tab(text: 'Ujian & Quiz'),
@@ -2980,18 +3267,33 @@ class _StudentPerformanceCard extends StatelessWidget {
         children: [
           // ─── Header: Student Info & Status Pill ───
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.all(14),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: statusColor.withAlpha(25),
-                  child: Text(
-                    student.fullName.isNotEmpty ? student.fullName[0].toUpperCase() : 'S',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        statusColor.withAlpha(35),
+                        statusColor.withAlpha(15),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: statusColor.withAlpha(80), width: 1.5),
+                  ),
+                  child: Center(
+                    child: Text(
+                      student.fullName.isNotEmpty ? student.fullName[0].toUpperCase() : 'S',
+                      style: GoogleFonts.outfit(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                      ),
                     ),
                   ),
                 ),
@@ -3003,58 +3305,65 @@ class _StudentPerformanceCard extends StatelessWidget {
                       Text(
                         student.fullName,
                         style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
                           fontSize: 15,
                           color: const Color(0xFF0F172A),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      Row(
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               'Kelas ${student.className ?? student.classId ?? "-"}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF475569),
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
                           Text(
                             'NIS: ${student.nis ?? student.username}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withAlpha(20),
+                    color: statusColor.withAlpha(18),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: statusColor.withAlpha(60)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(statusIcon, size: 13, color: statusColor),
+                      Icon(statusIcon, size: 12, color: statusColor),
                       const SizedBox(width: 4),
                       Text(
                         statusLabel,
-                        style: TextStyle(
+                        style: GoogleFonts.outfit(
                           fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                           color: statusColor,
                         ),
                       ),
@@ -3073,26 +3382,26 @@ class _StudentPerformanceCard extends StatelessWidget {
             child: Row(
               children: [
                 _buildMetricChip(
-                  label: 'Rata-rata Ujian',
+                  label: 'Rata2 Ujian',
                   value: overallExamAvg != null ? overallExamAvg.toStringAsFixed(1) : '-',
                   color: const Color(0xFF2563EB),
                   icon: Icons.quiz_rounded,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildMetricChip(
-                  label: 'Rata-rata Tugas',
+                  label: 'Rata2 Tugas',
                   value: overallTaskAvg != null ? overallTaskAvg.toStringAsFixed(1) : '-',
                   color: const Color(0xFF059669),
                   icon: Icons.assignment_turned_in_rounded,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildMetricChip(
-                  label: 'Ketuntasan Tugas',
+                  label: 'Ketuntasan',
                   value: totalTasksCount > 0 ? '$completedTasksTotal/$totalTasksCount' : '-',
                   color: const Color(0xFFD97706),
                   icon: Icons.task_alt_rounded,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _buildMetricChip(
                   label: 'Nilai Rapor',
                   value: overallFinalAvg != null ? overallFinalAvg.toStringAsFixed(1) : '-',
@@ -3139,10 +3448,10 @@ class _StudentPerformanceCard extends StatelessWidget {
               tilePadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(
                 'Lihat Rincian Lengkap per Mata Pelajaran (${grades.length} Mapel)',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E3A8A),
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E3A8A),
                 ),
               ),
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -3168,12 +3477,12 @@ class _StudentPerformanceCard extends StatelessWidget {
                           children: [
                             Text(
                               g.subject.name,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'KKM: ${g.subject.kkm.toStringAsFixed(0)}  •  Ujian: ${examVal != null ? examVal.toStringAsFixed(1) : "-"}  •  Tugas: ${taskVal != null ? taskVal.toStringAsFixed(1) : "-"}  •  Bonus: +${g.bonusGrade.toStringAsFixed(1)}',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -3181,16 +3490,16 @@ class _StudentPerformanceCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isPass ? Colors.green.shade50 : Colors.red.shade50,
+                          color: isPass ? const Color(0xFFDCFCE7) : const Color(0xFFFFE4E6),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isPass ? Colors.green.shade200 : Colors.red.shade200),
+                          border: Border.all(color: isPass ? const Color(0xFF86EFAC) : const Color(0xFFFDA4AF)),
                         ),
                         child: Text(
                           '${finalVal > 0 ? finalVal.toStringAsFixed(1) : "-"} (${g.predicate})',
-                          style: TextStyle(
+                          style: GoogleFonts.outfit(
                             fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: isPass ? Colors.green.shade800 : Colors.red.shade800,
+                            fontWeight: FontWeight.w700,
+                            color: isPass ? const Color(0xFF15803D) : const Color(0xFFE11D48),
                           ),
                         ),
                       ),
@@ -3213,31 +3522,31 @@ class _StudentPerformanceCard extends StatelessWidget {
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withAlpha(14),
+          color: color.withAlpha(12),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withAlpha(35)),
+          border: Border.all(color: color.withAlpha(30)),
         ),
         child: Column(
           children: [
-            Icon(icon, size: 15, color: color),
+            Icon(icon, size: 14, color: color),
             const SizedBox(height: 3),
             Text(
               value,
               style: GoogleFonts.outfit(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
                 color: color,
               ),
             ),
             const SizedBox(height: 1),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 9.5,
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w500,
+              style: GoogleFonts.outfit(
+                fontSize: 9,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -3298,21 +3607,21 @@ class _StudentDualBarChart extends StatelessWidget {
 
           // Chart Canvas
           SizedBox(
-            height: 165,
+            height: 185,
             child: Row(
               children: [
                 // Y-Axis Scale
                 SizedBox(
-                  width: 32,
+                  width: 28,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: const [
-                      Text('100', style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
-                      Text('75', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
-                      Text('50', style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
-                      Text('25', style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
-                      Text('0', style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
+                      Text('100', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                      Text('75', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                      Text('50', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                      Text('25', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                      Text('0', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
                     ],
                   ),
                 ),
@@ -3323,15 +3632,17 @@ class _StudentDualBarChart extends StatelessWidget {
                   child: Stack(
                     children: [
                       // Background grid lines
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
-                          Container(height: 1, color: const Color(0xFFEF4444).withAlpha(160)),
-                          const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
-                          const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
-                          const Divider(height: 1, thickness: 1.2, color: Color(0xFFCBD5E1)),
-                        ],
+                      Positioned.fill(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
+                            Container(height: 1, color: const Color(0xFFEF4444).withAlpha(160)),
+                            const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
+                            const Divider(height: 1, thickness: 0.8, color: Color(0xFFE2E8F0)),
+                            const Divider(height: 1, thickness: 1.2, color: Color(0xFFCBD5E1)),
+                          ],
+                        ),
                       ),
 
                       // Grouped Bars Container
@@ -3344,15 +3655,16 @@ class _StudentDualBarChart extends StatelessWidget {
                             final taskScore = g.assignmentAverage ?? 0.0;
                             final subjectCode = g.subject.code.isNotEmpty
                                 ? g.subject.code
-                                : (g.subject.name.length > 5 ? g.subject.name.substring(0, 5) : g.subject.name);
+                                : (g.subject.name.length > 6 ? g.subject.name.substring(0, 6) : g.subject.name);
 
-                            const double maxBarHeight = 120.0;
+                            const double maxBarHeight = 110.0;
                             final examBarHeight = ((examScore / 100.0) * maxBarHeight).clamp(4.0, maxBarHeight);
                             final taskBarHeight = ((taskScore / 100.0) * maxBarHeight).clamp(4.0, maxBarHeight);
 
                             return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 10),
+                              margin: const EdgeInsets.symmetric(horizontal: 8),
                               child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Row(
@@ -3360,19 +3672,20 @@ class _StudentDualBarChart extends StatelessWidget {
                                     children: [
                                       // Exam Bar (Blue)
                                       Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
                                           Text(
                                             g.examAverage != null ? '${examScore.toInt()}' : '-',
-                                            style: const TextStyle(
+                                            style: GoogleFonts.outfit(
                                               fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF1D4ED8),
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF1D4ED8),
                                             ),
                                           ),
                                           const SizedBox(height: 2),
                                           Container(
-                                            width: 16,
+                                            width: 15,
                                             height: examBarHeight,
                                             decoration: BoxDecoration(
                                               gradient: const LinearGradient(
@@ -3380,34 +3693,35 @@ class _StudentDualBarChart extends StatelessWidget {
                                                 end: Alignment.bottomCenter,
                                                 colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
                                               ),
-                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                                               boxShadow: [
                                                 BoxShadow(
                                                   color: const Color(0xFF2563EB).withAlpha(30),
-                                                  blurRadius: 4,
+                                                  blurRadius: 3,
                                                 ),
                                               ],
                                             ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 3),
 
                                       // Task Bar (Emerald)
                                       Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
                                           Text(
                                             g.assignmentAverage != null ? '${taskScore.toInt()}' : '-',
-                                            style: const TextStyle(
+                                            style: GoogleFonts.outfit(
                                               fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF047857),
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF047857),
                                             ),
                                           ),
                                           const SizedBox(height: 2),
                                           Container(
-                                            width: 16,
+                                            width: 15,
                                             height: taskBarHeight,
                                             decoration: BoxDecoration(
                                               gradient: const LinearGradient(
@@ -3415,11 +3729,11 @@ class _StudentDualBarChart extends StatelessWidget {
                                                 end: Alignment.bottomCenter,
                                                 colors: [Color(0xFF10B981), Color(0xFF047857)],
                                               ),
-                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                                               boxShadow: [
                                                 BoxShadow(
                                                   color: const Color(0xFF059669).withAlpha(30),
-                                                  blurRadius: 4,
+                                                  blurRadius: 3,
                                                 ),
                                               ],
                                             ),
@@ -3428,21 +3742,21 @@ class _StudentDualBarChart extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   Text(
                                     subjectCode,
-                                    style: const TextStyle(
+                                    style: GoogleFonts.outfit(
                                       fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF334155),
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF334155),
                                     ),
                                   ),
                                   Text(
                                     'KKM ${g.subject.kkm.toStringAsFixed(0)}',
-                                    style: const TextStyle(
+                                    style: GoogleFonts.outfit(
                                       fontSize: 8.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFEF4444),
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFFEF4444),
                                     ),
                                   ),
                                 ],
@@ -3826,10 +4140,7 @@ class _AdminProfilePage extends StatelessWidget {
                     // Google Gemini AI Configuration
                     _buildGeminiApiKeyCard(context),
 
-                    const SizedBox(height: 16),
 
-                    // App Updates & APK Release Manager
-                    _buildAppUpdateManagerCard(context, fb),
 
                     const SizedBox(height: 16),
 
@@ -3975,291 +4286,7 @@ class _AdminProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildAppUpdateManagerCard(BuildContext context, FirebaseService fb) {
-    final serverVer = fb.appVersionConfig;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDDD6FE)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6D28D9).withAlpha(10),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.system_update_rounded, color: Color(0xFF6D28D9), size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pembaruan & Rilis APK',
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2E1065),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Kelola rilis APK baru & cek pembaruan otomatis',
-                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F3FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDDD6FE)),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Versi di Server Firebase:', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                    Text(
-                      serverVer != null ? 'v${serverVer.latestVersion} (Build ${serverVer.versionCode})' : 'Belum dikonfigurasi',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF6D28D9)),
-                    ),
-                  ],
-                ),
-                if (serverVer != null && serverVer.apkUrl.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Link APK:', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          serverVer.apkUrl,
-                          textAlign: TextAlign.end,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: Colors.blue.shade700, decoration: TextDecoration.underline),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF6D28D9),
-                    side: const BorderSide(color: Color(0xFF7C3AED)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () => AppUpdateDialog.handleManualUpdateCheck(context),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Cek Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 1,
-                  ),
-                  onPressed: () => _showPublishReleaseDialog(context, fb),
-                  icon: const Icon(Icons.cloud_upload_rounded, size: 16),
-                  label: const Text('Rilis APK Baru', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showPublishReleaseDialog(BuildContext context, FirebaseService fb) {
-    final currentConfig = fb.appVersionConfig;
-    final versionController = TextEditingController(text: currentConfig?.latestVersion ?? '1.0.1');
-    final codeController = TextEditingController(text: '${(currentConfig?.versionCode ?? 1) + 1}');
-    final urlController = TextEditingController(text: currentConfig?.apkUrl ?? '');
-    final notesController = TextEditingController(
-      text: currentConfig?.releaseNotes.isNotEmpty == true
-          ? currentConfig!.releaseNotes
-          : 'Pembaruan aplikasi: perbaikan stabilitas dan penambahan fitur baru.',
-    );
-    bool forceUpdate = currentConfig?.forceUpdate ?? false;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withAlpha(25),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF6D28D9), size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Rilis Versi APK Baru',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 17),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Saat rilis baru dipublikasikan, seluruh siswa & guru yang membuka aplikasi akan langsung melihat dialog pembaruan otomatis.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: versionController,
-                    decoration: InputDecoration(
-                      labelText: 'Versi Baru (cth: 1.0.1)',
-                      labelStyle: const TextStyle(fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.label_outline_rounded, size: 18),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Versi tidak boleh kosong' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: codeController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Kode Versi / Version Code (cth: 2)',
-                      labelStyle: const TextStyle(fontSize: 13),
-                      helperText: 'Harus lebih tinggi dari kode versi sekarang',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.numbers_rounded, size: 18),
-                    ),
-                    validator: (v) {
-                      final code = int.tryParse(v ?? '');
-                      if (code == null || code <= 0) return 'Masukkan angka yang valid';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: urlController,
-                    decoration: InputDecoration(
-                      labelText: 'Link Download APK Langsung',
-                      labelStyle: const TextStyle(fontSize: 13),
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.link_rounded, size: 18),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'URL APK tidak boleh kosong' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: notesController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Catatan Rilis / Fitur Baru',
-                      labelStyle: const TextStyle(fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Wajibkan Pembaruan (Force Update)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Pengguna tidak bisa menutup dialog update sebelum memperbarui', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                    value: forceUpdate,
-                    activeTrackColor: const Color(0xFF7C3AED),
-                    onChanged: (val) => setModalState(() => forceUpdate = val),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(dialogCtx).pop();
-                  await showLoadingDialog(
-                    context,
-                    message: 'Mempublikasikan versi baru ke Cloud Firestore & mengirim notifikasi...',
-                    action: () async {
-                      await fb.publishAppUpdate(
-                        version: versionController.text.trim(),
-                        versionCode: int.parse(codeController.text.trim()),
-                        apkUrl: urlController.text.trim(),
-                        releaseNotes: notesController.text.trim(),
-                        forceUpdate: forceUpdate,
-                      );
-                    },
-                    successMessage: 'Pembaruan versi ${versionController.text.trim()} berhasil dipublikasikan!',
-                    errorMessage: 'Gagal mempublikasikan pembaruan aplikasi.',
-                  );
-                }
-              },
-              icon: const Icon(Icons.publish_rounded, size: 16),
-              label: const Text('Publikasikan Rilis', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildGeminiApiKeyCard(BuildContext context) {
     return FutureBuilder<String>(

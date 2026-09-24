@@ -35,7 +35,6 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
   double _progressPercent = 0.0;
   bool _initializedProgress = false;
   String? _selectedForumClass;
-  String _selectedAssignmentClass = 'all';
 
   List<AssignmentModel> _getApplicableAssignments(FirebaseService fbService, [String? materialId]) {
     final mId = (materialId ?? widget.material.id).trim();
@@ -379,6 +378,14 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
     final assignmentsDone = _areAssignmentsCompleted(fbService, applicableAssignments);
     final maxAllowedProgress = (!hasAssignments || assignmentsDone) ? 100.0 : 50.0;
 
+    final hasAssignmentTab = isTeacher ? assignments.isNotEmpty : applicableAssignments.isNotEmpty;
+    final neededTabCount = hasAssignmentTab ? 3 : 2;
+    if (_tabController.length != neededTabCount) {
+      final oldIndex = _tabController.index.clamp(0, neededTabCount - 1);
+      _tabController.dispose();
+      _tabController = TabController(length: neededTabCount, vsync: this, initialIndex: oldIndex);
+    }
+
     final savedProgress = fbService.getMaterialProgress(currentUser?.id ?? '', currentMaterial.id);
     if (savedProgress > _progressPercent) {
       _progressPercent = savedProgress;
@@ -525,6 +532,24 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
 
                       if (currentUser?.isGuru == true || currentUser?.role == 'guru') ...[
                         const SizedBox(width: 4),
+                        if (!hasAssignmentTab)
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            tooltip: 'Buat Tugas untuk Materi Ini',
+                            icon: const Icon(Icons.add_task_rounded, color: Colors.white, size: 18),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AssignmentFormScreen(
+                                  materialId: currentMaterial.id,
+                                  subjectId: currentMaterial.subjectId,
+                                  initialClassIds: currentMaterial.classIds,
+                                ),
+                              ),
+                            ),
+                          ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
@@ -553,52 +578,52 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Compact horizontal TabBar
+                  // Compact horizontal TabBar (Dipercantik & Jelas Kontras)
                   Container(
-                    height: 38,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(35),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withAlpha(20)),
+                      color: Colors.black.withAlpha(50),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withAlpha(35),
+                        width: 1.2,
+                      ),
                     ),
-                    padding: const EdgeInsets.all(3),
+                    padding: const EdgeInsets.all(3.5),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withAlpha(55),
-                            Colors.white.withAlpha(30),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(9),
-                        border: Border.all(color: Colors.white.withAlpha(50)),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(20),
-                            blurRadius: 3,
-                            offset: const Offset(0, 1),
+                            color: Colors.black.withAlpha(40),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white60,
+                      labelColor: const Color(0xFF0F172A),
+                      unselectedLabelColor: Colors.white,
                       labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                       tabs: [
                         Tab(
-                          height: 32,
+                          height: 34,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.menu_book_rounded, size: 14),
+                              const Icon(Icons.menu_book_rounded, size: 15),
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
                                   'Materi',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -607,17 +632,20 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                           ),
                         ),
                         Tab(
-                          height: 32,
+                          height: 34,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.forum_rounded, size: 14),
+                              const Icon(Icons.forum_rounded, size: 15),
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
                                   'Forum Kelas',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -625,25 +653,33 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                             ],
                           ),
                         ),
-                        Tab(
-                          height: 32,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.assignment_rounded, size: 14),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  assignments.isNotEmpty ? 'Tugas (${assignments.length})' : 'Tugas',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        if (hasAssignmentTab)
+                          Tab(
+                            height: 34,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.assignment_rounded, size: 15),
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    isTeacher
+                                        ? (assignments.isNotEmpty
+                                            ? 'Tugas (${assignments.length})'
+                                            : 'Tugas')
+                                        : 'Tugas (${applicableAssignments.length})',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -667,305 +703,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                 _buildMediaViewer(maxLimit: maxAllowedProgress),
                 const SizedBox(height: 16),
 
-                // Real-Time Progress Bar Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _progressPercent >= 100
-                          ? const Color(0xFF10B981).withAlpha(100)
-                          : const Color(0xFFE2E8F0),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _progressPercent >= 100
-                            ? const Color(0xFF10B981).withAlpha(25)
-                            : Colors.black.withAlpha(8),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: _progressPercent >= 100
-                                  ? const Color(0xFFD1FAE5)
-                                  : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              _progressPercent >= 100
-                                  ? Icons.verified_rounded
-                                  : Icons.trending_up_rounded,
-                              color: _progressPercent >= 100
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFF0D2B6E),
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Progres Belajar Mandiri',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14.5,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                Text(
-                                  'Tersinkronisasi otomatis ke Guru & Firebase',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 11,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: _progressPercent >= 100
-                                    ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                                    : (_progressPercent >= 50 && hasAssignments && !assignmentsDone)
-                                        ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
-                                        : [const Color(0xFF0D2B6E), const Color(0xFF1E3A8A)],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (_progressPercent >= 100
-                                          ? const Color(0xFF10B981)
-                                          : (_progressPercent >= 50 && hasAssignments && !assignmentsDone)
-                                              ? const Color(0xFFF59E0B)
-                                              : const Color(0xFF0D2B6E))
-                                      .withAlpha(60),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              '${_progressPercent.toInt()}%',
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      // Progress Bar with custom rounded track
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          height: 10,
-                          child: Stack(
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                color: const Color(0xFFF1F5F9),
-                              ),
-                              FractionallySizedBox(
-                                widthFactor: (_progressPercent / 100).clamp(0.0, 1.0),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: _progressPercent >= 100
-                                          ? [const Color(0xFF10B981), const Color(0xFF34D399)]
-                                          : (_progressPercent >= 50 && hasAssignments && !assignmentsDone)
-                                              ? [const Color(0xFFF59E0B), const Color(0xFFFBBF24)]
-                                              : [const Color(0xFF0D2B6E), const Color(0xFF3B82F6)],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _progressPercent >= 100
-                            ? (hasAssignments
-                                ? '🎉 Hebat! Kamu sudah menyelesaikan membaca materi dan mengumpulkan tugas (100% Tuntas).'
-                                : '🎉 Hebat! Kamu sudah menyelesaikan materi ini 100% dan tersimpan otomatis di Firebase.')
-                            : (hasAssignments && !assignmentsDone)
-                                ? (_progressPercent >= 50
-                                    ? '📖 Membaca materi selesai (Maks. 50%). Selesaikan tugas materi ini di tab "Tugas" untuk mencapai 100%!'
-                                    : '⚡ Progres membaca tercatat ${_progressPercent.toInt()}% (Maksimal 50% untuk membaca materi. Tugas wajib dikerjakan untuk 100%).')
-                                : _progressPercent > 0
-                                    ? '⚡ Terhubung ke Firebase: Progres tercatat ${_progressPercent.toInt()}% secara otomatis saat membaca slide / menonton video.'
-                                    : '📖 Progres bertambah otomatis saat kamu membaca slide, menyimak video, atau menelaah materi.',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: _progressPercent >= 100
-                              ? const Color(0xFF059669)
-                              : (hasAssignments && !assignmentsDone && _progressPercent >= 50)
-                                  ? const Color(0xFFD97706)
-                                  : const Color(0xFF64748B),
-                          fontWeight: _progressPercent >= 100 || (hasAssignments && !assignmentsDone && _progressPercent >= 50)
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Status otomatisasi progres (tanpa validasi manual oleh siswa)
-                      if (!isTeacher) ...[
-                        if (_progressPercent >= 100) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withAlpha(15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF10B981).withAlpha(40)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    hasAssignments
-                                        ? 'Materi & Tugas Tuntas 100% (Tervalidasi Otomatis)'
-                                        : 'Materi tuntas dipelajari 100% (Tervalidasi Otomatis)',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      color: const Color(0xFF059669),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '+20 Poin',
-                                    style: GoogleFonts.outfit(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ] else if (hasAssignments && !assignmentsDone && _progressPercent >= 50) ...[
-                          // Membaca mencapai batas maksimal 50%, ajak siswa ke Tab Tugas
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFFBEB),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFFDE68A)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.assignment_late_rounded, color: Color(0xFFD97706), size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Membaca Tuntas 50% • Kerjakan Tugas untuk 100%',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF92400E),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Materi ini memiliki tugas yang wajib dikumpulkan agar progres belajarmu tuntas 100%.',
-                                  style: TextStyle(fontSize: 11.5, color: Colors.amber.shade900),
-                                ),
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97706),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 9),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
-                                    ),
-                                    icon: const Icon(Icons.arrow_forward_rounded, size: 15),
-                                    label: Text(
-                                      'Buka Tab Tugas (${applicableAssignments.length})',
-                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
-                                    ),
-                                    onPressed: () => _tabController.animateTo(2),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0D2B6E).withAlpha(10),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF0D2B6E).withAlpha(25)),
-                            ),
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D2B6E)),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    hasAssignments
-                                        ? 'Progres membaca bertambah otomatis hingga 50% (Selesaikan tugas untuk 100%).'
-                                        : 'Progres bertambah otomatis saat kamu membaca materi & menyimak media.',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 11.5,
-                                      color: const Color(0xFF0D2B6E),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
+
 
                 // AI Action Buttons Banner (Hanya untuk role siswa, disembunyikan untuk guru)
                 if (currentUser?.isGuru != true && currentUser?.role != 'guru') ...[
@@ -1419,132 +1157,38 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
             },
           ),
 
-          // TAB 3: Assignments List
-          Builder(
-            builder: (context) {
-              final displayedAssignments = isTeacher
-                  ? (_selectedAssignmentClass != 'all'
-                      ? assignments.where((a) => a.classIds.isEmpty || a.classIds.any((c) => c.trim().toLowerCase() == _selectedAssignmentClass.trim().toLowerCase())).toList()
-                      : assignments)
-                  : applicableAssignments;
+          // TAB 3: Assignments List (Hanya ditampilkan jika materi mengandung tugas)
+          if (hasAssignmentTab)
+            Builder(
+              builder: (context) {
+              final displayedAssignments = isTeacher ? assignments : applicableAssignments;
 
               return Column(
                 children: [
-                  if (isTeacher) ...[
-                    // Class Filter Bar for Assignments
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.emerald.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.tune_rounded, size: 16, color: AppColors.emerald),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Filter Tugas Berdasarkan Kelas:',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: FilterChip(
-                                    label: Text(
-                                      'Semua Kelas (${assignments.length})',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        fontWeight: _selectedAssignmentClass == 'all' ? FontWeight.bold : FontWeight.w500,
-                                        color: _selectedAssignmentClass == 'all' ? Colors.white : const Color(0xFF334155),
-                                      ),
-                                    ),
-                                    selected: _selectedAssignmentClass == 'all',
-                                    selectedColor: AppColors.primary,
-                                    backgroundColor: const Color(0xFFF1F5F9),
-                                    showCheckmark: false,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(
-                                        color: _selectedAssignmentClass == 'all' ? AppColors.primary : Colors.transparent,
-                                      ),
-                                    ),
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setState(() {
-                                          _selectedAssignmentClass = 'all';
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                                ...teacherClasses.map((cls) {
-                                  final isSelected = _selectedAssignmentClass == cls;
-                                  final count = assignments.where((a) => a.classIds.isEmpty || a.classIds.contains(cls)).length;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: FilterChip(
-                                      label: Text(
-                                        '$cls ($count)',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 12,
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                          color: isSelected ? Colors.white : const Color(0xFF334155),
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      selectedColor: AppColors.primary,
-                                      backgroundColor: const Color(0xFFF1F5F9),
-                                      showCheckmark: false,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        side: BorderSide(
-                                          color: isSelected ? AppColors.primary : Colors.transparent,
-                                        ),
-                                      ),
-                                      onSelected: (selected) {
-                                        if (selected) {
-                                          setState(() {
-                                            _selectedAssignmentClass = cls;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  if (isTeacher)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
                       child: SizedBox(
                         width: double.infinity,
-                        child: FilledButton.tonalIcon(
-                          icon: const Icon(Icons.add_task_rounded),
-                          label: const Text('Buat Tugas Baru untuk Materi Ini'),
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.navy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.add_task_rounded, size: 18),
+                          label: Text(
+                            'Buat Tugas Baru untuk Materi Ini',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -1560,7 +1204,6 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                         ),
                       ),
                     ),
-                  ],
                   Expanded(
                     child: displayedAssignments.isEmpty
                         ? Center(
@@ -1572,9 +1215,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                                   Icon(Icons.assignment_outlined, size: 48, color: Colors.grey.shade400),
                                   const SizedBox(height: 12),
                                   Text(
-                                    isTeacher && _selectedAssignmentClass != 'all'
-                                        ? 'Tidak ada tugas untuk kelas $_selectedAssignmentClass.'
-                                        : 'Tidak ada tugas untuk materi ini.',
+                                    'Tidak ada tugas untuk materi ini.',
                                     style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade600),
                                   ),
                                 ],
@@ -1588,215 +1229,356 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen>
                             itemBuilder: (context, index) {
                               final asg = displayedAssignments[index];
 
-                              // For teachers, calculate submission stats for this assignment
+                              // Submission stats for this assignment
                               final allSubs = fbService.getSubmissionsForAssignment(asg.id);
-                              final classSubs = _selectedAssignmentClass == 'all'
-                                  ? allSubs
-                                  : allSubs.where((s) {
-                                      final std = fbService.allStudents.where((u) => u.id == s.submitterId).firstOrNull;
-                                      final c = std?.className ?? std?.classId ?? 'X-RPL-1';
-                                      return c == _selectedAssignmentClass;
-                                    }).toList();
-                              final gradedCount = classSubs.where((s) => s.score != null).length;
+                              final gradedCount = allSubs.where((s) => s.score != null).length;
+                              final sub = fbService.submissions.where(
+                                (s) => s.assignmentId == asg.id && (s.submitterId == currentUser?.id || s.memberStudentIds.contains(currentUser?.id)),
+                              ).firstOrNull;
 
-                              return Card(
-                                elevation: 1,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  side: const BorderSide(color: AppColors.borderLight),
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: (sub != null && sub.score != null)
+                                        ? const Color(0xFF10B981).withAlpha(60)
+                                        : const Color(0xFFE2E8F0),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0A0F172A),
+                                      blurRadius: 16,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.all(16),
-                                  leading: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: asg.codeConfig != null
-                                          ? AppColors.accent.withAlpha(20)
-                                          : AppColors.primary.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      asg.codeConfig != null ? Icons.code_rounded : Icons.assignment_rounded,
-                                      color: asg.codeConfig != null ? AppColors.accent : AppColors.primary,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    asg.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const SizedBox(height: 4),
-                                      Text(asg.description, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                      const SizedBox(height: 6),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => AssignmentDetailScreen(assignment: asg),
+                                        ),
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(18),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          if (asg.classIds.isNotEmpty)
-                                            ...asg.classIds.map((c) => Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors.primary.withAlpha(15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: AppColors.primary.withAlpha(40)),
+                                          // Top Row: Type Pill + Action/Score (NO OVERFLOW)
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            children: [
+                                              // Type Tag Capsule with Icon
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                                                decoration: BoxDecoration(
+                                                  color: asg.codeConfig != null
+                                                      ? const Color(0xFFEFF6FF)
+                                                      : const Color(0xFFFFF7ED),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: asg.codeConfig != null
+                                                        ? const Color(0xFFBFDBFE)
+                                                        : const Color(0xFFFED7AA),
+                                                    width: 1,
                                                   ),
-                                                  child: Text(
-                                                    c,
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppColors.primary,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      asg.codeConfig != null
+                                                          ? Icons.code_rounded
+                                                          : Icons.assignment_rounded,
+                                                      color: asg.codeConfig != null
+                                                          ? const Color(0xFF2563EB)
+                                                          : AppColors.orange,
+                                                      size: 14,
+                                                    ),
+                                                    const SizedBox(width: 5),
+                                                    Text(
+                                                      asg.codeConfig != null
+                                                          ? 'Koding (Compiler IDE)'
+                                                          : (asg.allowedSubmissionTypes.isNotEmpty
+                                                              ? asg.allowedSubmissionTypes.first.label
+                                                              : 'Tugas Mandiri'),
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: asg.codeConfig != null
+                                                            ? const Color(0xFF1D4ED8)
+                                                            : const Color(0xFFC2410C),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              // Right status or Teacher Action
+                                              if (isTeacher) ...[
+                                                IconButton(
+                                                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 19),
+                                                  tooltip: 'Hapus Tugas',
+                                                  visualDensity: VisualDensity.compact,
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                  onPressed: () => _confirmDeleteAssignment(context, fbService, asg),
+                                                ),
+                                              ] else ...[
+                                                if (sub != null && sub.score != null) ...[
+                                                  // Badge Nilai Emerald Premium
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      gradient: const LinearGradient(
+                                                        colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      border: Border.all(color: const Color(0xFFA7F3D0), width: 1.2),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: const Color(0xFF10B981).withAlpha(30),
+                                                          blurRadius: 8,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF059669)),
+                                                        const SizedBox(width: 6),
+                                                        Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              'NILAI',
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 8.5,
+                                                                fontWeight: FontWeight.w800,
+                                                                color: const Color(0xFF047857),
+                                                                letterSpacing: 0.5,
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              '${sub.score!.toInt()}',
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 15,
+                                                                fontWeight: FontWeight.w900,
+                                                                color: const Color(0xFF065F46),
+                                                                height: 1.1,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                )),
-                                          if (asg.isGroup)
-                                            Chip(
-                                              label: Text('Kelompok (${asg.maxGroupMembers} Siswa)'),
-                                              backgroundColor: Colors.blue.shade50,
-                                              labelStyle: const TextStyle(fontSize: 10, color: Colors.blue),
-                                              padding: EdgeInsets.zero,
-                                              visualDensity: VisualDensity.compact,
-                                            ),
-                                          ...asg.allowedSubmissionTypes.map((t) => Chip(
-                                                label: Text(t.label),
-                                                backgroundColor: Colors.grey.shade100,
-                                                labelStyle: const TextStyle(fontSize: 10),
-                                                padding: EdgeInsets.zero,
-                                                visualDensity: VisualDensity.compact,
-                                              )),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Builder(
-                                    builder: (context) {
-                                      if (isTeacher) {
-                                        return Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.primary.withAlpha(15),
-                                                borderRadius: BorderRadius.circular(10),
-                                                border: Border.all(color: AppColors.primary.withAlpha(50)),
-                                              ),
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                crossAxisAlignment: CrossAxisAlignment.end,
-                                                children: [
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      const Icon(Icons.groups_outlined, size: 13, color: AppColors.primary),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        '${classSubs.length} Kumpul',
-                                                        style: GoogleFonts.outfit(
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: AppColors.primary,
+                                                ] else if (sub != null) ...[
+                                                  // Terkumpul Menunggu Dinilai
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFFFFBEB),
+                                                      borderRadius: BorderRadius.circular(10),
+                                                      border: Border.all(color: const Color(0xFFFDE68A)),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFFD97706)),
+                                                        const SizedBox(width: 5),
+                                                        Text(
+                                                          'Terkumpul',
+                                                          style: GoogleFonts.outfit(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: const Color(0xFF92400E),
+                                                          ),
                                                         ),
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
                                                   ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    '$gradedCount Dinilai',
-                                                    style: GoogleFonts.outfit(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: gradedCount > 0 ? AppColors.emerald : Colors.grey.shade600,
+                                                ] else ...[
+                                                  // Belum dikerjakan CTA
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.orangePale,
+                                                      borderRadius: BorderRadius.circular(10),
+                                                      border: Border.all(color: AppColors.orangeLight.withAlpha(80)),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'Kerjakan',
+                                                          style: GoogleFonts.outfit(
+                                                            fontSize: 11.5,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: AppColors.orangeDark,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        const Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.orangeDark),
+                                                      ],
                                                     ),
                                                   ),
                                                 ],
+                                              ],
+                                            ],
+                                          ),
+
+                                          const SizedBox(height: 12),
+
+                                          // Assignment Title
+                                          Text(
+                                            asg.title,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF0F172A),
+                                              letterSpacing: -0.2,
+                                              height: 1.3,
+                                            ),
+                                          ),
+
+                                          if (asg.description.trim().isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              asg.description.trim(),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13,
+                                                color: const Color(0xFF64748B),
+                                                height: 1.4,
                                               ),
                                             ),
-                                            const SizedBox(width: 4),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                              tooltip: 'Hapus Tugas Ini',
-                                              onPressed: () => _confirmDeleteAssignment(context, fbService, asg),
-                                            ),
                                           ],
-                                        );
-                                      }
 
-                                      final sub = fbService.submissions.where(
-                                        (s) => s.assignmentId == asg.id && (s.submitterId == currentUser?.id || s.memberStudentIds.contains(currentUser?.id)),
-                                      ).firstOrNull;
+                                          const SizedBox(height: 14),
 
-                                      if (sub != null) {
-                                        if (sub.score != null) {
-                                          return Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.emerald.withAlpha(20),
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: AppColors.emerald.withAlpha(70)),
-                                            ),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Text(
-                                                  'Nilai',
-                                                  style: TextStyle(fontSize: 10, color: AppColors.emerald, fontWeight: FontWeight.bold),
+                                          // Bottom Metadata: Target Kelas & Grup & Submission Stats (Guru) & Arrow
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 6,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                                  children: [
+                                                    if (asg.classIds.isNotEmpty)
+                                                      ...asg.classIds.map((c) => Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFFF1F5F9),
+                                                              borderRadius: BorderRadius.circular(6),
+                                                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                                                            ),
+                                                            child: Text(
+                                                              c,
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: const Color(0xFF334155),
+                                                              ),
+                                                            ),
+                                                          )),
+                                                    if (asg.isGroup)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFEFF6FF),
+                                                          borderRadius: BorderRadius.circular(7),
+                                                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.groups_rounded, size: 13, color: Color(0xFF2563EB)),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'Kelompok (${asg.maxGroupMembers} Siswa)',
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.w600,
+                                                                color: const Color(0xFF1D4ED8),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    if (isTeacher)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFEFF6FF),
+                                                          borderRadius: BorderRadius.circular(7),
+                                                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.people_alt_rounded, size: 12.5, color: Color(0xFF2563EB)),
+                                                            const SizedBox(width: 4.5),
+                                                            Text(
+                                                              '${allSubs.length} Kumpul',
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: const Color(0xFF1D4ED8),
+                                                              ),
+                                                            ),
+                                                            if (gradedCount > 0) ...[
+                                                              const SizedBox(width: 5),
+                                                              Container(
+                                                                width: 3.5,
+                                                                height: 3.5,
+                                                                decoration: const BoxDecoration(
+                                                                  color: Color(0xFF10B981),
+                                                                  shape: BoxShape.circle,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 5),
+                                                              Text(
+                                                                '$gradedCount Dinilai',
+                                                                style: GoogleFonts.outfit(
+                                                                  fontSize: 11,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: const Color(0xFF059669),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ],
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
-                                                Text(
-                                                  '${sub.score!.toInt()}',
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: AppColors.emerald,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        } else {
-                                          return Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF59E0B).withAlpha(20),
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: const Color(0xFFF59E0B).withAlpha(70)),
-                                            ),
-                                            child: const Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.hourglass_top_rounded, size: 14, color: Color(0xFFB45309)),
-                                                SizedBox(height: 2),
-                                                Text(
-                                                  'Terkumpul',
-                                                  style: TextStyle(fontSize: 9.5, color: Color(0xFFB45309), fontWeight: FontWeight.bold),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        }
-                                      }
-                                      return const Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.chevron_right, color: Colors.grey),
-                                          Text(
-                                            'Kerjakan',
-                                            style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              const Icon(
+                                                Icons.chevron_right_rounded,
+                                                color: Color(0xFF94A3B8),
+                                                size: 20,
+                                              ),
+                                            ],
                                           ),
                                         ],
-                                      );
-                                    },
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => AssignmentDetailScreen(assignment: asg),
                                       ),
-                                    );
-                                  },
+                                    ),
+                                  ),
                                 ),
                               );
                             },

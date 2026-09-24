@@ -173,6 +173,8 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
       subjectId: widget.subjectId,
       cpId: _selectedCpId,
       tpId: _selectedTpId,
+      teacherId: widget.existingQuestion?.teacherId ?? fb.currentUser?.id,
+      creatorName: widget.existingQuestion?.creatorName ?? fb.currentUser?.fullName,
       type: _selectedType,
       content: _contentController.text.trim(),
       equationLatex: _equationController.text.trim().isNotEmpty ? _equationController.text.trim() : null,
@@ -187,9 +189,15 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
           ? 'Memperbarui butir soal...'
           : 'Menyimpan butir soal ke Bank Soal...',
       action: () async {
-        await fb.addQuestion(question);
+        if (widget.existingQuestion != null) {
+          await fb.updateQuestion(question);
+        } else {
+          await fb.addQuestion(question);
+        }
       },
-      successMessage: 'Butir soal berhasil disimpan ke Bank Soal!',
+      successMessage: widget.existingQuestion != null
+          ? 'Butir soal berhasil diperbarui!'
+          : 'Butir soal berhasil disimpan ke Bank Soal!',
       errorMessage: 'Gagal menyimpan butir soal. Silakan coba lagi.',
     );
 

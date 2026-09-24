@@ -2767,21 +2767,32 @@ class FirebaseService extends ChangeNotifier {
   // ==================== QUESTION BANK ====================
 
   Future<void> addQuestion(QuestionModel question) async {
-    _questions.insert(0, question);
+    final finalQuestion = question.copyWith(
+      teacherId: question.teacherId ?? _currentUser?.id,
+      creatorName: question.creatorName ?? _currentUser?.fullName,
+    );
+    _questions.insert(0, finalQuestion);
     notifyListeners();
     try {
-      await db.collection('questions').doc(question.id).set(question.toMap());
+      await db.collection('questions').doc(finalQuestion.id).set(finalQuestion.toMap());
     } catch (e) {
       debugPrint('[Firestore] Error adding question: $e');
     }
   }
 
   Future<void> addQuestionsBulk(List<QuestionModel> newQuestions) async {
-    _questions.addAll(newQuestions);
+    final List<QuestionModel> stamped = newQuestions.map((q) {
+      return q.copyWith(
+        teacherId: q.teacherId ?? _currentUser?.id,
+        creatorName: q.creatorName ?? _currentUser?.fullName,
+      );
+    }).toList();
+
+    _questions.addAll(stamped);
     notifyListeners();
     try {
       final batch = db.batch();
-      for (final q in newQuestions) {
+      for (final q in stamped) {
         batch.set(db.collection('questions').doc(q.id), q.toMap());
       }
       await batch.commit();
@@ -2790,17 +2801,49 @@ class FirebaseService extends ChangeNotifier {
     }
   }
 
+  Future<void> updateQuestion(QuestionModel question) async {
+    final idx = _questions.indexWhere((q) => q.id == question.id);
+    if (idx != -1) {
+      _questions[idx] = question;
+    } else {
+      _questions.insert(0, question);
+    }
+    notifyListeners();
+    try {
+      await db.collection('questions').doc(question.id).set(question.toMap());
+    } catch (e) {
+      debugPrint('[Firestore] Error updating question: $e');
+    }
+  }
+
+  Future<void> deleteQuestion(String questionId) async {
+    _questions.removeWhere((q) => q.id == questionId);
+    notifyListeners();
+    try {
+      await db.collection('questions').doc(questionId).delete();
+    } catch (e) {
+      debugPrint('[Firestore] Error deleting question: $e');
+    }
+  }
+
   List<QuestionModel> getQuestions({
     required String subjectId,
     String? cpId,
     String? tpId,
     QuestionType? type,
+    String? teacherId,
   }) {
     return _questions.where((q) {
       if (q.subjectId != subjectId) return false;
       if (cpId != null && q.cpId != cpId) return false;
       if (tpId != null && q.tpId != tpId) return false;
       if (type != null && q.type != type) return false;
+      if (teacherId != null && teacherId.isNotEmpty) {
+        // If question has a teacherId, match it; if null/legacy, allow matching or filter
+        if (q.teacherId != null && q.teacherId!.isNotEmpty && q.teacherId != teacherId) {
+          return false;
+        }
+      }
       return true;
     }).toList();
   }

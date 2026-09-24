@@ -2,7 +2,6 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:firebase_core/firebase_core.dart' show Firebase;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/services/background_sync_service.dart';
 import 'core/services/fcm_service.dart';
@@ -124,19 +123,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       final result = await fbService.checkForAppUpdate();
       if (!mounted) return;
       if (result.hasUpdate) {
-        final prefs = await SharedPreferences.getInstance();
-        final dismissedVersion = prefs.getString('dismissed_update_version');
-        final dismissedAt = prefs.getInt('dismissed_update_at') ?? 0;
-        final dismissedTime = DateTime.fromMillisecondsSinceEpoch(dismissedAt);
-        final hoursSinceDismiss = DateTime.now().difference(dismissedTime).inHours;
-
-        // Skip hanya jika versi sama DAN belum 24 jam sejak dismiss
-        // (Force update tidak bisa di-skip)
-        if (!result.isForceUpdate &&
-            dismissedVersion == result.serverVersion?.latestVersion &&
-            hoursSinceDismiss < 24) {
-          return;
-        }
         if (!mounted) return;
         AppUpdateDialog.show(context, result);
       }

@@ -31,29 +31,25 @@ class CurvedHeaderCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF040D1F), // Deepest Navy
-            Color(0xFF071540), // Deep Navy
-            Color(0xFF0D2B6E), // Primary Navy
-            Color(0xFF1A4DB5), // Medium Navy
+            Color(0xFF060F1E), // Deepest Navy
+            Color(0xFF0A1931), // Deep Navy
+            Color(0xFF0F2552), // Primary Navy
+            Color(0xFF1E3A8A), // Medium Navy
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: const Color(0xFF0D2B6E).withAlpha(80),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: const Color(0xFFF97316).withAlpha(35),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Color(0x220A1931),
+            blurRadius: 16,
+            offset: Offset(0, 5),
+            spreadRadius: 0,
           ),
         ],
         border: Border.all(
-          color: Colors.white.withAlpha(25),
+          color: Colors.white.withAlpha(24),
           width: 1,
         ),
       ),

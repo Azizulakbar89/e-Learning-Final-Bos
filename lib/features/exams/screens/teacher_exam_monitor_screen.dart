@@ -351,14 +351,14 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
     final kkm = examSubject?.kkm ?? 75.0;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             CurvedHeaderCard(
               title: 'Ruang Pantau: ${currentExam.title}',
-              subtitle: 'Pantau Nilai, Integritas, dan Sesi Live Ujian',
+              subtitle: '${currentExam.category.fullLabel} • Pantau Nilai, Integritas & Sesi Siswa',
               actions: [
                 IconButton(
                   tooltip: 'Sinkronkan Nilai ke SidikMu (Sumatif)',
@@ -366,407 +366,638 @@ class _TeacherExamMonitorScreenState extends State<TeacherExamMonitorScreen> {
                   onPressed: () => _openSidikmuSumatifSync(context, currentExam, allSessions),
                 ),
                 IconButton(
-                  tooltip: 'Download Excel Nilai Ujian (Pilihan Per Kelas)',
+                  tooltip: 'Download Excel Nilai Ujian',
                   icon: const Icon(Icons.file_download_outlined, color: Colors.white, size: 20),
                   onPressed: () => _promptDownloadExcel(context, currentExam, allSessions),
                 ),
-                IconButton(
-                  tooltip: 'Duplikat Ujian ke Kelas Lain',
-                  icon: const Icon(Icons.copy_rounded, color: AppColors.orange, size: 20),
-                  onPressed: () => DuplicateExamDialog.show(context, currentExam),
-                ),
-                IconButton(
-                  tooltip: 'Edit Ujian Ini',
-                  icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ExamFormScreen(
-                        subjectId: currentExam.subjectId,
-                        existingExam: currentExam,
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Hapus Ujian Ini',
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                  onPressed: () => _confirmDeleteExam(context, fb, currentExam),
-                ),
-              ],
-            ),
-          // Control Bar: Toggle Anti-Cheat
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: currentExam.antiCheatEnabled ? Colors.red.shade50 : Colors.grey.shade100,
-            child: Row(
-              children: [
-                Icon(
-                  currentExam.antiCheatEnabled ? Icons.security_rounded : Icons.shield_outlined,
-                  color: currentExam.antiCheatEnabled ? Colors.red.shade800 : Colors.grey,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sistem Deteksi Kecurangan (Zero-Tolerance Anti-Cheat)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: currentExam.antiCheatEnabled ? Colors.red.shade900 : Colors.black87,
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
+                  tooltip: 'Menu Opsi Ujian',
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  onSelected: (value) {
+                    if (value == 'duplicate') {
+                      DuplicateExamDialog.show(context, currentExam);
+                    } else if (value == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ExamFormScreen(
+                            subjectId: currentExam.subjectId,
+                            existingExam: currentExam,
+                          ),
                         ),
-                      ),
-                      Text(
-                        currentExam.antiCheatEnabled
-                            ? 'Mode Ketat Aktif: Pindah aplikasi / notifikasi ditarik otomatis mengunci siswa.'
-                            : 'Mode Bebas: Deteksi kecurangan dinonaktifkan sementara.',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: currentExam.antiCheatEnabled,
-                  activeThumbColor: AppColors.rose,
-                  onChanged: (val) {
-                    fb.toggleExamAntiCheat(currentExam.id, val);
+                      );
+                    } else if (value == 'delete') {
+                      _confirmDeleteExam(context, fb, currentExam);
+                    }
                   },
-                ),
-              ],
-            ),
-          ),
-
-          // Class Filter Bar
-          if (classes.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.filter_list_rounded, size: 18, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Kelas:',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'duplicate',
                       child: Row(
                         children: [
-                          ChoiceChip(
-                            label: Text('Semua Kelas (${allSessions.length})'),
-                            selected: _selectedClassFilter == 'all',
-                            selectedColor: AppColors.primary.withAlpha(35),
-                            onSelected: (selected) {
-                              if (selected) setState(() => _selectedClassFilter = 'all');
-                            },
-                          ),
-                          const SizedBox(width: 6),
-                          ...classes.map((cls) {
-                            final count = allSessions
-                                .where((s) => s.studentClass.trim().toLowerCase() == cls.trim().toLowerCase())
-                                .length;
-                            final isSel = _selectedClassFilter.toLowerCase() == cls.toLowerCase();
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text('$cls ($count)'),
-                                selected: isSel,
-                                selectedColor: AppColors.primary.withAlpha(35),
-                                onSelected: (selected) {
-                                  setState(() {
-                                    _selectedClassFilter = selected ? cls : 'all';
-                                  });
-                                },
-                              ),
-                            );
-                          }),
+                          Icon(Icons.copy_rounded, color: Color(0xFFF97316), size: 18),
+                          SizedBox(width: 10),
+                          Text('Duplikat ke Kelas Lain', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         ],
                       ),
                     ),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, color: Color(0xFF0284C7), size: 18),
+                          SizedBox(width: 10),
+                          Text('Edit Pengaturan Ujian', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                          SizedBox(width: 10),
+                          Text('Hapus Jadwal Ujian', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // Control Bar: Toggle Anti-Cheat
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: currentExam.antiCheatEnabled ? const Color(0xFFFFF1F2) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: currentExam.antiCheatEnabled ? const Color(0xFFFECDD3) : AppColors.borderLight,
+                  width: currentExam.antiCheatEnabled ? 1.5 : 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (currentExam.antiCheatEnabled ? Colors.red : Colors.black).withAlpha(8),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-            ),
-
-          // Statistics Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildStatBadge(
-                    label: _selectedClassFilter == 'all' ? 'Total Peserta' : 'Peserta ($_selectedClassFilter)',
-                    value: '${displayedSessions.length}',
-                    color: AppColors.primary,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: currentExam.antiCheatEnabled ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      currentExam.antiCheatEnabled ? Icons.shield_rounded : Icons.shield_outlined,
+                      color: currentExam.antiCheatEnabled ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  _buildStatBadge(
-                    label: 'KKM Mapel',
-                    value: kkm.toStringAsFixed(0),
-                    color: AppColors.orange,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Zero-Tolerance Anti-Cheat',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: currentExam.antiCheatEnabled ? const Color(0xFF9F1239) : const Color(0xFF1E293B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: currentExam.antiCheatEnabled ? const Color(0xFFE11D48) : const Color(0xFF94A3B8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                currentExam.antiCheatEnabled ? 'AKTIF' : 'NONAKTIF',
+                                style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          currentExam.antiCheatEnabled
+                              ? 'Kunci layar otomatis saat siswa berpindah tab/aplikasi.'
+                              : 'Deteksi kecurangan dinonaktifkan sementara.',
+                          style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  _buildStatBadge(
-                    label: 'Tuntas KKM ✅',
-                    value: '${displayedSessions.where((s) => (s.finalScore ?? s.nonEssayScore ?? 0) >= kkm && s.isCompleted).length}',
-                    color: Colors.green,
-                  ),
-                  const SizedBox(width: 10),
-                  _buildStatBadge(
-                    label: 'Terkunci 🚨',
-                    value: '${displayedSessions.where((s) => s.isLocked).length}',
-                    color: AppColors.rose,
-                  ),
-                  const SizedBox(width: 10),
-                  _buildStatBadge(
-                    label: 'Selesai 📝',
-                    value: '${displayedSessions.where((s) => s.isCompleted).length}',
-                    color: AppColors.navy,
+                  Transform.scale(
+                    scale: 0.85,
+                    child: Switch(
+                      value: currentExam.antiCheatEnabled,
+                      activeTrackColor: const Color(0xFFE11D48),
+                      activeThumbColor: Colors.white,
+                      onChanged: (val) {
+                        fb.toggleExamAntiCheat(currentExam.id, val);
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          // Real-time Student Sessions Grid
-          Expanded(
-            child: displayedSessions.isEmpty
-                ? Center(
-                    child: Text(
-                      _selectedClassFilter == 'all'
-                          ? 'Belum ada siswa yang memulai ujian ini.'
-                          : 'Belum ada siswa kelas $_selectedClassFilter yang memulai ujian ini.',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            // Class Filter Bar
+            if (classes.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(14, 2, 14, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.filter_list_rounded, size: 16, color: Color(0xFF64748B)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Filter Kelas:',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFF334155)),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 56),
-                    itemCount: displayedSessions.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final s = displayedSessions[index];
-                      return Card(
-                        elevation: s.isLocked ? 3 : 1,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(
-                            color: s.isLocked ? AppColors.orangeDark : AppColors.borderLight,
-                            width: s.isLocked ? 2 : 1,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: s.isLocked
-                                        ? AppColors.orangeDark.withAlpha(30)
-                                        : AppColors.navy.withAlpha(20),
-                                    child: Icon(
-                                      s.isLocked ? Icons.lock : Icons.person,
-                                      color: s.isLocked ? AppColors.orangeDark : AppColors.navy,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          s.studentName,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                        ),
-                                        Text(
-                                          'NIS: ${s.studentNis} • Kelas: ${s.studentClass}',
-                                          style: const TextStyle(color: AppColors.textSecondaryLight, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  _buildStatusChip(s),
-                                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              label: Text('Semua (${allSessions.length})'),
+                              selected: _selectedClassFilter == 'all',
+                              selectedColor: AppColors.primary.withAlpha(30),
+                              labelStyle: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: _selectedClassFilter == 'all' ? FontWeight.bold : FontWeight.w500,
+                                color: _selectedClassFilter == 'all' ? AppColors.primary : const Color(0xFF475569),
                               ),
-
-                              if (s.isLocked) ...[
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.orangeDark.withAlpha(15),
-                                    borderRadius: BorderRadius.circular(8),
+                              onSelected: (selected) {
+                                if (selected) setState(() => _selectedClassFilter = 'all');
+                              },
+                            ),
+                            const SizedBox(width: 6),
+                            ...classes.map((cls) {
+                              final count = allSessions
+                                  .where((s) => s.studentClass.trim().toLowerCase() == cls.trim().toLowerCase())
+                                  .length;
+                              final isSel = _selectedClassFilter.toLowerCase() == cls.toLowerCase();
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text('$cls ($count)'),
+                                  selected: isSel,
+                                  selectedColor: AppColors.primary.withAlpha(30),
+                                  labelStyle: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                    color: isSel ? AppColors.primary : const Color(0xFF475569),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.warning_amber_rounded, color: AppColors.orangeDark, size: 16),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Pelanggaran (${s.violationCount}x): ${s.lastViolationReason ?? "Pindah aplikasi"}',
-                                          style: const TextStyle(color: AppColors.orangeDark, fontSize: 12, fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      _selectedClassFilter = selected ? cls : 'all';
+                                    });
+                                  },
                                 ),
-                              ],
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                              const SizedBox(height: 12),
-                              // Live Answer Progress Bar
-                              Row(
-                                children: [
-                                  Text(
-                                    'Jawaban Terisi: ${s.answers.length}/${currentExam.questionIds.length}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
-                                  const Spacer(),
-                                  if (s.finalScore != null) ...[
-                                    Builder(builder: (_) {
-                                      final scoreVal = s.finalScore!;
-                                      final isTuntas = scoreVal >= kkm;
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: isTuntas ? Colors.green.shade50 : Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: isTuntas ? Colors.green.shade200 : Colors.red.shade200),
-                                        ),
-                                        child: Text(
-                                          'Nilai: ${scoreVal.toStringAsFixed(1)} (KKM: ${kkm.toStringAsFixed(0)} • ${isTuntas ? "Tuntas" : "Remedial"})',
-                                          style: TextStyle(
-                                            color: isTuntas ? Colors.green.shade800 : Colors.red.shade800,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
-                                ],
+            // Statistics Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildStatBadge(
+                      label: _selectedClassFilter == 'all' ? 'Total Peserta' : 'Peserta ($_selectedClassFilter)',
+                      value: '${displayedSessions.length}',
+                      color: AppColors.primary,
+                      icon: Icons.people_alt_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatBadge(
+                      label: 'KKM Mapel',
+                      value: kkm.toStringAsFixed(0),
+                      color: const Color(0xFFF97316),
+                      icon: Icons.flag_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatBadge(
+                      label: 'Tuntas KKM',
+                      value: '${displayedSessions.where((s) => (s.finalScore ?? s.nonEssayScore ?? 0) >= kkm && s.isCompleted).length}',
+                      color: const Color(0xFF10B981),
+                      icon: Icons.check_circle_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatBadge(
+                      label: 'Terkunci 🚨',
+                      value: '${displayedSessions.where((s) => s.isLocked).length}',
+                      color: const Color(0xFFEF4444),
+                      icon: Icons.lock_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatBadge(
+                      label: 'Selesai 📝',
+                      value: '${displayedSessions.where((s) => s.isCompleted).length}',
+                      color: const Color(0xFF6366F1),
+                      icon: Icons.assignment_turned_in_rounded,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Real-time Student Sessions Grid
+            Expanded(
+              child: displayedSessions.isEmpty
+                  ? Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(28),
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(8),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
                               ),
-                              const Divider(height: 20),
-
-                              // Teacher Quick Control Buttons
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  if (s.isLocked)
-                                    FilledButton.icon(
-                                      style: FilledButton.styleFrom(backgroundColor: AppColors.orange),
-                                      icon: const Icon(Icons.lock_open, size: 16),
-                                      label: const Text('Buka Blokir (Unblock)'),
-                                      onPressed: () => fb.unblockExamSession(s.id),
-                                    ),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: s.antiCheatDisabledForStudent
-                                          ? AppColors.navy
-                                          : AppColors.orange,
-                                      side: BorderSide(
-                                        color: s.antiCheatDisabledForStudent
-                                            ? AppColors.navy
-                                            : AppColors.orange.withAlpha(120),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withAlpha(20),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.sensors_rounded,
+                                  size: 40,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Ruang Pantau Siaga',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _selectedClassFilter == 'all'
+                                    ? 'Belum ada siswa yang mulai mengerjakan "${currentExam.title}". Progres jawaban, skor, dan status integritas anti-cheat akan muncul otomatis secara real-time di sini.'
+                                    : 'Belum ada siswa dari kelas $_selectedClassFilter yang memulai ujian ini.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.school_rounded, size: 14, color: Color(0xFF475569)),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Target Kelas: ${classes.join(", ")}',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF475569),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    icon: Icon(
-                                      s.antiCheatDisabledForStudent
-                                          ? Icons.shield_outlined
-                                          : Icons.gpp_bad_outlined,
-                                      size: 16,
-                                    ),
-                                    label: Text(
-                                      s.antiCheatDisabledForStudent
-                                          ? 'Cheat: Dinonaktifkan'
-                                          : 'Nonaktifkan Cheat Siswa',
-                                    ),
-                                    onPressed: () {
-                                      final newStatus = !s.antiCheatDisabledForStudent;
-                                      fb.toggleStudentAntiCheat(s.id, newStatus);
-                                      if (newStatus) {
-                                        AppSnackBar.warning(
-                                          context,
-                                          'Anti-Cheat DINONAKTIFKAN khusus untuk ${s.studentName}. Siswa bebas bernavigasi tanpa penguncian.',
-                                        );
-                                      } else {
-                                        AppSnackBar.info(
-                                          context,
-                                          'Anti-Cheat DIAKTIFKAN kembali untuk ${s.studentName}.',
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.refresh, size: 16),
-                                    label: const Text('Hapus Cache Akun (Safe)'),
-                                    onPressed: () {
-                                      fb.clearExamSessionCache(s.id);
-                                      AppSnackBar.info(
-                                        context,
-                                        'Cache sesi siswa disegarkan. Jawaban tetap tersimpan utuh.',
-                                      );
-                                    },
-                                  ),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.rose),
-                                    icon: const Icon(Icons.restart_alt, size: 16),
-                                    label: const Text('Reset Jawaban'),
-                                    onPressed: () => _confirmReset(context, fb, s),
-                                  ),
-                                  if (s.isCompleted)
-                                    FilledButton.tonalIcon(
-                                      icon: const Icon(Icons.rate_review_outlined, size: 16),
-                                      label: const Text('Nilai Esai (Skala 1-5)'),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => EssayGradingScreen(exam: currentExam, session: s),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 56),
+                      itemCount: displayedSessions.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final s = displayedSessions[index];
+                        return Card(
+                          elevation: s.isLocked ? 3 : 1,
+                          margin: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: s.isLocked ? const Color(0xFFEF4444) : AppColors.borderLight,
+                              width: s.isLocked ? 1.8 : 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: s.isLocked
+                                          ? const Color(0xFFFEE2E2)
+                                          : AppColors.primary.withAlpha(20),
+                                      child: Icon(
+                                        s.isLocked ? Icons.lock_rounded : Icons.person_rounded,
+                                        color: s.isLocked ? const Color(0xFFDC2626) : AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            s.studentName,
+                                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
+                                          ),
+                                          Text(
+                                            'NIS: ${s.studentNis} • Kelas: ${s.studentClass}',
+                                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _buildStatusChip(s),
+                                  ],
+                                ),
+
+                                if (s.isLocked) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF1F2),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFFECDD3)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Pelanggaran (${s.violationCount}x): ${s.lastViolationReason ?? "Pindah aplikasi / layar"}',
+                                            style: const TextStyle(color: Color(0xFF9F1239), fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                const SizedBox(height: 12),
+                                // Live Answer Progress Bar
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Jawaban Terisi: ${s.answers.length}/${currentExam.questionIds.length}',
+                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF334155)),
+                                    ),
+                                    const Spacer(),
+                                    if (s.finalScore != null) ...[
+                                      Builder(builder: (_) {
+                                        final scoreVal = s.finalScore!;
+                                        final isTuntas = scoreVal >= kkm;
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: isTuntas ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: isTuntas ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5)),
+                                          ),
+                                          child: Text(
+                                            'Nilai: ${scoreVal.toStringAsFixed(1)} (${isTuntas ? "Tuntas" : "Remedial"})',
+                                            style: TextStyle(
+                                              color: isTuntas ? const Color(0xFF166534) : const Color(0xFF991B1B),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ],
+                                ),
+                                const Divider(height: 20),
+
+                                // Teacher Quick Control Buttons
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    if (s.isLocked)
+                                      FilledButton.icon(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: const Color(0xFFF97316),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        icon: const Icon(Icons.lock_open_rounded, size: 16),
+                                        label: const Text('Buka Blokir (Unblock)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        onPressed: () => fb.unblockExamSession(s.id),
+                                      ),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        foregroundColor: s.antiCheatDisabledForStudent
+                                            ? AppColors.navy
+                                            : const Color(0xFFEA580C),
+                                        side: BorderSide(
+                                          color: s.antiCheatDisabledForStudent
+                                              ? AppColors.navy
+                                              : const Color(0xFFEA580C).withAlpha(120),
+                                        ),
+                                      ),
+                                      icon: Icon(
+                                        s.antiCheatDisabledForStudent
+                                            ? Icons.shield_outlined
+                                            : Icons.gpp_bad_outlined,
+                                        size: 15,
+                                      ),
+                                      label: Text(
+                                        s.antiCheatDisabledForStudent
+                                            ? 'Cheat: Nonaktif'
+                                            : 'Bebaskan Cheat Siswa',
+                                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                      ),
+                                      onPressed: () {
+                                        final newStatus = !s.antiCheatDisabledForStudent;
+                                        fb.toggleStudentAntiCheat(s.id, newStatus);
+                                        if (newStatus) {
+                                          AppSnackBar.warning(
+                                            context,
+                                            'Anti-Cheat DINONAKTIFKAN khusus untuk ${s.studentName}. Siswa bebas bernavigasi tanpa penguncian.',
+                                          );
+                                        } else {
+                                          AppSnackBar.info(
+                                            context,
+                                            'Anti-Cheat DIAKTIFKAN kembali untuk ${s.studentName}.',
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.refresh_rounded, size: 15),
+                                      label: const Text('Refresh Cache', style: TextStyle(fontSize: 11.5)),
+                                      onPressed: () {
+                                        fb.clearExamSessionCache(s.id);
+                                        AppSnackBar.info(
+                                          context,
+                                          'Cache sesi siswa disegarkan. Jawaban tetap tersimpan utuh.',
+                                        );
+                                      },
+                                    ),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFEF4444),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.restart_alt_rounded, size: 15),
+                                      label: const Text('Reset Jawaban', style: TextStyle(fontSize: 11.5)),
+                                      onPressed: () => _confirmReset(context, fb, s),
+                                    ),
+                                    if (s.isCompleted)
+                                      FilledButton.tonalIcon(
+                                        style: FilledButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        icon: const Icon(Icons.rate_review_outlined, size: 15),
+                                        label: const Text('Nilai Esai', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => EssayGradingScreen(exam: currentExam, session: s),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatBadge({
+    required String label,
+    required String value,
+    required Color color,
+    IconData? icon,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 105),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withAlpha(50)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(12),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-    ),
-  );
-}
-
-  Widget _buildStatBadge({required String label, required String value, required Color color}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withAlpha(15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withAlpha(40)),
-        ),
-        child: Column(
-          children: [
-            Text(value, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: const Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

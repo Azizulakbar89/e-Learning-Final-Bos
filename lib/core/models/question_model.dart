@@ -86,6 +86,8 @@ class QuestionModel {
   final String subjectId;
   final String? cpId;
   final String? tpId;
+  final String? teacherId;
+  final String? creatorName;
   final QuestionType type;
   final String content; // Text / WYSIWYG
   final String? equationLatex; // Math formula in LaTeX
@@ -101,6 +103,8 @@ class QuestionModel {
     required this.subjectId,
     this.cpId,
     this.tpId,
+    this.teacherId,
+    this.creatorName,
     required this.type,
     required this.content,
     this.equationLatex,
@@ -120,6 +124,8 @@ class QuestionModel {
       'subject_id': subjectId,
       'cp_id': cpId,
       'tp_id': tpId,
+      'teacher_id': teacherId,
+      'creator_name': creatorName,
       'question_type': type.code,
       'content': content,
       'equation_latex': equationLatex,
@@ -138,6 +144,8 @@ class QuestionModel {
       subjectId: map['subject_id'] ?? '',
       cpId: map['cp_id'],
       tpId: map['tp_id'],
+      teacherId: map['teacher_id'],
+      creatorName: map['creator_name'],
       type: QuestionTypeExtension.fromString(map['question_type'] ?? 'single'),
       content: map['content'] ?? '',
       equationLatex: map['equation_latex'],
@@ -157,6 +165,8 @@ class QuestionModel {
     String? subjectId,
     String? cpId,
     String? tpId,
+    String? teacherId,
+    String? creatorName,
     QuestionType? type,
     String? content,
     String? equationLatex,
@@ -172,6 +182,8 @@ class QuestionModel {
       subjectId: subjectId ?? this.subjectId,
       cpId: cpId ?? this.cpId,
       tpId: tpId ?? this.tpId,
+      teacherId: teacherId ?? this.teacherId,
+      creatorName: creatorName ?? this.creatorName,
       type: type ?? this.type,
       content: content ?? this.content,
       equationLatex: equationLatex ?? this.equationLatex,

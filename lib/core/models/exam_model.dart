@@ -1,3 +1,46 @@
+enum ExamCategory {
+  quiz,
+  harian,
+  pts,
+  pas;
+
+  String get label {
+    switch (this) {
+      case ExamCategory.quiz:
+        return 'Quiz';
+      case ExamCategory.harian:
+        return 'Harian';
+      case ExamCategory.pts:
+        return 'PTS';
+      case ExamCategory.pas:
+        return 'PAS';
+    }
+  }
+
+  String get fullLabel {
+    switch (this) {
+      case ExamCategory.quiz:
+        return 'Kuis Interaktif';
+      case ExamCategory.harian:
+        return 'Penilaian Harian (PH)';
+      case ExamCategory.pts:
+        return 'Penilaian Tengah Semester (PTS)';
+      case ExamCategory.pas:
+        return 'Penilaian Akhir Semester (PAS)';
+    }
+  }
+
+  static ExamCategory fromString(String? val) {
+    if (val == null) return ExamCategory.harian;
+    final normalized = val.toLowerCase().trim();
+    if (normalized == 'quiz' || normalized == 'kuis') return ExamCategory.quiz;
+    if (normalized == 'harian' || normalized == 'ph' || normalized == 'ulangan harian') return ExamCategory.harian;
+    if (normalized == 'pts' || normalized == 'uts') return ExamCategory.pts;
+    if (normalized == 'pas' || normalized == 'pat' || normalized == 'uas') return ExamCategory.pas;
+    return ExamCategory.harian;
+  }
+}
+
 class ExamModel {
   final String id;
   final String subjectId;
@@ -5,6 +48,7 @@ class ExamModel {
   final List<String> classIds;
   final String title;
   final String description;
+  final ExamCategory category;
   final int durationMinutes;
   final bool antiCheatEnabled; // Toggleable by teacher during exam
   final List<String> questionIds;
@@ -19,6 +63,7 @@ class ExamModel {
     required this.classIds,
     required this.title,
     required this.description,
+    this.category = ExamCategory.harian,
     this.durationMinutes = 60,
     this.antiCheatEnabled = true,
     required this.questionIds,
@@ -35,6 +80,7 @@ class ExamModel {
       'class_ids': classIds,
       'title': title,
       'description': description,
+      'category': category.name,
       'duration_minutes': durationMinutes,
       'anti_cheat_enabled': antiCheatEnabled,
       'question_ids': questionIds,
@@ -52,6 +98,7 @@ class ExamModel {
       classIds: List<String>.from(map['class_ids'] ?? []),
       title: map['title'] ?? '',
       description: map['description'] ?? '',
+      category: ExamCategory.fromString(map['category'] ?? map['type']),
       durationMinutes: (map['duration_minutes'] as num?)?.toInt() ?? 60,
       antiCheatEnabled: map['anti_cheat_enabled'] ?? true,
       questionIds: List<String>.from(map['question_ids'] ?? []),
@@ -70,6 +117,7 @@ class ExamModel {
     List<String>? classIds,
     String? title,
     String? description,
+    ExamCategory? category,
     int? durationMinutes,
     bool? antiCheatEnabled,
     List<String>? questionIds,
@@ -84,6 +132,7 @@ class ExamModel {
       classIds: classIds ?? this.classIds,
       title: title ?? this.title,
       description: description ?? this.description,
+      category: category ?? this.category,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       antiCheatEnabled: antiCheatEnabled ?? this.antiCheatEnabled,
       questionIds: questionIds ?? this.questionIds,

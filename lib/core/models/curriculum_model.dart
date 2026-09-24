@@ -90,6 +90,8 @@ class CurriculumCpModel {
       description: map['description'] ?? '',
     );
   }
+  String get desc => description;
+
   CurriculumCpModel copyWith({
     String? id,
     String? subjectId,
@@ -147,6 +149,8 @@ class CurriculumTpModel {
       description: map['description'] ?? '',
     );
   }
+
+  String get desc => description;
 
   CurriculumTpModel copyWith({
     String? id,

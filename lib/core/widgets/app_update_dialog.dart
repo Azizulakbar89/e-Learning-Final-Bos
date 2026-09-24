@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_colors.dart';
 import '../models/app_version_model.dart';
@@ -27,9 +26,9 @@ class AppUpdateDialog extends StatefulWidget {
   ) async {
     await showDialog(
       context: context,
-      barrierDismissible: !result.isForceUpdate,
+      barrierDismissible: false,
       builder: (ctx) => PopScope(
-        canPop: !result.isForceUpdate,
+        canPop: false,
         child: AppUpdateDialog(updateResult: result),
       ),
     );
@@ -314,13 +313,17 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.orange, AppColors.orangeDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withAlpha(80),
+                      color: AppColors.orange.withAlpha(80),
                       blurRadius: 18,
-                      offset: const Offset(0, 8),
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -334,7 +337,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
 
               // Title
               Text(
-                'Pembaruan Tersedia!',
+                'Pembaruan Wajib Tersedia!',
                 style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -348,9 +351,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: const Color(0xFFF0F4F8),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -365,38 +368,40 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                     ),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF3B82F6)),
+                      child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.orange),
                     ),
                     Text(
                       'v$newVersion',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1D4ED8),
+                        color: AppColors.navy,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: const Color(0xFFFFF7ED),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                  border: Border.all(color: const Color(0xFFFED7AA)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.bolt_rounded, size: 15, color: Color(0xFF059669)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Langsung ke Versi Terkini (1x Download)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF065F46),
+                    Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFEA580C)),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Aplikasi wajib diperbarui untuk dapat digunakan',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFC2410C),
+                        ),
                       ),
                     ),
                   ],
@@ -473,12 +478,12 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               // Action Buttons
               SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 50,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppColors.orange,
                     foregroundColor: Colors.white,
-                    elevation: 2,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -490,40 +495,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.download_rounded, size: 20),
+                      : const Icon(Icons.system_update_rounded, size: 20),
                   label: Text(
                     _isDownloading ? 'Mengunduh Pembaruan...' : 'Perbarui Sekarang 🚀',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-
-              if (!widget.updateResult.isForceUpdate && !_isDownloading) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: TextButton(
-                    onPressed: () async {
-                      try {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString('dismissed_update_version', newVersion);
-                        // Simpan waktu dismiss agar popup muncul lagi setelah 24 jam
-                        await prefs.setInt('dismissed_update_at', DateTime.now().millisecondsSinceEpoch);
-                      } catch (_) {}
-                      if (context.mounted) Navigator.pop(context);
-                    },
-                    child: const Text(
-                      'Nanti Saja',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

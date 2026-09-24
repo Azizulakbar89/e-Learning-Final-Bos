@@ -37,9 +37,9 @@ class UserModel {
     this.sidikmuLastSyncedAt,
   });
 
-  bool get isSiswa => role == 'siswa';
-  bool get isGuru => role == 'guru';
-  bool get isAdmin => role == 'admin';
+  bool get isSiswa => role.trim().toLowerCase() == 'siswa' || role.trim().toLowerCase() == 'student';
+  bool get isGuru => role.trim().toLowerCase() == 'guru' || role.trim().toLowerCase() == 'teacher';
+  bool get isAdmin => role.trim().toLowerCase() == 'admin';
   bool get hasSidikmuAccount =>
       (sidikmuUsername != null && sidikmuUsername!.trim().isNotEmpty) &&
       (sidikmuPassword != null && sidikmuPassword!.isNotEmpty);

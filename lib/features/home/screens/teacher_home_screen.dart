@@ -15,9 +15,9 @@ import '../../../core/services/sidikmu_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/app_nav_rail.dart';
 import '../../../core/widgets/app_update_dialog.dart';
+import '../../../core/widgets/exam_category_badge.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/universal_app_header.dart';
-import '../../code_compiler/screens/code_playground_screen.dart';
 import '../../curriculum_and_questions/screens/cp_tp_manager_screen.dart';
 import '../../curriculum_and_questions/screens/missing_images_validator_screen.dart';
 import '../../curriculum_and_questions/screens/question_bank_screen.dart';
@@ -43,6 +43,7 @@ class TeacherHomeScreen extends StatefulWidget {
 class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   String _activeSubjectId = 'subj_web';
   int _currentNavIndex = 0;
+  final Set<String> _notifiedLockedSessionIds = {};
 
   static const _navItems = [
     AppNavRailItem(
@@ -96,6 +97,83 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     final materials = _activeSubjectId.isEmpty
         ? allTeacherMaterials
         : allTeacherMaterials.where((m) => m.subjectId == _activeSubjectId).toList();
+
+    // ─── Real-Time Alert for newly locked students ───
+    final teacherExamIds = allTeacherExams.map((e) => e.id).toSet();
+    final teacherStudents = fb.getTeacherStudents(currentUser);
+    final teacherStudentIds = teacherStudents.map((s) => s.id).toSet();
+
+    final lockedSessions = fb.examSessions.where((s) {
+      return s.isLocked && (teacherExamIds.contains(s.examId) || teacherStudentIds.contains(s.studentId));
+    }).toList();
+
+    for (final s in lockedSessions) {
+      if (!_notifiedLockedSessionIds.contains(s.id)) {
+        _notifiedLockedSessionIds.add(s.id);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final exam = fb.exams.where((e) => e.id == s.examId).firstOrNull;
+          final examTitle = exam?.title ?? 'Kuis / Ujian';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              ),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+              duration: const Duration(seconds: 7),
+              content: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withAlpha(35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.lock_person_rounded, color: Color(0xFFEF4444), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Siswa Terkunci!',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: const Color(0xFFFCA5A5),
+                          ),
+                        ),
+                        Text(
+                          '${s.studentName} (${s.studentClass.isNotEmpty ? s.studentClass : "Kelas"}) terdeteksi keluar aplikasi pada "$examTitle"',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              action: SnackBarAction(
+                label: 'BUKA KUNCI',
+                textColor: const Color(0xFF38BDF8),
+                onPressed: () {
+                  _showLockedStudentsModal(context, fb, currentUser);
+                },
+              ),
+            ),
+          );
+        });
+      }
+    }
+
+    final currentLockedIds = lockedSessions.map((s) => s.id).toSet();
+    _notifiedLockedSessionIds.removeWhere((id) => !currentLockedIds.contains(id));
 
     final List<Widget> pages = [
       _TeacherDashboardPage(
@@ -207,12 +285,16 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                 child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
               ),
               const SizedBox(width: 10),
-              Text(
-                'e-learning spemdalas',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  'e-learning spemdalas',
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -342,6 +424,292 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       ),
     );
   }
+}
+
+// ─── LOCKED STUDENTS MODAL ──────────────────────────────────────────────────
+void _showLockedStudentsModal(BuildContext context, FirebaseService fb, dynamic currentUser) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Consumer<FirebaseService>(
+        builder: (context, fbService, _) {
+          final teacherStudents = fbService.getTeacherStudents(currentUser);
+          final teacherStudentIds = teacherStudents.map((s) => s.id).toSet();
+          final teacherExams = fbService.getTeacherExams(currentUser);
+          final teacherExamIds = teacherExams.map((e) => e.id).toSet();
+
+          final lockedSessions = fbService.examSessions.where((s) {
+            return s.isLocked &&
+                (teacherExamIds.contains(s.examId) || teacherStudentIds.contains(s.studentId));
+          }).toList();
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (lockedSessions.isNotEmpty ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withAlpha(25),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        lockedSessions.isNotEmpty ? Icons.lock_person_rounded : Icons.verified_user_rounded,
+                        color: lockedSessions.isNotEmpty ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daftar Siswa Terkunci',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          Text(
+                            lockedSessions.isNotEmpty
+                                ? '${lockedSessions.length} siswa perlu dibuka kuncinya'
+                                : 'Semua sesi ujian siswa berjalan normal',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                if (lockedSessions.isEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFECFDF5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 40),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Tidak Ada Siswa Terkunci',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Seluruh siswa mengerjakan ujian dengan lancar tanpa pelanggaran anti-cheat.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: lockedSessions.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 10),
+                      itemBuilder: (context, idx) {
+                        final s = lockedSessions[idx];
+                        final exam = fbService.exams.where((e) => e.id == s.examId).firstOrNull;
+
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFFECACA)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: const Color(0xFFEF4444).withAlpha(30),
+                                    child: const Icon(Icons.person_rounded, color: Color(0xFFDC2626), size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          s.studentName,
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14.5,
+                                            color: const Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Kelas: ${s.studentClass.isNotEmpty ? s.studentClass : "-"} • NIS: ${s.studentNis}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.lock_rounded, size: 12, color: Colors.white),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${s.violationCount}x Pelanggaran',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.quiz_rounded, size: 14, color: Color(0xFFEA580C)),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        exam?.title ?? 'Ujian Siswa',
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: const Color(0xFF334155),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (exam != null) ...[
+                                      const SizedBox(width: 6),
+                                      ExamCategoryBadge(category: exam.category),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: () {
+                                        fbService.unblockExamSession(s.id);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Kunci ujian untuk ${s.studentName} berhasil dibuka!'),
+                                            backgroundColor: const Color(0xFF10B981),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.lock_open_rounded, size: 16),
+                                      label: const Text('Buka Kunci Sekarang'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF10B981),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                                  if (exam != null) ...[
+                                    const SizedBox(width: 8),
+                                    OutlinedButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => TeacherExamMonitorScreen(exam: exam),
+                                          ),
+                                        );
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        side: const BorderSide(color: Color(0xFF94A3B8)),
+                                      ),
+                                      child: const Text('Monitor', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
 // ─── DASHBOARD PAGE ──────────────────────────────────────────────────────────
@@ -486,7 +854,7 @@ class _TeacherDashboardPage extends StatelessWidget {
               ],
 
               // Stats Overview
-              _buildStatsRow(isWide),
+              _buildStatsRow(context, isWide),
               const SizedBox(height: 20),
 
               // Missing images alert
@@ -558,7 +926,7 @@ class _TeacherDashboardPage extends StatelessWidget {
   }
 
 
-  Widget _buildStatsRow(bool isWide) {
+  Widget _buildStatsRow(BuildContext context, bool isWide) {
     final teacherStudents = fb.getTeacherStudents(currentUser);
     final teacherStudentIds = teacherStudents.map((s) => s.id).toSet();
     final teacherClasses = fb.getTeacherClasses(currentUser);
@@ -574,32 +942,51 @@ class _TeacherDashboardPage extends StatelessWidget {
 
     final stats = [
       _StatItem(
-        Icons.people_alt_rounded,
-        teacherStudents.length.toString(),
-        'Siswa Binaan',
-        isOrange: false,
+        icon: Icons.people_alt_rounded,
+        value: teacherStudents.length.toString(),
+        label: 'Siswa Binaan',
+        primaryColor: const Color(0xFF2563EB),
+        lightColor: const Color(0xFFEFF6FF),
+        borderColor: const Color(0xFFBFDBFE),
         badgeText: '${teacherClasses.length} Rombel',
+        badgeColor: const Color(0xFF2563EB),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const StudentRosterScreen()),
+        ),
       ),
       _StatItem(
-        Icons.quiz_rounded,
-        exams.length.toString(),
-        'Ujian Aktif',
-        isOrange: true,
+        icon: Icons.quiz_rounded,
+        value: exams.length.toString(),
+        label: 'Ujian Aktif',
+        primaryColor: const Color(0xFF7C3AED),
+        lightColor: const Color(0xFFF5F3FF),
+        borderColor: const Color(0xFFDDD6FE),
         badgeText: 'Tersedia',
+        badgeColor: const Color(0xFF7C3AED),
+        onTap: onNavigateToQuiz,
       ),
       _StatItem(
-        Icons.visibility_rounded,
-        liveStudents.toString(),
-        'Sedang Ujian',
-        isOrange: true,
+        icon: Icons.visibility_rounded,
+        value: liveStudents.toString(),
+        label: 'Sedang Ujian',
+        primaryColor: const Color(0xFF059669),
+        lightColor: const Color(0xFFECFDF5),
+        borderColor: const Color(0xFFA7F3D0),
         badgeText: liveStudents > 0 ? 'Live' : 'Kosong',
+        badgeColor: const Color(0xFF059669),
+        onTap: onNavigateToQuiz,
       ),
       _StatItem(
-        Icons.lock_rounded,
-        lockedStudents.toString(),
-        'Terkunci',
-        isOrange: false,
-        badgeText: lockedStudents > 0 ? 'Perlu Cek' : 'Aman',
+        icon: lockedStudents > 0 ? Icons.lock_person_rounded : Icons.lock_rounded,
+        value: lockedStudents.toString(),
+        label: 'Terkunci',
+        primaryColor: lockedStudents > 0 ? const Color(0xFFDC2626) : const Color(0xFF475569),
+        lightColor: lockedStudents > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
+        borderColor: lockedStudents > 0 ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
+        badgeText: lockedStudents > 0 ? 'Perlu Buka' : 'Aman',
+        badgeColor: lockedStudents > 0 ? const Color(0xFFDC2626) : const Color(0xFF10B981),
+        onTap: () => _showLockedStudentsModal(context, fb, currentUser),
       ),
     ];
 
@@ -619,7 +1006,7 @@ class _TeacherDashboardPage extends StatelessWidget {
         Row(
           children: [
             Expanded(child: _buildStatCard(stats[0], isWide)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(stats[1], isWide)),
           ],
         ),
@@ -627,7 +1014,7 @@ class _TeacherDashboardPage extends StatelessWidget {
         Row(
           children: [
             Expanded(child: _buildStatCard(stats[2], isWide)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(stats[3], isWide)),
           ],
         ),
@@ -636,121 +1023,90 @@ class _TeacherDashboardPage extends StatelessWidget {
   }
 
   Widget _buildStatCard(_StatItem stat, bool isWide) {
-    final isOrange = stat.isOrange;
-    final primaryColor = isOrange ? const Color(0xFFEA580C) : const Color(0xFF0D2B6E);
-    final gradientColors = isOrange
-        ? const [Color(0xFFFFEDD5), Color(0xFFFFF7ED), Colors.white]
-        : const [Color(0xFFDBEAFE), Color(0xFFEFF6FF), Colors.white];
-    final borderColor = isOrange ? const Color(0xFFFDBA74) : const Color(0xFF93C5FD);
-    final iconGradient = isOrange
-        ? const LinearGradient(
-            colors: [Color(0xFFEA580C), Color(0xFFF97316)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : const LinearGradient(
-            colors: [Color(0xFF0D2B6E), Color(0xFF2563EB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          );
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.3),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withAlpha(22),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Row(
-          children: [
-            // Vibrant gradient icon container
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                gradient: iconGradient,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withAlpha(45),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+        onTap: stat.onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: stat.borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: stat.primaryColor.withAlpha(14),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-              child: Icon(stat.icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        stat.value,
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 22,
-                          color: isOrange ? const Color(0xFF9A3412) : const Color(0xFF071540),
-                          letterSpacing: -0.5,
-                          height: 1.0,
-                        ),
-                      ),
-                      if (stat.badgeText != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: borderColor),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryColor.withAlpha(15),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: stat.lightColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: stat.borderColor),
+                ),
+                child: Icon(stat.icon, color: stat.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          stat.value,
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                            color: const Color(0xFF0F172A),
+                            letterSpacing: -0.5,
+                            height: 1.0,
                           ),
-                          child: Text(
-                            stat.badgeText!,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: primaryColor,
+                        ),
+                        if (stat.badgeText != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: stat.lightColor,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: stat.borderColor),
+                            ),
+                            child: Text(
+                              stat.badgeText!,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: stat.badgeColor ?? stat.primaryColor,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    stat.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isOrange ? const Color(0xFF9A3412) : const Color(0xFF475569),
-                      fontWeight: FontWeight.w600,
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Text(
+                      stat.label,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -766,77 +1122,109 @@ class _TeacherDashboardPage extends StatelessWidget {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFBFDBFE)),
               ),
-              child: const Icon(Icons.layers_rounded, color: Color(0xFF0D2B6E), size: 14),
+              child: const Icon(Icons.layers_rounded, color: Color(0xFF1E40AF), size: 14),
             ),
             const SizedBox(width: 8),
             Text(
-              'Mata Pelajaran:',
-              style: TextStyle(
+              'Mata Pelajaran Diampu:',
+              style: GoogleFonts.outfit(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: isWide ? Colors.white70 : const Color(0xFF071540),
+                color: isWide ? Colors.white70 : const Color(0xFF0F172A),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           child: Row(
             children: displaySubjects.map((s) {
               final isActive = s.id == activeSubjectId;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
                   onTap: () => onSubjectChanged(s.id),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFF0D2B6E) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: isActive
+                          ? const LinearGradient(
+                              colors: [Color(0xFF0A1931), Color(0xFF1E3A8A)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isActive ? null : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isActive ? const Color(0xFF0D2B6E) : const Color(0xFFCBD5E1),
-                        width: 1.2,
+                        color: isActive ? const Color(0xFF1E3A8A) : const Color(0xFFE2E8F0),
+                        width: isActive ? 1.5 : 1,
                       ),
                       boxShadow: isActive
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF0D2B6E).withAlpha(40),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                                color: const Color(0xFF1E3A8A).withAlpha(45),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ]
-                          : null,
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(6),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (isActive) ...[
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF97316),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          '${s.name} (${s.code})',
-                          style: TextStyle(
-                            color: isActive ? Colors.white : const Color(0xFF334155),
-                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                            fontSize: 12,
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: isActive ? const Color(0xFFF97316) : Colors.grey.shade400,
+                            shape: BoxShape.circle,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          s.name,
+                          style: GoogleFonts.outfit(
+                            color: isActive ? Colors.white : const Color(0xFF334155),
+                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        if (s.code.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isActive ? Colors.white.withAlpha(25) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              s.code,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isActive ? Colors.white70 : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -861,47 +1249,49 @@ class _TeacherDashboardPage extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.analytics_rounded, size: 16, color: AppColors.primary),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Rata-Rata Nilai Per Kelas',
-                      style: GoogleFonts.outfit(
-                        fontSize: isWide ? 16 : 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: isWide ? Colors.white : AppColors.textPrimaryLight,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  child: const Icon(Icons.analytics_rounded, size: 15, color: Color(0xFF2563EB)),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Rata-Rata Nilai Per Kelas',
+                  style: GoogleFonts.outfit(
+                    fontSize: isWide ? 16 : 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: isWide ? Colors.white : const Color(0xFF0F172A),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              'Klik untuk rincian',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${classes.length} Rombel',
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 115,
+          height: 120,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             itemCount: classes.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 10),
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, idx) {
               final cls = classes[idx];
               final summary = fb.getClassScoreSummary(cls, subjectId: activeSubjectId);
@@ -909,10 +1299,15 @@ class _TeacherDashboardPage extends StatelessWidget {
               final int studentCount = summary['totalStudents'] as int;
 
               final Color scoreColor = avg >= 80
-                  ? AppColors.emerald
+                  ? const Color(0xFF059669)
                   : (avg >= 70
-                      ? const Color(0xFF3B82F6)
-                      : (avg >= 60 ? const Color(0xFFF59E0B) : AppColors.rose));
+                      ? const Color(0xFF2563EB)
+                      : (avg >= 60 ? const Color(0xFFD97706) : const Color(0xFFDC2626)));
+              final Color scoreBg = avg >= 80
+                  ? const Color(0xFFECFDF5)
+                  : (avg >= 70
+                      ? const Color(0xFFEFF6FF)
+                      : (avg >= 60 ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2)));
 
               return Material(
                 color: Colors.transparent,
@@ -925,35 +1320,31 @@ class _TeacherDashboardPage extends StatelessWidget {
                     subjectName: activeSubject?.name,
                   ),
                   child: Container(
-                    width: 200,
+                    width: 210,
                     decoration: BoxDecoration(
                       gradient: isWide
                           ? null
                           : const LinearGradient(
-                              colors: [Color(0xFFEFF6FF), Colors.white],
+                              colors: [Color(0xFFF8FAFC), Colors.white],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                       color: isWide ? AppColors.surfaceDark : null,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: isWide
-                            ? scoreColor.withAlpha(60)
-                            : const Color(0xFFBFDBFE),
+                        color: isWide ? scoreColor.withAlpha(60) : const Color(0xFFE2E8F0),
                         width: 1.2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: isWide
-                              ? Colors.black.withAlpha(30)
-                              : const Color(0xFF0D2B6E).withAlpha(15),
+                          color: const Color(0x0A0F172A),
                           blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -961,29 +1352,33 @@ class _TeacherDashboardPage extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Flexible(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A).withAlpha(8),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
                                 child: Text(
                                   cls,
                                   style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13.5,
-                                    color: isWide ? Colors.white : Colors.black87,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    color: const Color(0xFF0F172A),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: scoreColor.withAlpha(20),
+                                  color: scoreBg,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: scoreColor.withAlpha(60)),
+                                  border: Border.all(color: scoreColor.withAlpha(50)),
                                 ),
                                 child: Text(
                                   avg > 0 ? avg.toStringAsFixed(1) : '-',
-                                  style: TextStyle(
+                                  style: GoogleFonts.outfit(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                     color: scoreColor,
@@ -992,37 +1387,32 @@ class _TeacherDashboardPage extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
                           Row(
                             children: [
-                              Icon(Icons.people_outline_rounded,
-                                  size: 14,
-                                  color: isWide ? Colors.grey.shade400 : Colors.grey.shade500),
-                              const SizedBox(width: 4),
+                              Icon(Icons.people_alt_rounded, size: 14, color: Colors.grey.shade500),
+                              const SizedBox(width: 5),
                               Text(
-                                '$studentCount Siswa',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isWide ? Colors.grey.shade400 : Colors.grey.shade600,
+                                '$studentCount Siswa Terdaftar',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
                           Row(
                             children: [
                               Text(
-                                'Lihat Nilai Siswa',
+                                'Lihat Rincian Nilai',
                                 style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: scoreColor,
                                 ),
                               ),
-                              const SizedBox(width: 2),
-                              Icon(Icons.chevron_right_rounded, size: 14, color: scoreColor),
+                              const SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_rounded, size: 13, color: scoreColor),
                             ],
                           ),
                         ],
@@ -1050,37 +1440,38 @@ class _TeacherDashboardPage extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.emerald.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.menu_book_rounded, size: 16, color: AppColors.emerald),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Progress Materi Belajar Per Kelas',
-                      style: GoogleFonts.outfit(
-                        fontSize: isWide ? 16 : 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: isWide ? Colors.white : AppColors.textPrimaryLight,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  child: const Icon(Icons.menu_book_rounded, size: 15, color: Color(0xFF059669)),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Progress Materi Belajar',
+                  style: GoogleFonts.outfit(
+                    fontSize: isWide ? 16 : 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: isWide ? Colors.white : const Color(0xFF0F172A),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              'Klik untuk rincian',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Per Kelas',
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              ),
             ),
           ],
         ),
@@ -1089,8 +1480,9 @@ class _TeacherDashboardPage extends StatelessWidget {
           height: 125,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             itemCount: classes.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 10),
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, idx) {
               final cls = classes[idx];
               final summary = fb.getClassMaterialProgressSummary(cls, activeSubjectId);
@@ -1101,7 +1493,7 @@ class _TeacherDashboardPage extends StatelessWidget {
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                   onTap: () => ClassMaterialProgressDialog.show(
                     context,
                     classId: cls,
@@ -1109,27 +1501,27 @@ class _TeacherDashboardPage extends StatelessWidget {
                     subjectName: activeSubject?.name,
                   ),
                   child: Container(
-                    width: 195,
-                    padding: const EdgeInsets.all(12),
+                    width: 210,
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       gradient: isWide
                           ? null
                           : const LinearGradient(
-                              colors: [Color(0xFFFFF7ED), Colors.white],
+                              colors: [Color(0xFFFFFBEB), Colors.white],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                       color: isWide ? AppColors.surfaceDark : null,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: isWide ? AppColors.borderDark.withAlpha(80) : const Color(0xFFFED7AA),
+                        color: const Color(0xFFFDE68A),
                         width: 1.2,
                       ),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: isWide ? Colors.black.withAlpha(20) : const Color(0xFFEA580C).withAlpha(15),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
+                          color: Color(0x0A0F172A),
+                          blurRadius: 10,
+                          offset: Offset(0, 3),
                         ),
                       ],
                     ),
@@ -1140,63 +1532,54 @@ class _TeacherDashboardPage extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Flexible(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A).withAlpha(8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                               child: Text(
                                 cls,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.5,
-                                  color: isWide ? Colors.white : Colors.black87,
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: const Color(0xFF0F172A),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 4),
                             Text(
                               '${avgProgress.toInt()}% Selesai',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11.5,
-                                color: AppColors.emerald,
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                color: const Color(0xFF059669),
                               ),
                             ),
                           ],
                         ),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(6),
                           child: LinearProgressIndicator(
                             value: (avgProgress / 100).clamp(0.0, 1.0),
                             minHeight: 6,
-                            backgroundColor: isWide ? Colors.white12 : Colors.grey.shade200,
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.emerald),
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                           ),
                         ),
-                        Text(
-                          '$studentCount Siswa • $totalClassMaterials Materi',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: isWide ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Flexible(
-                              child: Text(
-                                'Lihat Progress Anak',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.emerald,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              '$studentCount Siswa • $totalClassMaterials Materi',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            SizedBox(width: 2),
-                            Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.emerald),
+                            const Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF059669)),
                           ],
                         ),
                       ],
@@ -1282,18 +1665,19 @@ class _TeacherDashboardPage extends StatelessWidget {
         title: 'Bank Soal',
         subtitle: '5 Tipe & LaTeX',
         icon: Icons.quiz_outlined,
-        isOrange: false, // Navy
+        primaryColor: const Color(0xFF2563EB),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => QuestionBankScreen(initialSubjectId: activeSubjectId)),
+            builder: (_) => QuestionBankScreen(initialSubjectId: activeSubjectId),
+          ),
         ),
       ),
       _ActionCard(
         title: 'Kelola CP & TP',
         subtitle: 'Capaian & Tujuan',
         icon: Icons.account_tree_outlined,
-        isOrange: true, // Orange
+        primaryColor: const Color(0xFFEA580C),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CpTpManagerScreen()),
@@ -1303,7 +1687,7 @@ class _TeacherDashboardPage extends StatelessWidget {
         title: 'Kelola Kelas',
         subtitle: 'Daftar Kelas Sekolah',
         icon: Icons.meeting_room_outlined,
-        isOrange: true, // Orange
+        primaryColor: const Color(0xFFEA580C),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SchoolClassManagerScreen()),
@@ -1313,32 +1697,11 @@ class _TeacherDashboardPage extends StatelessWidget {
         title: 'Data Siswa',
         subtitle: 'NIS, Akun & Nilai',
         icon: Icons.people_alt_outlined,
-        isOrange: false, // Navy
+        primaryColor: const Color(0xFF2563EB),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const StudentRosterScreen()),
         ),
-      ),
-      _ActionCard(
-        title: 'Code IDE',
-        subtitle: 'HTML, JS, PHP...',
-        icon: Icons.terminal_rounded,
-        isOrange: false, // Navy
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CodePlaygroundScreen()),
-        ),
-      ),
-      _ActionCard(
-        title: 'Daftar Kuis',
-        subtitle: 'Kelola Ujian Aktif',
-        icon: Icons.assignment_outlined,
-        isOrange: true, // Orange
-        onTap: () {
-          if (onNavigateToQuiz != null) {
-            onNavigateToQuiz!();
-          }
-        },
       ),
     ];
 
@@ -1355,13 +1718,13 @@ class _TeacherDashboardPage extends StatelessWidget {
 
     final rows = <Widget>[];
     for (int i = 0; i < actions.length; i += 2) {
-      if (i > 0) rows.add(const SizedBox(height: 12));
+      if (i > 0) rows.add(const SizedBox(height: 10));
       final hasSecond = i + 1 < actions.length;
       rows.add(
         Row(
           children: [
             Expanded(child: _buildActionCardWidget(actions[i], isWide)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: hasSecond
                   ? _buildActionCardWidget(actions[i + 1], isWide)
@@ -1379,24 +1742,6 @@ class _TeacherDashboardPage extends StatelessWidget {
   }
 
   Widget _buildActionCardWidget(_ActionCard card, bool isWide) {
-    final isOrange = card.isOrange;
-    final primaryColor = isOrange ? const Color(0xFFEA580C) : const Color(0xFF0D2B6E);
-    final gradientColors = isOrange
-        ? const [Color(0xFFFFEDD5), Color(0xFFFFF7ED), Colors.white]
-        : const [Color(0xFFDBEAFE), Color(0xFFEFF6FF), Colors.white];
-    final borderColor = isOrange ? const Color(0xFFFDBA74) : const Color(0xFF93C5FD);
-    final iconGradient = isOrange
-        ? const LinearGradient(
-            colors: [Color(0xFFEA580C), Color(0xFFF97316)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : const LinearGradient(
-            colors: [Color(0xFF0D2B6E), Color(0xFF2563EB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          );
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1404,95 +1749,67 @@ class _TeacherDashboardPage extends StatelessWidget {
         onTap: card.onTap,
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: borderColor,
-              width: 1.3,
-            ),
-            boxShadow: [
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
               BoxShadow(
-                color: primaryColor.withAlpha(20),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Color(0x080F172A),
+                blurRadius: 8,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: card.primaryColor.withAlpha(18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(card.icon, color: card.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: iconGradient,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withAlpha(45),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                    Text(
+                      card.title,
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: const Color(0xFF0F172A),
                       ),
-                      child: Icon(card.icon, color: Colors.white, size: 20),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: borderColor.withAlpha(120)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withAlpha(18),
-                            blurRadius: 4,
-                          ),
-                        ],
+                    const SizedBox(height: 2),
+                    Text(
+                      card.subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
                       ),
-                      child: Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 12,
-                        color: primaryColor,
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  card.title,
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: isOrange ? const Color(0xFF7C2D12) : const Color(0xFF071540),
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              ),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  card.subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isOrange ? const Color(0xFF9A3412) : const Color(0xFF475569),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+                child: const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF94A3B8)),
+              ),
+            ],
           ),
         ),
       ),
@@ -1505,18 +1822,47 @@ class _TeacherDashboardPage extends StatelessWidget {
         Expanded(
           child: _sectionTitle('Pantau Ujian Real-Time', isWide),
         ),
-        FilledButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ExamFormScreen(subjectId: activeSubjectId)),
+        Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEA580C), Color(0xFFF97316)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF97316).withAlpha(60),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Buat Ujian'),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ExamFormScreen(subjectId: activeSubjectId)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Buat Ujian',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -1539,48 +1885,76 @@ class _TeacherDashboardPage extends StatelessWidget {
     final liveSessions = fb.examSessions.where((s) => s.examId == exam.id).toList();
     final lockedCount = liveSessions.where((s) => s.isLocked).length;
     final hasIssue = lockedCount > 0;
+    final isLive = liveSessions.isNotEmpty;
     final examModel = exam is ExamModel ? exam : null;
     final classList = (exam.classIds is List) ? (exam.classIds as List).cast<String>() : <String>[];
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isWide ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => TeacherExamMonitorScreen(exam: exam)),
+        border: Border.all(
+          color: hasIssue
+              ? const Color(0xFFFDA4AF)
+              : (isWide ? AppColors.borderDark.withAlpha(80) : const Color(0xFFE2E8F0)),
+          width: hasIssue ? 1.5 : 1,
         ),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: isWide ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: hasIssue
-                  ? AppColors.rose.withAlpha(120)
-                  : (isWide ? AppColors.borderDark.withAlpha(80) : AppColors.borderLight),
-            ),
-            boxShadow: hasIssue
-                ? [BoxShadow(color: AppColors.rose.withAlpha(30), blurRadius: 12)]
-                : null,
+        boxShadow: [
+          BoxShadow(
+            color: hasIssue
+                ? const Color(0xFFF43F5E).withAlpha(20)
+                : const Color(0xFF0F172A).withAlpha(8),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => TeacherExamMonitorScreen(exam: exam)),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Icon + Title + Subtitle
+                // Top Row: Device Icon + Title + Status Badges
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
-                        color: (hasIssue ? AppColors.rose : AppColors.primary).withAlpha(20),
+                        gradient: LinearGradient(
+                          colors: hasIssue
+                              ? [const Color(0xFFFFE4E6), const Color(0xFFFECDD3)]
+                              : (isLive
+                                  ? [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)]
+                                  : [const Color(0xFFFFF7ED), const Color(0xFFFFEDD5)]),
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: hasIssue
+                              ? const Color(0xFFFDA4AF)
+                              : (isLive ? const Color(0xFF86EFAC) : const Color(0xFFFED7AA)),
+                          width: 1,
+                        ),
                       ),
                       child: Icon(
-                        hasIssue ? Icons.lock_person_rounded : Icons.desktop_windows_rounded,
-                        color: hasIssue ? AppColors.rose : AppColors.primary,
+                        hasIssue
+                            ? Icons.lock_person_rounded
+                            : (isLive ? Icons.sensors_rounded : Icons.computer_rounded),
+                        color: hasIssue
+                            ? const Color(0xFFE11D48)
+                            : (isLive ? const Color(0xFF16A34A) : const Color(0xFFEA580C)),
                         size: 20,
                       ),
                     ),
@@ -1589,76 +1963,172 @@ class _TeacherDashboardPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              ExamCategoryBadge(category: exam.category),
+                              const SizedBox(width: 6),
+                              if (isLive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF86EFAC)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF16A34A),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'LIVE',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF15803D),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
                           Text(
                             exam.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: isWide ? Colors.white : AppColors.textPrimaryLight,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
+                              color: isWide ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${classList.isEmpty ? "Semua Kelas" : classList.join(", ")} • ${liveSessions.length} Peserta',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isWide ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                            ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.groups_rounded, size: 13, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${classList.isEmpty ? "Semua Kelas" : classList.join(", ")}  •  ${liveSessions.length} Peserta',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 const Divider(height: 1, color: Color(0xFFF1F5F9)),
                 const SizedBox(height: 10),
 
-                // Bottom Action Bar: Horizontal actions without redundant chips
+                // Bottom Action Bar
                 Row(
                   children: [
                     if (hasIssue)
-                      _examChip(
-                        '$lockedCount Terkunci',
-                        Icons.lock_rounded,
-                        AppColors.orangeDark,
-                        isWide,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE4E6),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDA4AF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.lock_rounded, size: 11, color: Color(0xFFE11D48)),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$lockedCount Terkunci',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFE11D48),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     const Spacer(),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => TeacherExamMonitorScreen(exam: exam)),
+                    // Monitor button
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: hasIssue
+                              ? [const Color(0xFFE11D48), const Color(0xFFF43F5E)]
+                              : [const Color(0xFFEA580C), const Color(0xFFF97316)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (hasIssue ? const Color(0xFFE11D48) : const Color(0xFFEA580C)).withAlpha(50),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      icon: const Icon(Icons.visibility_rounded, size: 14),
-                      label: const Text('Monitor'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: hasIssue ? AppColors.orangeDark : AppColors.orange,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 12),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TeacherExamMonitorScreen(exam: exam),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.remove_red_eye_rounded, size: 13, color: Colors.white),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Monitor',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     if (examModel != null)
-                      IconButton(
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        padding: const EdgeInsets.all(6),
-                        tooltip: 'Duplikat Ujian ke Kelas Lain',
-                        icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.orange),
-                        onPressed: () => DuplicateExamDialog.show(context, examModel),
+                      _buildMiniActionButton(
+                        icon: Icons.copy_rounded,
+                        color: const Color(0xFFEA580C),
+                        tooltip: 'Duplikat Ujian',
+                        onTap: () => DuplicateExamDialog.show(context, examModel),
                       ),
-                    IconButton(
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: const EdgeInsets.all(6),
+                    _buildMiniActionButton(
+                      icon: Icons.edit_outlined,
+                      color: const Color(0xFF2563EB),
                       tooltip: 'Edit Ujian',
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.navyMid),
-                      onPressed: () => Navigator.push(
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => ExamFormScreen(
@@ -1668,12 +2138,11 @@ class _TeacherDashboardPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: const EdgeInsets.all(6),
+                    _buildMiniActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: const Color(0xFFE11D48),
                       tooltip: 'Hapus Ujian',
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.orangeDark),
-                      onPressed: () => _confirmDeleteExam(context, exam),
+                      onTap: () => _confirmDeleteExam(context, exam),
                     ),
                   ],
                 ),
@@ -1681,6 +2150,28 @@ class _TeacherDashboardPage extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMiniActionButton({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(15),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        padding: const EdgeInsets.all(6),
+        tooltip: tooltip,
+        icon: Icon(icon, size: 16, color: color),
+        onPressed: onTap,
       ),
     );
   }
@@ -1720,55 +2211,58 @@ class _TeacherDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _examChip(String label, IconData icon, Color color, bool isWide) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 150),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: color),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMaterialHeader(BuildContext context, bool isWide) {
     return Row(
       children: [
         Expanded(child: _sectionTitle('Materi Pelajaran', isWide)),
-        FilledButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => MaterialFormScreen(subjectId: activeSubjectId)),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withAlpha(40),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Tambah'),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1E293B),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MaterialFormScreen(subjectId: activeSubjectId),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Tambah',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
+
+
 
   Widget _buildMaterialList(BuildContext context, bool isWide) {
     if (materials.isEmpty) {
@@ -1811,94 +2305,161 @@ class _TeacherDashboardPage extends StatelessWidget {
 
     final schedDt = material.scheduledOpenAt;
     final schedStr = schedDt != null
-        ? '🕒 Buka: ${schedDt.day.toString().padLeft(2, '0')}/${schedDt.month.toString().padLeft(2, '0')}/${schedDt.year}'
+        ? 'Buka: ${schedDt.day.toString().padLeft(2, '0')}/${schedDt.month.toString().padLeft(2, '0')}/${schedDt.year}'
         : null;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isWide ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isWide ? AppColors.borderDark.withAlpha(80) : AppColors.borderLight,
+          color: isWide ? AppColors.borderDark.withAlpha(80) : const Color(0xFFE2E8F0),
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0F172A),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => MaterialDetailScreen(material: material)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(25),
-                      borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => MaterialDetailScreen(material: material)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withAlpha(60)),
+                      ),
+                      child: Icon(icon, color: color, size: 20),
                     ),
-                    child: Icon(icon, color: color, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          material.title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: isWide ? Colors.white : AppColors.textPrimaryLight,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            material.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: isWide ? Colors.white : const Color(0xFF0F172A),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Kelas: ${material.classIds.map((cid) => fb.schoolClasses.where((c) => c.id == cid).firstOrNull?.name ?? cid).join(", ")}  •  $label'
-                          '${schedStr != null ? '  •  $schedStr' : ''}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isWide
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+                          const SizedBox(height: 3),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '•',
+                                style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
+                              ),
+                              Text(
+                                material.classIds.map((cid) => fb.schoolClasses.where((c) => c.id == cid).firstOrNull?.name ?? cid).join(", "),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              if (schedStr != null) ...[
+                                Text(
+                                  '•',
+                                  style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.schedule_rounded, size: 11, color: Color(0xFFEA580C)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      schedStr,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFFEA580C),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Edit Materi',
-                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF3B82F6)),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MaterialFormScreen(
-                          subjectId: material.subjectId,
-                          existingMaterial: material,
+                    const SizedBox(width: 8),
+                    _buildMiniActionButton(
+                      icon: Icons.edit_outlined,
+                      color: const Color(0xFF2563EB),
+                      tooltip: 'Edit Materi',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MaterialFormScreen(
+                            subjectId: material.subjectId,
+                            existingMaterial: material,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Hapus Materi',
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                    onPressed: () => _confirmDeleteMaterial(context, material),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.chevron_right_rounded,
-                      size: 18,
-                      color: isWide ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                ],
-              ),
+                    _buildMiniActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: const Color(0xFFE11D48),
+                      tooltip: 'Hapus Materi',
+                      onTap: () => _confirmDeleteMaterial(context, material),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ],
+                ),
 
-              // Assignment badge + download row
-              if (assignBadgeLabel != null || assignment != null) ...
-                [
+                // Assignment badge + download row
+                if (assignBadgeLabel != null || assignment != null) ...[
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1912,10 +2473,10 @@ class _TeacherDashboardPage extends StatelessWidget {
                           ),
                           child: Text(
                             assignBadgeLabel,
-                            style: TextStyle(
-                              fontSize: 10,
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
                               color: assignBadgeColor,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1947,32 +2508,33 @@ class _TeacherDashboardPage extends StatelessWidget {
                               child: Row(children: [
                                 const Icon(Icons.download_rounded, size: 16, color: AppColors.primary),
                                 const SizedBox(width: 8),
-                                Text('Download Nilai Kelas $className'),
+                                Text('Download Nilai Kelas $className', style: GoogleFonts.outfit(fontSize: 13)),
                               ]),
                             );
                           }).toList(),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.emerald.withAlpha(20),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppColors.emerald.withAlpha(80)),
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFA7F3D0)),
                             ),
                             child: Row(children: [
-                              const Icon(Icons.download_rounded, size: 13, color: AppColors.emerald),
+                              const Icon(Icons.download_rounded, size: 13, color: Color(0xFF059669)),
                               const SizedBox(width: 4),
                               Text('Unduh Nilai',
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.emerald,
-                                      fontWeight: FontWeight.bold)),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      color: const Color(0xFF059669),
+                                      fontWeight: FontWeight.w700)),
                             ]),
                           ),
                         ),
                     ],
                   ),
                 ],
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2068,15 +2630,23 @@ class _StatItem {
   final IconData icon;
   final String value;
   final String label;
-  final bool isOrange;
+  final Color primaryColor;
+  final Color lightColor;
+  final Color borderColor;
   final String? badgeText;
+  final Color? badgeColor;
+  final VoidCallback? onTap;
 
-  const _StatItem(
-    this.icon,
-    this.value,
-    this.label, {
-    this.isOrange = false,
+  const _StatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.primaryColor,
+    required this.lightColor,
+    required this.borderColor,
     this.badgeText,
+    this.badgeColor,
+    this.onTap,
   });
 }
 
@@ -2084,14 +2654,14 @@ class _ActionCard {
   final String title;
   final String subtitle;
   final IconData icon;
-  final bool isOrange;
+  final Color primaryColor;
   final VoidCallback onTap;
 
   const _ActionCard({
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.isOrange = false,
+    required this.primaryColor,
     required this.onTap,
   });
 }
@@ -2117,13 +2687,29 @@ class _TeacherExamsPage extends StatefulWidget {
 }
 
 class _TeacherExamsPageState extends State<_TeacherExamsPage> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
   String? _filterSubjectId;
   String _filterClass = 'all';
+  String _filterCategory = 'all';
 
   @override
   void initState() {
     super.initState();
     _filterSubjectId = 'all';
+    _filterClass = 'all';
+    _filterCategory = 'all';
+    _searchCtrl.addListener(() {
+      setState(() {
+        _searchQuery = _searchCtrl.text.trim();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   void _promptExportExcel(BuildContext context, ExamModel currentExam, List<ExamSessionModel> allSessions) {
@@ -2302,6 +2888,12 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
     final teacherClasses = fb.getTeacherClasses(widget.currentUser);
 
     final exams = allExams.where((e) {
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchTitle = e.title.toLowerCase().contains(query);
+        final matchDesc = e.description.toLowerCase().contains(query);
+        if (!matchTitle && !matchDesc) return false;
+      }
       if (_filterSubjectId != null && _filterSubjectId != 'all') {
         if (e.subjectId != _filterSubjectId) return false;
       }
@@ -2309,6 +2901,9 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
         if (e.classIds.isNotEmpty && !e.classIds.contains(_filterClass)) {
           return false;
         }
+      }
+      if (_filterCategory != 'all') {
+        if (e.category.name != _filterCategory) return false;
       }
       return true;
     }).toList();
@@ -2491,103 +3086,188 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Filter Subject Chips
-                    if (displaySubjects.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          const Icon(Icons.layers_rounded, size: 14, color: Color(0xFF64748B)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Mapel: ',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                    // Filter Panel: Search + 3 Dropdowns (Matching Design Model)
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(6),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        height: 38,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: const Text('Semua Mapel'),
-                                selected: _filterSubjectId == null || _filterSubjectId == 'all',
-                                onSelected: (sel) {
-                                  if (sel) setState(() => _filterSubjectId = 'all');
-                                },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Search Input
+                          TextField(
+                            controller: _searchCtrl,
+                            style: GoogleFonts.outfit(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Cari judul materi atau deskripsi...',
+                              hintStyle: GoogleFonts.outfit(color: const Color(0xFF94A3B8), fontSize: 13),
+                              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      onPressed: () => _searchCtrl.clear(),
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: const Color(0xFFF1F5F9),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                            ...displaySubjects.map((s) {
-                              final sel = _filterSubjectId == s.id;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ChoiceChip(
-                                  label: Text(s.name),
-                                  selected: sel,
-                                  onSelected: (selected) {
-                                    if (selected) {
-                                      setState(() => _filterSubjectId = s.id);
-                                    }
-                                  },
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
+                          ),
+                          const SizedBox(height: 12),
 
-                    // Filter Class Chips
-                    if (teacherClasses.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          const Icon(Icons.groups_rounded, size: 14, color: Color(0xFF64748B)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Kelas: ',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        height: 38,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: const Text('Semua Kelas'),
-                                selected: _filterClass == 'all',
-                                onSelected: (sel) {
-                                  if (sel) setState(() => _filterClass = 'all');
+                          // Dropdown 1: Mapel (Full Width)
+                          _buildFilterDropdown(
+                            icon: Icons.menu_book_rounded,
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: (displaySubjects.any((s) => s.id == _filterSubjectId) || _filterSubjectId == 'all')
+                                    ? _filterSubjectId
+                                    : 'all',
+                                isExpanded: true,
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                                items: [
+                                  const DropdownMenuItem(
+                                    value: 'all',
+                                    child: Text('Semua Materi / Mapel'),
+                                  ),
+                                  ...displaySubjects.map((s) => DropdownMenuItem(
+                                        value: s.id,
+                                        child: Text(s.name, overflow: TextOverflow.ellipsis),
+                                      )),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _filterSubjectId = val);
+                                  }
                                 },
                               ),
                             ),
-                            ...teacherClasses.map((cls) {
-                              final sel = _filterClass == cls;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ChoiceChip(
-                                  label: Text(cls),
-                                  selected: sel,
-                                  onSelected: (selected) {
-                                    if (selected) {
-                                      setState(() => _filterClass = cls);
-                                    }
-                                  },
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Row: Dropdown 2 (Target Kelas) & Dropdown 3 (Jenis Tugas / Ujian)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildFilterDropdown(
+                                  icon: Icons.school_rounded,
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: (teacherClasses.contains(_filterClass) || _filterClass == 'all')
+                                          ? _filterClass
+                                          : 'all',
+                                      isExpanded: true,
+                                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                                      items: [
+                                        const DropdownMenuItem(
+                                          value: 'all',
+                                          child: Text('Semua Kelas'),
+                                        ),
+                                        ...teacherClasses.map((cls) => DropdownMenuItem(
+                                              value: cls,
+                                              child: Text('Kelas $cls', overflow: TextOverflow.ellipsis),
+                                            )),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() => _filterClass = val);
+                                        }
+                                      },
+                                    ),
+                                  ),
                                 ),
-                              );
-                            }),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _buildFilterDropdown(
+                                  icon: Icons.assignment_outlined,
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _filterCategory,
+                                      isExpanded: true,
+                                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                                      items: [
+                                        const DropdownMenuItem(
+                                          value: 'all',
+                                          child: Text('Semua Jenis Ujian'),
+                                        ),
+                                        ...ExamCategory.values.map((cat) => DropdownMenuItem(
+                                              value: cat.name,
+                                              child: Text(cat.label, overflow: TextOverflow.ellipsis),
+                                            )),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() => _filterCategory = val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Reset button if filters applied
+                          if ((_filterSubjectId != null && _filterSubjectId != 'all') ||
+                              _filterClass != 'all' ||
+                              _filterCategory != 'all' ||
+                              _searchQuery.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _searchCtrl.clear();
+                                    _filterSubjectId = 'all';
+                                    _filterClass = 'all';
+                                    _filterCategory = 'all';
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.refresh_rounded, size: 14, color: AppColors.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Reset Filter',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                    ],
+                    ),
+                    const SizedBox(height: 16),
 
                     // Section Title
                     Row(
@@ -2689,12 +3369,21 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              exam.title,
-                                              style: GoogleFonts.outfit(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                              ),
+                                            Row(
+                                              children: [
+                                                ExamCategoryBadge(category: exam.category),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    exam.title,
+                                                    style: GoogleFonts.outfit(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 15,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                             const SizedBox(height: 4),
                                             Wrap(
@@ -2817,6 +3506,28 @@ class _TeacherExamsPageState extends State<_TeacherExamsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(child: child),
+        ],
       ),
     );
   }
@@ -3382,24 +4093,58 @@ class _TeacherProfilePage extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary.withAlpha(20),
-                                  foregroundColor: AppColors.primary,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    side: BorderSide(color: AppColors.primary.withAlpha(80)),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _showEditProfileDialog(context),
+                                  borderRadius: BorderRadius.circular(20),
+                                  splashColor: AppColors.primary.withAlpha(30),
+                                  highlightColor: AppColors.primary.withAlpha(15),
+                                  child: Ink(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.primary.withAlpha(24),
+                                          AppColors.primary.withAlpha(12),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: AppColors.primary.withAlpha(90),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withAlpha(20),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.edit_note_rounded,
+                                          size: 16,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Edit Profil',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                onPressed: () => _showEditProfileDialog(context),
-                                icon: const Icon(Icons.edit_outlined, size: 13),
-                                label: Text(
-                                  'Edit Profil',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
@@ -3633,20 +4378,52 @@ class _TeacherProfilePage extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              ElevatedButton(
-                                onPressed: () => _showSidikmuAccountDialog(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0284C7),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  elevation: 0,
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: Text(
-                                  (user?.hasSidikmuAccount == true) ? 'Kelola' : 'Tautkan',
-                                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _showSidikmuAccountDialog(context),
+                                  borderRadius: BorderRadius.circular(20),
+                                  splashColor: Colors.white24,
+                                  child: Ink(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0284C7).withAlpha(80),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          (user?.hasSidikmuAccount == true)
+                                              ? Icons.tune_rounded
+                                              : Icons.link_rounded,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          (user?.hasSidikmuAccount == true) ? 'Kelola' : 'Tautkan',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -3709,28 +4486,11 @@ class _TeacherProfilePage extends StatelessWidget {
                       ),
                     ),
                     _buildToolTile(
-                      icon: Icons.code_rounded,
-                      color: const Color(0xFFF59E0B),
-                      title: 'Code Compiler IDE',
-                      subtitle: 'Playground kode HTML, CSS, JS, & Arduino',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CodePlaygroundScreen()),
-                      ),
-                    ),
-                    _buildToolTile(
                       icon: Icons.notifications_active_rounded,
                       color: const Color(0xFF0D9488),
                       title: 'Uji Pop-Up Notifikasi',
                       subtitle: 'Tes pop-up status bar HP & banner melayang seketika',
                       onTap: () => FcmService.triggerTestNotification(context),
-                    ),
-                    _buildToolTile(
-                      icon: Icons.copy_rounded,
-                      color: const Color(0xFF059669),
-                      title: 'Salin Token FCM Perangkat',
-                      subtitle: 'Salin token perangkat untuk uji kirim pesan dari Firebase Console',
-                      onTap: () => FcmService.copyTokenToClipboard(context),
                     ),
                     _buildToolTile(
                       icon: Icons.system_update_rounded,
@@ -3893,36 +4653,37 @@ class _TeacherOvalBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const activeColor = AppColors.primary;
     final items = [
       const _TeacherNavItem(
         icon: Icons.home_outlined,
         activeIcon: Icons.home_rounded,
         label: 'Home',
-        color: AppColors.primary,
+        color: activeColor,
       ),
       const _TeacherNavItem(
         icon: Icons.quiz_outlined,
         activeIcon: Icons.quiz_rounded,
         label: 'Quiz',
-        color: AppColors.rose,
+        color: activeColor,
       ),
       const _TeacherNavItem(
         icon: Icons.menu_book_outlined,
         activeIcon: Icons.menu_book_rounded,
         label: 'Materi',
-        color: AppColors.primary,
+        color: activeColor,
       ),
       const _TeacherNavItem(
         icon: Icons.chat_bubble_outline_rounded,
         activeIcon: Icons.chat_bubble_rounded,
         label: 'Pesan',
-        color: Color(0xFF0284C7),
+        color: activeColor,
       ),
       const _TeacherNavItem(
         icon: Icons.person_outline_rounded,
         activeIcon: Icons.person_rounded,
         label: 'Profile',
-        color: AppColors.purple,
+        color: activeColor,
       ),
     ];
 
@@ -3934,19 +4695,8 @@ class _TeacherOvalBottomNav extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(20),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: AppColors.primary.withAlpha(12),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+            boxShadow: AppColors.floatingShadow,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: Row(
@@ -4035,4 +4785,5 @@ class _TeacherNavItem {
     required this.color,
   });
 }
+
 

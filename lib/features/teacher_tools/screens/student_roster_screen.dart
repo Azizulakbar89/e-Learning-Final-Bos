@@ -58,73 +58,86 @@ class _StudentRosterScreenState extends State<StudentRosterScreen> {
               title: 'Data Siswa & Kredensial Akun',
               subtitle: 'Manajemen Akun & Reset Kredensial Siswa',
             ),
-          // Header description
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: AppColors.primary.withAlpha(15),
-            child: Row(
-              children: [
-                const Icon(Icons.security_outlined, color: AppColors.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Guru pengampu berhak melihat NIS dan password akun siswa binaan untuk keperluan pendampingan teknis dan reset sandi di sekolah.',
-                    style: TextStyle(fontSize: 12, color: AppColors.primaryDark),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Taught classes info pill
-          if (taughtClasses.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.groups_rounded, size: 15, color: Color(0xFF1E3A8A)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Menampilkan ${filteredStudents.length} siswa binaan • Kelas: ${taughtClasses.join(", ")}',
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Filters
+          // Filters (Search bar + Modern Pill Dropdown)
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Cari nama atau NIS siswa...',
-                      prefixIcon: const Icon(Icons.search),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    onChanged: (val) => setState(() => _searchQuery = val),
+                    child: TextField(
+                      style: GoogleFonts.outfit(fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Cari nama atau NIS siswa...',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                DropdownButton<String>(
-                  value: activeFilter,
-                  items: filterItems.map((c) {
-                    return DropdownMenuItem(value: c, child: Text(c));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedClassFilter = val);
-                  },
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(5),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: activeFilter,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary, size: 20),
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E293B),
+                      ),
+                      items: filterItems.map((c) {
+                        return DropdownMenuItem(
+                          value: c,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                c == 'Semua Kelas' ? Icons.apps_rounded : Icons.class_outlined,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(c),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedClassFilter = val);
+                      },
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -174,95 +187,163 @@ class _StudentRosterScreenState extends State<StudentRosterScreen> {
                           ? studentExams.map((e) => e.finalScore!).reduce((a, b) => a + b) / studentExams.length
                           : 88.5; // Baseline good score
 
-                      return Card(
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(color: AppColors.borderLight),
+                      return Container(
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(6),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: AppColors.primaryLight.withAlpha(50),
-                                    child: Text(
-                                      student.fullName.isNotEmpty ? student.fullName[0] : 'S',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          student.fullName,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                        ),
-                                        Text(
-                                          'Kelas: ${student.classId ?? "-"} • NIS: ${student.nis ?? "-"}',
-                                          style: const TextStyle(color: AppColors.textSecondaryLight, fontSize: 13),
-                                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary.withAlpha(40),
+                                        AppColors.primary.withAlpha(15),
                                       ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.primary.withAlpha(70)),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      student.fullName.isNotEmpty ? student.fullName[0].toUpperCase() : 'S',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student.fullName,
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.5,
+                                          color: const Color(0xFF1E293B),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Kelas: ${student.className ?? student.classId ?? "-"} • NIS: ${student.nis ?? "-"}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star_rounded, size: 14, color: Color(0xFF059669)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Nilai: ${avgGrade.toStringAsFixed(1)}',
+                                        style: GoogleFonts.outfit(
+                                          color: const Color(0xFF059669),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 10),
+
+                            // Credential Display for Teacher (Protected from overflow)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.vpn_key_rounded, size: 15, color: Color(0xFFF59E0B)),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'Password: ',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                                  ),
+                                  Expanded(
+                                    child: SelectableText(
+                                      student.initialPassword ?? 'siswa12345',
+                                      style: GoogleFonts.firaCode(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFEA580C),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                     decoration: BoxDecoration(
-                                      color: AppColors.emerald.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(20),
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFFDE68A)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.grade_rounded, size: 16, color: AppColors.emerald),
-                                        const SizedBox(width: 4),
                                         Text(
-                                          'Nilai: ${avgGrade.toStringAsFixed(1)}',
+                                          '${student.totalPoints}',
                                           style: const TextStyle(
-                                            color: AppColors.emerald,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 13,
+                                            color: Color(0xFFB45309),
                                           ),
                                         ),
+                                        const SizedBox(width: 3),
+                                        const Text('🌟', style: TextStyle(fontSize: 9)),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
-                              const Divider(height: 24),
-
-                              // Credential Display for Teacher
-                              Row(
-                                children: [
-                                  const Icon(Icons.key_rounded, size: 16, color: AppColors.amber),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Password Akun Siswa: ',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                  SelectableText(
-                                    student.initialPassword ?? 'siswa12345',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    'Poin: ${student.totalPoints} 🌟',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     },

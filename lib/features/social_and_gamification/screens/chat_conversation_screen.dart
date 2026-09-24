@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/models/streak_model.dart';
 import '../../../core/services/content_filter_service.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../../core/utils/date_formatter.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/widgets/curved_header_card.dart';
 import '../widgets/streak_milestone_dialog.dart';
@@ -526,7 +527,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
 
     final isDead = liveStreak.isDead;
-    final hoursLeft = liveStreak.expiresAt.difference(DateTime.now()).inHours;
     final chatTitle = liveStreak.getDisplayName(
       currentUserId: currentUser?.id,
       currentUserName: currentUser?.fullName,
@@ -606,45 +606,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Expanded(
               child: Column(
                 children: [
-                  // Streak Status Bar
-                  Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: isDead
-                ? const Color(0xFFF1F5F9)
-                : (liveStreak.isExpiringSoon ? Colors.red.shade50 : Colors.amber.shade50),
-            child: Row(
-              children: [
-                Icon(
-                  isDead
-                      ? Icons.ac_unit_rounded
-                      : (liveStreak.isExpiringSoon ? Icons.local_fire_department : Icons.local_fire_department_rounded),
-                  size: 18,
-                  color: isDead
-                      ? const Color(0xFF64748B)
-                      : (liveStreak.isExpiringSoon ? Colors.red : Colors.orange),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isDead
-                        ? 'Streak padam (tidak ada chat selama 1 hari). Kirim pesan sekarang untuk menyalakan api hari ke-1 🔥'
-                        : (liveStreak.isExpiringSoon
-                            ? 'PERINGATAN: Streak padam dalam $hoursLeft jam! Kirim chat sekarang 🔥'
-                            : 'Streak aktif (${liveStreak.streakCount} hari). Sisa waktu: $hoursLeft jam.'),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDead
-                          ? const Color(0xFF475569)
-                          : (liveStreak.isExpiringSoon ? Colors.red.shade900 : Colors.orange.shade900),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Messages List
+                  // Messages List
           Expanded(
             child: messages.isEmpty
                 ? Center(
@@ -703,8 +665,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     itemBuilder: (context, index) {
                       final msg = messages[index];
                       final isMe = msg.senderId == currentUser?.id;
-                      final timeStr =
-                          '${msg.sentAt.hour.toString().padLeft(2, '0')}:${msg.sentAt.minute.toString().padLeft(2, '0')}';
+                      final timeStr = AppDateFormatter.formatDateWithTime(msg.sentAt);
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

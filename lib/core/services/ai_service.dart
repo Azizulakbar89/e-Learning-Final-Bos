@@ -12,11 +12,12 @@ class AiService {
   // In-memory cache for API key
   static String? _cachedApiKey;
 
-  // Active verified Gemini models (priority order)
+  // Active verified Gemini models (priority order for fastest multimodal response)
   static const List<String> _models = [
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
     'gemini-2.5-flash',
-    'gemini-flash-latest',
-    'gemini-2.5-pro',
   ];
 
   /// Retrieves the current effective Gemini API key:
@@ -79,6 +80,12 @@ class AiService {
                     ]
                   }
                 ],
+                'generationConfig': {
+                  'temperature': 0.1,
+                  'thinkingConfig': {
+                    'thinkingBudget': 0,
+                  },
+                },
               }),
             )
             .timeout(const Duration(seconds: 10));
@@ -245,6 +252,206 @@ ${sb.toString()}
     );
   }
 
+  /// Extracts exam questions from PDF bytes using Google Gemini Vision & Multimodal OCR.
+  /// Fully supports Indonesian, English, Arabic scripts with harakat, and Mathematics LaTeX formulas.
+  static Future<String?> extractQuestionsFromPdfData({
+    required Uint8List pdfBytes,
+    String? subjectName,
+  }) async {
+    final apiKey = await getEffectiveApiKey();
+    final base64Pdf = base64Encode(pdfBytes);
+
+    final prompt = '''
+Kamu adalah AI Question Extractor & Math OCR cerdas untuk e-Learning sekolah.
+Tugasmu adalah menganalisis berkas PDF soal ujian dan mengekstrak semua butir soal dengan sangat akurat dan terstruktur.
+
+Dukungan Bahasa & Konten:
+1. Bahasa Indonesia: Teks soal, bacaan, dan pilihan jawaban.
+2. Bahasa Inggris: Teks soal bahasa Inggris, reading passages, dialogue, grammar.
+3. Bahasa Arab: Teks soal bahasa Arab (pertahankan karakter Arab UTF-8 dengan harakat jika ada).
+4. Rumus Matematika / Sains: Tuliskan rumus matematika dalam notasi LaTeX baku (contoh: \\frac{a}{b}, \\sqrt{x}, x^2, \\int, \\sum, \\alpha, \\beta, dll). Jika ada formula di dalam teks, gunakan format LaTeX atau simpan di field 'equation'.
+
+Aturan Struktur Output:
+- Kenali tipe soal: 'single' (Pilihan Ganda 1 jawaban), 'multi' (Pilihan Ganda Kompleks >1 jawaban), 'essay' (Esai/Uraian), 'matching' (Menjodohkan).
+- Deteksi kunci jawaban yang tepat ('A', 'B', dll untuk single; ['A','C'] untuk multi; map pasangan untuk matching; null untuk essay).
+- Output HARUS HANYA JSON array of objects tanpa teks pengantar atau markdown tambahan.
+
+Contoh Format JSON:
+[
+  {
+    "type": "single",
+    "content": "Tentukan nilai x dari persamaan...",
+    "equation": "2x + 5 = 15",
+    "options": [
+      {"id": "A", "text": "5"},
+      {"id": "B", "text": "10"},
+      {"id": "C", "text": "15"},
+      {"id": "D", "text": "20"}
+    ],
+    "correct": "A",
+    "has_image": false,
+    "missing_image": false
+  }
+]
+''';
+
+    for (final model in _models) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+        );
+
+        final response = await http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'parts': [
+                      {
+                        'inline_data': {
+                          'mime_type': 'application/pdf',
+                          'data': base64Pdf,
+                        }
+                      },
+                      {'text': prompt}
+                    ]
+                  }
+                ],
+                'generationConfig': {
+                  'temperature': 0.2,
+                  'maxOutputTokens': 8192,
+                  'thinkingConfig': {
+                    'thinkingBudget': 0,
+                  },
+                },
+              }),
+            )
+            .timeout(const Duration(seconds: 75));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final candidates = data['candidates'] as List?;
+          if (candidates != null && candidates.isNotEmpty) {
+            final parts = candidates[0]['content']?['parts'] as List?;
+            if (parts != null && parts.isNotEmpty) {
+              final text = parts[0]['text'] as String?;
+              if (text != null && text.isNotEmpty) {
+                return text;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[AiService] PDF OCR Gemini ($model) note: $e');
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Extracts exam questions from a rendered page image using Gemini Vision (Ultra-Fast & Accurate)
+  static Future<String?> extractQuestionsFromImageBytes({
+    required Uint8List imageBytes,
+    String? mimeType = 'image/jpeg',
+  }) async {
+    final apiKey = await getEffectiveApiKey();
+    final base64Image = base64Encode(imageBytes);
+
+    const prompt = '''
+Kamu adalah AI Question Extractor & Math OCR untuk e-Learning sekolah.
+Ekstrak SEMUA butir soal ujian yang ada pada gambar halaman berkas ini secara persis dan lengkap.
+
+Dukungan Bahasa & Konten:
+1. Bahasa Indonesia: Teks soal, bacaan, dan pilihan jawaban.
+2. Bahasa Inggris: Teks soal, passage, dialog, grammar.
+3. Bahasa Arab: Pertahankan seluruh teks Arab UTF-8 dengan harakat lengkap, abjad pilihan (أ، ب، ج، د، ه atau A, B, C, D, E).
+4. Rumus Matematika / Sains: Tuliskan rumus matematika dalam notasi LaTeX baku (contoh: \\frac{a}{b}, \\sqrt{x}, x^2, \\int, dll).
+
+Aturan Output:
+- Kembalikan HANYA JSON array of objects (tanpa markdown atau teks pengantar).
+- Format:
+[
+  {
+    "type": "single",
+    "content": "Teks soal lengkap...",
+    "equation": "formula latex jika ada atau null",
+    "options": [
+      {"id": "A", "text": "Pilihan A..."},
+      {"id": "B", "text": "Pilihan B..."}
+    ],
+    "correct": "A",
+    "has_image": false,
+    "missing_image": false
+  }
+]
+''';
+
+    for (final model in _models) {
+      try {
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+        );
+
+        final response = await http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'parts': [
+                      {
+                        'inline_data': {
+                          'mime_type': mimeType,
+                          'data': base64Image,
+                        }
+                      },
+                      {'text': prompt}
+                    ]
+                  }
+                ],
+                'generationConfig': {
+                  'temperature': 0.1,
+                  'maxOutputTokens': 8192,
+                  'thinkingConfig': {
+                    'thinkingBudget': 0,
+                  },
+                },
+              }),
+            )
+            .timeout(const Duration(seconds: 45));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final candidates = data['candidates'] as List?;
+          if (candidates != null && candidates.isNotEmpty) {
+            final parts = candidates[0]['content']?['parts'] as List?;
+            if (parts != null && parts.isNotEmpty) {
+              final text = parts[0]['text'] as String?;
+              if (text != null && text.isNotEmpty) {
+                return text;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[AiService] Image OCR Gemini ($model) note: $e');
+        }
+      }
+    }
+    return null;
+  }
+
   /// Internal caller to Gemini API with automatic model fallback
   static Future<String?> _callGemini(String prompt) async {
     final apiKey = await getEffectiveApiKey();
@@ -275,6 +482,9 @@ ${sb.toString()}
                   'topK': 40,
                   'topP': 0.95,
                   'maxOutputTokens': 2048,
+                  'thinkingConfig': {
+                    'thinkingBudget': 0,
+                  },
                 },
               }),
             )

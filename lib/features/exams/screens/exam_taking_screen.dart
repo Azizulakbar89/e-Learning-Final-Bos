@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +10,8 @@ import '../../../core/models/question_model.dart';
 import '../../../core/services/anti_cheat_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
+import '../../../core/widgets/smart_math_text.dart';
+import '../../home/widgets/badge_share_dialog.dart';
 
 class ExamTakingScreen extends StatefulWidget {
   final ExamModel exam;
@@ -342,8 +343,18 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(dialogCtx); // close result dialog
+                    final user = fb.currentUser;
+                    if (user != null && user.isSiswa && mounted) {
+                      final updatedBadges = fb.getStudentBadges(user);
+                      await BadgeShareDialog.checkAndShowNewBadges(
+                        context: context,
+                        badges: updatedBadges,
+                        student: user,
+                      );
+                    }
+                    if (!mounted) return;
                     Navigator.pop(context); // return to exams screen
                   },
                   child: const Text('Kembali ke Daftar Ujian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1135,13 +1146,14 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            currentQuestion.content,
+          SmartMathText(
+            text: currentQuestion.content,
             style: const TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w600),
           ),
 
-          // Math equation render — MS Word style display block
-          if (currentQuestion.equationLatex != null) ...[
+          // Math equation render — MS Word style display block (if not already in content)
+          if (currentQuestion.equationLatex != null &&
+              !currentQuestion.content.contains(currentQuestion.equationLatex!.replaceAll(r'$', ''))) ...[
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
@@ -1189,19 +1201,11 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
                   Center(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: Math.tex(
-                        currentQuestion.equationLatex!,
-                        textStyle: const TextStyle(
-                          fontSize: 24,
+                      child: SmartMathText(
+                        text: currentQuestion.equationLatex!,
+                        style: const TextStyle(
+                          fontSize: 22,
                           color: Colors.black87,
-                        ),
-                        onErrorFallback: (err) => Text(
-                          currentQuestion.equationLatex!,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.red,
-                            fontFamily: 'monospace',
-                          ),
                         ),
                       ),
                     ),
@@ -1257,7 +1261,7 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
                 title: Row(
                   children: [
                     Text('${opt.id}. ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Expanded(child: Text(opt.text)),
+                    Expanded(child: SmartMathText(text: opt.text)),
                   ],
                 ),
               ),
@@ -1293,7 +1297,7 @@ class _ExamTakingScreenState extends State<ExamTakingScreen> {
               title: Row(
                 children: [
                   Text('${opt.id}. ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Expanded(child: Text(opt.text)),
+                  Expanded(child: SmartMathText(text: opt.text)),
                 ],
               ),
             ),

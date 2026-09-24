@@ -60,15 +60,15 @@ class AppTheme {
 
       // ── Typography ─────────────────────────────────────────
       textTheme: baseText.copyWith(
-        displayLarge:  GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight),
-        displayMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight),
-        headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight),
-        headlineMedium:GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
-        titleLarge:    GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+        displayLarge:  GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.textPrimaryLight, letterSpacing: -0.6),
+        displayMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight, letterSpacing: -0.4),
+        headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimaryLight, letterSpacing: -0.3),
+        headlineMedium:GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight, letterSpacing: -0.2),
+        titleLarge:    GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight, letterSpacing: -0.1),
         titleMedium:   GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
         titleSmall:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
-        bodyLarge:     GoogleFonts.inter(fontSize: 16, color: AppColors.textPrimaryLight, height: 1.5),
-        bodyMedium:    GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondaryLight, height: 1.5),
+        bodyLarge:     GoogleFonts.inter(fontSize: 15, color: AppColors.textPrimaryLight, height: 1.5),
+        bodyMedium:    GoogleFonts.inter(fontSize: 13.5, color: AppColors.textSecondaryLight, height: 1.5),
         bodySmall:     GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondaryLight),
         labelLarge:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: _orange),
         labelMedium:   GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _navy),
@@ -79,8 +79,8 @@ class AppTheme {
         backgroundColor: _navy,
         foregroundColor: _white,
         elevation: 0,
-        scrolledUnderElevation: 2,
-        shadowColor: _navy.withAlpha(80),
+        scrolledUnderElevation: 1,
+        shadowColor: const Color(0x1A0A1931),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: AppColors.navyDark,
           statusBarIconBrightness: Brightness.light,
@@ -98,10 +98,10 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: _white,
         elevation: 0,
-        shadowColor: _navy.withAlpha(15),
+        shadowColor: const Color(0x0A0F172A),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderLight, width: 1),
         ),
       ),
 

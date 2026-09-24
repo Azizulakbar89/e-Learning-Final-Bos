@@ -54,6 +54,22 @@ class FcmSenderService {
     }
   }
 
+  /// Validasi apakah string token berformat token FCM resmi (bukan dummy/kosong)
+  static bool isValidToken(String? token) {
+    if (token == null) return false;
+    final t = token.trim();
+    if (t.isEmpty || t.length < 32) return false;
+    if (t.contains(' ') ||
+        t.startsWith('dummy') ||
+        t.startsWith('mock') ||
+        t.startsWith('test_') ||
+        t.contains('tch_') ||
+        t.contains('std_')) {
+      return false;
+    }
+    return true;
+  }
+
   /// Kirim push notifikasi langsung ke token perangkat spesifik (misal: Chat pribadi)
   static Future<bool> sendToDevice({
     required String fcmToken,
@@ -61,9 +77,17 @@ class FcmSenderService {
     required String body,
     Map<String, String>? data,
   }) async {
+    final token = fcmToken.trim();
+    if (!isValidToken(token)) {
+      if (kDebugMode) {
+        debugPrint('[FcmSender] Token dilewati karena format tidak valid/dummy: "$token"');
+      }
+      return false;
+    }
+
     return _sendFcmPayload({
       'message': {
-        'token': fcmToken,
+        'token': token,
         'notification': {
           'title': title,
           'body': body,
@@ -131,7 +155,15 @@ class FcmSenderService {
         if (kDebugMode) debugPrint('[FcmSender] Sinyal push notifikasi instan berhasil dikirim ke Google FCM!');
         return true;
       } else {
-        if (kDebugMode) debugPrint('[FcmSender] Gagal mengirim push FCM: ${res.statusCode} - ${res.body}');
+        try {
+          final errJson = json.decode(res.body);
+          final message = errJson['error']?['message'] ?? res.body;
+          if (kDebugMode) {
+            debugPrint('[FcmSender] Push FCM dilewati (${res.statusCode}): $message');
+          }
+        } catch (_) {
+          if (kDebugMode) debugPrint('[FcmSender] Gagal mengirim push FCM: ${res.statusCode} - ${res.body}');
+        }
         return false;
       }
     } catch (e) {

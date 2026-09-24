@@ -869,8 +869,9 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        flexibleSpace: Container(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(116),
+        child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -882,103 +883,152 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-          ),
-        ),
-        elevation: 0,
-        leading: Center(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => Navigator.maybePop(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(25),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withAlpha(40)),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x280A1931),
+                blurRadius: 18,
+                offset: Offset(0, 6),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
-            ),
+            ],
           ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.assignment.title,
-              style: GoogleFonts.outfit(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: widget.assignment.isGroup
-                        ? const Color(0xFF8B5CF6).withAlpha(55)
-                        : const Color(0xFF38BDF8).withAlpha(45),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: widget.assignment.isGroup
-                          ? const Color(0xFFA78BFA).withAlpha(90)
-                          : const Color(0xFF7DD3FC).withAlpha(80),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        widget.assignment.isGroup ? Icons.groups_rounded : Icons.person_rounded,
-                        size: 11,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.assignment.isGroup ? 'Tugas Kelompok' : 'Tugas Individu',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => Navigator.maybePop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(25),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withAlpha(40)),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
                         ),
                       ),
+                      const SizedBox(width: 10),
+                      if (subject != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(20),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withAlpha(35)),
+                          ),
+                          child: Text(
+                            subject.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: widget.assignment.isGroup
+                              ? const Color(0xFF8B5CF6).withAlpha(55)
+                              : const Color(0xFF38BDF8).withAlpha(45),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: widget.assignment.isGroup
+                                ? const Color(0xFFA78BFA).withAlpha(90)
+                                : const Color(0xFF7DD3FC).withAlpha(80),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.assignment.isGroup ? Icons.groups_rounded : Icons.person_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.assignment.isGroup ? 'Kelompok' : 'Individu',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Deadline chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isOverdue ? const Color(0xFFBE123C).withAlpha(45) : Colors.white.withAlpha(18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isOverdue ? const Color(0xFFFDA4AF).withAlpha(90) : const Color(0xFFFDE68A).withAlpha(70),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.alarm_rounded,
+                              size: 12,
+                              color: isOverdue ? const Color(0xFFFDA4AF) : const Color(0xFFFDE68A),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              AppDateFormatter.formatDate(widget.assignment.deadline),
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: isOverdue ? const Color(0xFFFDA4AF) : const Color(0xFFFEF3C7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isTeacher) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFCA5A5), size: 19),
+                          tooltip: 'Hapus Tugas',
+                          onPressed: () => _confirmDeleteAssignment(context, fbService),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                if (subject != null) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      subject.name,
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withAlpha(200),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    widget.assignment.title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.2,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ],
+              ),
             ),
-          ],
+          ),
         ),
-        actions: [
-          if (isTeacher)
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
-              tooltip: 'Hapus Tugas',
-              onPressed: () => _confirmDeleteAssignment(context, fbService),
-            ),
-        ],
       ),
       body: ResponsiveFormWrapper(
         maxWidth: 960,
@@ -987,215 +1037,68 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── AESTHETIC ASSIGNMENT / GROUP CARD ──
-              Container(
-                decoration: BoxDecoration(
-                  gradient: widget.assignment.isGroup
-                      ? const LinearGradient(
-                          colors: [
-                            Color(0xFFFFFFFF),
-                            Color(0xFFFAF5FF), // Soft lavender tint
-                            Color(0xFFF5EEFD),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : const LinearGradient(
-                          colors: [
-                            Color(0xFFFFFFFF),
-                            Color(0xFFF8FAFC),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: widget.assignment.isGroup
-                        ? const Color(0xFFDDD6FE)
-                        : const Color(0xFFE2E8F0),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.assignment.isGroup
-                          ? const Color(0xFF7C3AED).withAlpha(18)
-                          : Colors.black.withAlpha(10),
-                      blurRadius: 22,
-                      offset: const Offset(0, 8),
+              // ── AESTHETIC ASSIGNMENT INSTRUCTION CARD ──
+              if (widget.assignment.description.trim().isNotEmpty ||
+                  widget.assignment.isGroup ||
+                  widget.assignment.allowedSubmissionTypes.isNotEmpty) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 1.2,
                     ),
-                    BoxShadow(
-                      color: Colors.black.withAlpha(6),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Accent Glow Strip
-                      Container(
-                        height: 5,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: widget.assignment.isGroup
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9), Color(0xFFEC4899)],
-                                )
-                              : AppColors.orangeGradient,
-                        ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0A0F172A),
+                        blurRadius: 16,
+                        offset: Offset(0, 4),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            // 1. Tag & Deadline Row
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 10,
-                              runSpacing: 8,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        gradient: widget.assignment.isGroup
-                                            ? const LinearGradient(
-                                                colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              )
-                                            : const LinearGradient(
-                                                colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-                                              ),
-                                        borderRadius: BorderRadius.circular(20),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: (widget.assignment.isGroup
-                                                    ? const Color(0xFF8B5CF6)
-                                                    : const Color(0xFF0284C7))
-                                                .withAlpha(65),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            widget.assignment.isGroup
-                                                ? Icons.groups_rounded
-                                                : Icons.person_rounded,
-                                            color: Colors.white,
-                                            size: 15,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            widget.assignment.isGroup ? 'Tugas Kelompok' : 'Tugas Individu',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
-                                              letterSpacing: 0.2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (widget.assignment.isGroup) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEDE9FE),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: const Color(0xFFDDD6FE)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.people_outline_rounded,
-                                                size: 13, color: Color(0xFF6D28D9)),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Maks. ${widget.assignment.maxGroupMembers} Siswa/Tim',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w600,
-                                                color: const Color(0xFF6D28D9),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                // Deadline Pill
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5.5),
-                                  decoration: BoxDecoration(
-                                    color: isOverdue ? const Color(0xFFFFF1F2) : const Color(0xFFFFFBEB),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isOverdue ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.alarm_rounded,
-                                        size: 14,
-                                        color: isOverdue ? const Color(0xFFE11D48) : const Color(0xFFD97706),
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        'Deadline: ${AppDateFormatter.formatDate(widget.assignment.deadline)}',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: isOverdue ? const Color(0xFFBE123C) : const Color(0xFFB45309),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A).withAlpha(12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.assignment_outlined,
+                                size: 16,
+                                color: Color(0xFF1E293B),
+                              ),
                             ),
-
-                            const SizedBox(height: 16),
-
-                            // 2. Assignment Title
+                            const SizedBox(width: 8),
                             Text(
-                              widget.assignment.title,
+                              'Petunjuk & Format Tugas',
                               style: GoogleFonts.outfit(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
-                                letterSpacing: -0.4,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
                               ),
                             ),
-
-                            // 3. Description
-                            if (widget.assignment.description.trim().isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                widget.assignment.description,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13.5,
-                                  color: const Color(0xFF475569),
-                                  height: 1.55,
-                                ),
-                              ),
-                            ],
+                          ],
+                        ),
+                        // 3. Description
+                        if (widget.assignment.description.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.assignment.description,
+                            style: GoogleFonts.outfit(
+                              fontSize: 13.5,
+                              color: const Color(0xFF475569),
+                              height: 1.55,
+                            ),
+                          ),
+                        ],
 
                             // 4. Group System Highlight Info (if group)
                             if (widget.assignment.isGroup) ...[
@@ -1310,11 +1213,9 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 24),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
             // IF TEACHER: Show list of submissions to review & grade
             if (isTeacher) ...[

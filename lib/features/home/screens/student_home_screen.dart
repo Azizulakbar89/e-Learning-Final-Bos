@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/models/assignment_model.dart';
 import '../../../core/models/curriculum_model.dart';
 import '../../../core/models/exam_model.dart';
 import '../../../core/models/question_model.dart';
@@ -10,6 +11,7 @@ import '../../../core/services/firebase_service.dart';
 import '../../../core/widgets/app_loading_overlay.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/widgets/app_nav_rail.dart';
+import '../../../core/widgets/exam_category_badge.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/universal_app_header.dart';
 import '../../code_compiler/screens/code_playground_screen.dart';
@@ -186,12 +188,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
               ),
               const SizedBox(width: 10),
-              Text(
-                'e-learning spemdalas',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  'e-learning spemdalas',
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -376,9 +382,6 @@ class _DashboardPageState extends State<_DashboardPage> {
                       const SizedBox(height: 24),
                     ],
 
-                    // 2 Kartu: Poin Gamifikasi & Compiler (Sesuai Permintaan User)
-                    _buildGamificationAndCompilerRow(context, isWide),
-                    const SizedBox(height: 16),
 
                     // ─── Nilai Mata Pelajaran Section (Akumulasi Nilai per Mapel Langsung di Bawahnya Tanpa Jarak Jauh) ───
                     _buildSubjectGradesSection(context, isWide),
@@ -451,28 +454,30 @@ class _DashboardPageState extends State<_DashboardPage> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildGamificationAndCompilerRow(BuildContext context, bool isWide) {
     return Row(
       children: [
         // Kartu 1: Poin Gamifikasi
         Expanded(
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const PointRedemptionScreen()),
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-                boxShadow: [
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                boxShadow: const [
                   BoxShadow(
-                    color: const Color(0xFFF59E0B).withAlpha(20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: Color(0x0A0F172A),
+                    blurRadius: 14,
+                    offset: Offset(0, 4),
+                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -482,15 +487,8 @@ class _DashboardPageState extends State<_DashboardPage> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(10),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: const Center(
                       child: Text('🌟', style: TextStyle(fontSize: 18)),
@@ -505,9 +503,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                         Text(
                           '${widget.totalPoints}',
                           style: GoogleFonts.outfit(
-                            fontSize: 18,
+                            fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFFB45309),
+                            color: const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -516,9 +514,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                         const Text(
                           'Poin Gamifikasi',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF92400E),
+                            color: Color(0xFF64748B),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -536,22 +534,23 @@ class _DashboardPageState extends State<_DashboardPage> {
         // Kartu 2: Compiler Koding IDE
         Expanded(
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const CodePlaygroundScreen()),
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
-                boxShadow: [
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                boxShadow: const [
                   BoxShadow(
-                    color: const Color(0xFF10B981).withAlpha(20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: Color(0x0A0F172A),
+                    blurRadius: 14,
+                    offset: Offset(0, 4),
+                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -561,15 +560,8 @@ class _DashboardPageState extends State<_DashboardPage> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(10),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: const Center(
                       child: Text('💻', style: TextStyle(fontSize: 18)),
@@ -584,9 +576,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                         Text(
                           'Compiler',
                           style: GoogleFonts.outfit(
-                            fontSize: 18,
+                            fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF047857),
+                            color: const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -595,9 +587,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                         const Text(
                           'Koding IDE',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF065F46),
+                            color: Color(0xFF64748B),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -614,27 +606,6 @@ class _DashboardPageState extends State<_DashboardPage> {
     );
   }
 
-
-  Widget _miniAvatar(String char, Color color, double left) {
-    return Positioned(
-      left: left,
-      child: Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 1.5),
-        ),
-        child: Center(
-          child: Text(
-            char,
-            style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════════
   //  NILAI MATA PELAJARAN (Subject Grades Section)
@@ -761,22 +732,6 @@ class _DashboardPageState extends State<_DashboardPage> {
     bool isWide,
     FirebaseService fb,
   ) {
-    final pastelColors = [
-      const Color(0xFFF0FDF4), // Soft Mint
-      const Color(0xFFF0F9FF), // Soft Sky
-      const Color(0xFFF5F3FF), // Soft Lilac
-      const Color(0xFFFFFBEB), // Soft Amber
-    ];
-    final pastelBorders = [
-      const Color(0xFFBBF7D0),
-      const Color(0xFFBAE6FD),
-      const Color(0xFFDDD6FE),
-      const Color(0xFFFDE68A),
-    ];
-
-    final bg = pastelColors[index % pastelColors.length];
-    final border = pastelBorders[index % pastelBorders.length];
-
     IconData getSubjectIcon(String code) {
       final c = code.toLowerCase();
       if (c.contains('inf') || c.contains('web')) return Icons.code_rounded;
@@ -790,16 +745,13 @@ class _DashboardPageState extends State<_DashboardPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: bg,
+        color: isWide ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(
+          color: isWide ? AppColors.borderDark.withAlpha(80) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: AppColors.cardShadow,
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -818,9 +770,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: grade.statusColor.withAlpha(16),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: border),
+                      border: Border.all(color: grade.statusColor.withAlpha(45)),
                     ),
                     child: Center(
                       child: Icon(
@@ -840,27 +792,28 @@ class _DashboardPageState extends State<_DashboardPage> {
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: const Color(0xFF071540),
+                            letterSpacing: -0.2,
+                            color: isWide ? Colors.white : const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: border),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
                               child: Text(
                                 grade.subject.code,
                                 style: const TextStyle(
                                   fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
                                 ),
                               ),
                             ),
@@ -886,17 +839,11 @@ class _DashboardPageState extends State<_DashboardPage> {
 
                   // Score Box
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: grade.statusColor.withAlpha(12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(4),
-                          blurRadius: 4,
-                        ),
-                      ],
+                      border: Border.all(color: grade.statusColor.withAlpha(40)),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -929,13 +876,13 @@ class _DashboardPageState extends State<_DashboardPage> {
 
               // Middle: Progress Bar
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 5),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: progress,
-                    minHeight: 6,
-                    backgroundColor: Colors.white.withAlpha(180),
+                    minHeight: 5,
+                    backgroundColor: const Color(0xFFF1F5F9),
                     valueColor: AlwaysStoppedAnimation<Color>(grade.statusColor),
                   ),
                 ),
@@ -958,7 +905,7 @@ class _DashboardPageState extends State<_DashboardPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF64748B)),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
                 ],
               ),
             ],
@@ -970,10 +917,11 @@ class _DashboardPageState extends State<_DashboardPage> {
 
   Widget _gradePill(String emoji, String text, {Color? color}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -984,7 +932,7 @@ class _DashboardPageState extends State<_DashboardPage> {
             text,
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               color: color ?? const Color(0xFF475569),
             ),
           ),
@@ -1374,18 +1322,10 @@ class _DashboardPageState extends State<_DashboardPage> {
         color: isWide ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDone
-              ? AppColors.navy.withAlpha(35)
-              : AppColors.orange.withAlpha(55),
-          width: 1.2,
+          color: isWide ? AppColors.borderDark.withAlpha(80) : const Color(0xFFE2E8F0),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: (isDone ? AppColors.navy : AppColors.orange).withAlpha(12),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: AppColors.cardShadow,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1394,29 +1334,19 @@ class _DashboardPageState extends State<_DashboardPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: isDone
-                    ? const LinearGradient(
-                        colors: [AppColors.navy, AppColors.navyLight],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : const LinearGradient(
-                        colors: [AppColors.orange, AppColors.orangeDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                color: isDone
+                    ? const Color(0xFF10B981).withAlpha(16)
+                    : AppColors.orange.withAlpha(16),
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isDone ? AppColors.navy : AppColors.orange).withAlpha(35),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                border: Border.all(
+                  color: isDone
+                      ? const Color(0xFF10B981).withAlpha(45)
+                      : AppColors.orange.withAlpha(45),
+                ),
               ),
               child: Icon(
                 isDone ? Icons.check_circle_rounded : Icons.timer_rounded,
-                color: Colors.white,
+                color: isDone ? const Color(0xFF059669) : AppColors.orange,
                 size: 22,
               ),
             ),
@@ -1425,33 +1355,42 @@ class _DashboardPageState extends State<_DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.navy.withAlpha(15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.navy.withAlpha(30)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.menu_book_rounded, size: 11, color: AppColors.navy),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            subjectName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.navy,
-                            ),
-                          ),
+                  Row(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.menu_book_rounded, size: 11, color: Color(0xFF475569)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                subjectName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: ExamCategoryBadge(category: exam.category),
+                      ),
+                    ],
                   ),
                   Text(
                     exam.title,
@@ -1662,21 +1601,23 @@ class _DashboardPageState extends State<_DashboardPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.navy.withAlpha(isWide ? 30 : 12),
+        color: isWide ? AppColors.navy.withAlpha(30) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.navy.withAlpha(25)),
+        border: Border.all(
+          color: isWide ? AppColors.navy.withAlpha(25) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: isWide ? Colors.white70 : AppColors.navy),
+          Icon(icon, size: 10, color: isWide ? Colors.white70 : const Color(0xFF475569)),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: isWide ? Colors.white : AppColors.navy,
-              fontWeight: FontWeight.bold,
+              color: isWide ? Colors.white : const Color(0xFF475569),
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1688,53 +1629,74 @@ class _DashboardPageState extends State<_DashboardPage> {
     if (widget.materials.isEmpty) {
       return _buildEmptyState('Belum ada materi tersedia', Icons.book_outlined, isWide);
     }
+    final sortedMaterials = List<dynamic>.from(widget.materials)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return Column(
-      children: List.generate(widget.materials.length, (index) {
-        return _buildMaterialCard(context, widget.materials[index], isWide, index);
+      children: List.generate(sortedMaterials.length, (index) {
+        return _buildMaterialCard(context, sortedMaterials[index], isWide, index);
       }),
     );
   }
 
   Widget _buildMaterialCard(BuildContext context, dynamic mat, bool isWide, int index) {
+    final fb = context.watch<FirebaseService>();
+    final user = fb.currentUser;
+    final assignments = fb.getAssignmentsForMaterial(mat.id);
+    final studentClass =
+        (user?.className ?? user?.classId ?? '').trim().toLowerCase();
+    final applicableAssignments = assignments.where((a) {
+      if (a.classIds.isEmpty) return true;
+      if (studentClass.isEmpty) return true;
+      return a.classIds.any((c) => c.trim().toLowerCase() == studentClass);
+    }).toList();
+
+    AssignmentSubmissionModel? mySub;
+    for (final a in applicableAssignments) {
+      final subs = fb.getSubmissionsForAssignment(a.id);
+      final found = subs
+          .where((s) =>
+              s.submitterId == user?.id ||
+              s.memberStudentIds.contains(user?.id))
+          .firstOrNull;
+      if (found != null) {
+        mySub = found;
+        break;
+      }
+    }
+
+    final hasAssignment = applicableAssignments.isNotEmpty;
+    final progress =
+        user != null ? fb.getMaterialProgress(user.id, mat.id) : 0.0;
     final typeConfig = _getContentTypeConfig(mat.contentType);
-
-    // Alternating soft pastel colors matching reference images (Image 3 & 4)
-    final pastelColors = [
-      const Color(0xFFF5F3FF), // Soft Lilac
-      const Color(0xFFF0FDF4), // Soft Mint
-      const Color(0xFFF0F9FF), // Soft Sky
-      const Color(0xFFFFFBEB), // Soft Peach
-    ];
-    final pastelBorders = [
-      const Color(0xFFDDD6FE),
-      const Color(0xFFBBF7D0),
-      const Color(0xFFBAE6FD),
-      const Color(0xFFFDE68A),
-    ];
-
-    final cardBg = isWide ? AppColors.surfaceDark : pastelColors[index % pastelColors.length];
-    final cardBorder = isWide ? AppColors.borderDark.withAlpha(80) : pastelBorders[index % pastelBorders.length];
+    final subject = fb.subjects.where((s) => s.id == mat.subjectId).firstOrNull;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: cardBorder),
+        color: isWide ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isWide
+              ? AppColors.borderDark.withAlpha(80)
+              : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withAlpha(10),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => MaterialDetailScreen(material: mat)),
+            MaterialPageRoute(
+              builder: (context) => MaterialDetailScreen(material: mat),
+            ),
           );
         },
         child: Padding(
@@ -1742,15 +1704,41 @@ class _DashboardPageState extends State<_DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top tag row
+              // Top Row: Subject Badge + Type Badge + Rating
               Row(
                 children: [
+                  if (subject != null) ...[
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.primary.withAlpha(45)),
+                        ),
+                        child: Text(
+                          subject.name,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: typeConfig.color.withAlpha(15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: cardBorder),
+                      border: Border.all(color: typeConfig.color.withAlpha(40)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1759,9 +1747,9 @@ class _DashboardPageState extends State<_DashboardPage> {
                         const SizedBox(width: 4),
                         Text(
                           typeConfig.label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
                             color: typeConfig.color,
                           ),
                         ),
@@ -1769,77 +1757,303 @@ class _DashboardPageState extends State<_DashboardPage> {
                     ),
                   ),
                   const Spacer(),
-                  const Row(
-                    children: [
-                      Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
-                      SizedBox(width: 2),
-                      Text('4.9', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
-                    ],
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.star_rounded,
+                            size: 13, color: Color(0xFFF59E0B)),
+                        SizedBox(width: 2),
+                        Text(
+                          '4.9',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               // Title
               Text(
                 mat.title,
                 style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: isWide ? Colors.white : const Color(0xFF071540),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15.5,
+                  letterSpacing: -0.2,
+                  color: isWide ? Colors.white : const Color(0xFF0F172A),
+                  height: 1.25,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                mat.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  height: 1.35,
+              if (mat.description.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  mat.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+              ],
 
-              // Bottom row: Classmates avatars + Circular arrow button (→)
-              Row(
-                children: [
-                  SizedBox(
-                    width: 54,
-                    height: 22,
-                    child: Stack(
+              // Progress Belajar Siswa
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isWide
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isWide
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _miniAvatar('X', const Color(0xFF3B82F6), 0),
-                        _miniAvatar('Y', const Color(0xFF10B981), 14),
-                        _miniAvatar('Z', const Color(0xFFF59E0B), 28),
+                        Row(
+                          children: [
+                            Icon(
+                              progress >= 100
+                                  ? Icons.check_circle_rounded
+                                  : (progress > 0
+                                      ? Icons.pie_chart_rounded
+                                      : Icons.radio_button_unchecked_rounded),
+                              size: 14,
+                              color: progress >= 100
+                                  ? const Color(0xFF10B981)
+                                  : (progress > 0
+                                      ? const Color(0xFF2563EB)
+                                      : const Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Progress Belajar',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isWide
+                                    ? Colors.white70
+                                    : const Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          progress >= 100
+                              ? 'Selesai 100%'
+                              : '${progress.toInt()}%',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: progress >= 100
+                                ? const Color(0xFF10B981)
+                                : (progress > 0
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFF64748B)),
+                          ),
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: (progress / 100.0).clamp(0.0, 1.0),
+                        minHeight: 5,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          progress >= 100
+                              ? const Color(0xFF10B981)
+                              : (progress > 0
+                                  ? const Color(0xFF2563EB)
+                                  : const Color(0xFFCBD5E1)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Bottom Row: Status Tugas & Tombol Masuk (→)
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: !hasAssignment
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    size: 13,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Tidak Ada Tugas',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : (mySub != null && mySub.score != null)
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.stars_rounded,
+                                          size: 15,
+                                          color: Color(0xFF059669)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Nilai Tugas: ${mySub.score!.toInt()} / 100',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF047857),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : (mySub != null)
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFBEB),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFFFDE68A)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                              Icons.hourglass_top_rounded,
+                                              size: 13,
+                                              color: Color(0xFFD97706)),
+                                          const SizedBox(width: 5),
+                                          Flexible(
+                                            child: Text(
+                                              'Tugas Terkumpul (Menunggu Koreksi)',
+                                              maxLines: 1,
+                                              overflow:
+                                                  TextOverflow.ellipsis,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFFB45309),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF7ED),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFFFED7AA)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                              Icons.assignment_outlined,
+                                              size: 13,
+                                              color: Color(0xFFEA580C)),
+                                          const SizedBox(width: 5),
+                                          Flexible(
+                                            child: Text(
+                                              'Ada Tugas: ${applicableAssignments.first.title}',
+                                              maxLines: 1,
+                                              overflow:
+                                                  TextOverflow.ellipsis,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFFC2410C),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    '+16 Mempelajari',
-                    style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                  ),
-                  const Spacer(),
-                  // Circular arrow button (like Image 4)
+                  const SizedBox(width: 8),
+                  // Circular arrow button (→)
                   Container(
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFFF8FAFC),
                       shape: BoxShape.circle,
-                      border: Border.all(color: cardBorder),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(5),
-                          blurRadius: 4,
+                          color: Colors.black.withAlpha(6),
+                          blurRadius: 5,
                           offset: const Offset(0, 1),
                         ),
                       ],
                     ),
                     child: const Center(
-                      child: Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF071540)),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ],
@@ -1853,15 +2067,45 @@ class _DashboardPageState extends State<_DashboardPage> {
 
   Widget _buildEmptyState(String msg, IconData icon, bool isWide) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isWide ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isWide
+              ? AppColors.borderDark.withAlpha(80)
+              : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withAlpha(6),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 40, color: const Color(0xFF94A3B8)),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 28, color: const Color(0xFF64748B)),
+          ),
           const SizedBox(height: 10),
           Text(
             msg,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF64748B),
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -1940,20 +2184,20 @@ class _OvalBottomNavState extends State<_OvalBottomNav> {
         icon: Icons.quiz_outlined,
         activeIcon: Icons.quiz_rounded,
         label: 'Quiz',
-        color: AppColors.rose,
+        color: AppColors.primary,
         badgeCount: widget.uncompletedQuizCount,
       ),
       const _NavItem(
         icon: Icons.emoji_events_outlined,
         activeIcon: Icons.emoji_events_rounded,
         label: 'Peringkat',
-        color: Color(0xFFD97706),
+        color: AppColors.primary,
       ),
       const _NavItem(
         icon: Icons.person_outline_rounded,
         activeIcon: Icons.person_rounded,
         label: 'Profil',
-        color: AppColors.purple,
+        color: AppColors.primary,
       ),
     ];
 
@@ -1964,18 +2208,14 @@ class _OvalBottomNavState extends State<_OvalBottomNav> {
           height: 68,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-            boxShadow: [
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withAlpha(20),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: AppColors.primary.withAlpha(12),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Color(0x120F172A),
+                blurRadius: 20,
+                offset: Offset(0, 6),
+                spreadRadius: 0,
               ),
             ],
           ),

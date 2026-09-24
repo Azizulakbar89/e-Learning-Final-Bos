@@ -67,4 +67,12 @@ class AppDateFormatter {
     final minute = dt.minute.toString().padLeft(2, '0');
     return '${dt.day} $month ${dt.year}, $hour:$minute';
   }
+
+  /// Format: "15 Sep 2026, 08:00"
+  static String formatDateWithTime(DateTime dt) {
+    final month = _shortMonthNames[(dt.month - 1).clamp(0, 11)];
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${dt.day} $month ${dt.year}, $hour:$minute';
+  }
 }

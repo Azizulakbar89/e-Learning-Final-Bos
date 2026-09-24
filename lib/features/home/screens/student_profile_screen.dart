@@ -28,23 +28,19 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Cek badge baru setelah frame pertama selesai render
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkNewBadges());
+    // Sinkronisasi badge yang sudah dimiliki secara senyap tanpa popup
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncBadgesSilently());
   }
 
-  Future<void> _checkNewBadges() async {
+  Future<void> _syncBadgesSilently() async {
     if (_badgeCheckDone) return;
     _badgeCheckDone = true;
     if (!mounted) return;
     final fb = context.read<FirebaseService>();
     final currentUser = fb.currentUser;
     if (currentUser == null || !currentUser.isSiswa) return;
-    // Delay 600ms agar UI profil selesai render dulu sebelum popup muncul
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
     final badges = fb.getStudentBadges(currentUser);
-    await BadgeShareDialog.checkAndShowNewBadges(
-      context: context,
+    await BadgeShareDialog.syncExistingBadges(
       badges: badges,
       student: currentUser,
     );
@@ -479,13 +475,42 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             ],
             const SizedBox(height: 20),
 
+            if (badge.isEarned) ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    final fb = context.read<FirebaseService>();
+                    final user = fb.currentUser;
+                    if (user != null) {
+                      BadgeShareDialog.showSingleBadge(
+                        context: context,
+                        badge: badge,
+                        student: user,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 16),
+                  label: const Text('Bagikan Lencana Ini 🚀', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -617,14 +642,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Leaderboard Info Card
-                _buildLeaderboardPreviewCard(
-                  userClass: userClass.isNotEmpty ? userClass : "-",
-                  rankNumber: rankNumber,
-                  monthlyPoints: monthlyPoints,
-                  onTap: widget.onOpenLeaderboard,
-                ),
-                const SizedBox(height: 14),
 
                 // Push Notification & Device Token Card
                 _buildNotificationCard(context),
@@ -696,25 +713,77 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Grid of badges
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.88,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
+                // Horizontal Carousel of Badges
+                if (displayBadges.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.military_tech_outlined, size: 40, color: Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Tidak ada lencana pada kategori ini',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 190,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          clipBehavior: Clip.none,
+                          itemCount: displayBadges.length,
+                          separatorBuilder: (context, index) => const SizedBox(width: 12),
+                          itemBuilder: (ctx, idx) {
+                            final badge = displayBadges[idx];
+                            return SizedBox(
+                              width: 175,
+                              child: _BadgeCard(
+                                badge: badge,
+                                onTap: () => _showBadgeDetailDialog(context, badge),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.swipe_outlined,
+                            size: 14,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Geser horizontal untuk melihat ${displayBadges.length} lencana',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  itemCount: displayBadges.length,
-                  itemBuilder: (ctx, idx) {
-                    final badge = displayBadges[idx];
-                    return _BadgeCard(
-                      badge: badge,
-                      onTap: () => _showBadgeDetailDialog(context, badge),
-                    );
-                  },
-                ),
               ],
             ),
           ),
@@ -760,82 +829,99 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   Widget _buildNotificationCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withAlpha(30),
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [AppColors.navyLight, AppColors.navy],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withAlpha(30),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Icon(Icons.notifications_active_rounded, color: Color(0xFF059669), size: 20),
+            child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Push Notifikasi',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF065F46),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Push Notifikasi',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.navy.withAlpha(12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.navy.withAlpha(30)),
+                      ),
+                      child: const Text(
+                        'Aktif',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Aktif',
-                    style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                const SizedBox(height: 2),
+                const Text(
+                  'Ujian, tugas & pengumuman',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => FcmService.triggerTestNotification(context),
-                icon: const Icon(Icons.notifications_active_rounded, size: 12),
-                label: const Text('Tes Pop-Up', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.navy,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => FcmService.triggerTestNotification(context),
+            icon: const Icon(Icons.notifications_active_rounded, size: 15),
+            label: Text(
+              'Tes Pop-Up',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 5),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF059669),
-                  side: const BorderSide(color: Color(0xFF10B981)),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => FcmService.copyTokenToClipboard(context),
-                icon: const Icon(Icons.copy_rounded, size: 11),
-                label: const Text('Salin Token', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -844,47 +930,78 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   Widget _buildAppUpdateCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F3FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDDD6FE)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withAlpha(25),
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [AppColors.orange, AppColors.orangeDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.orange.withAlpha(35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Icon(Icons.system_update_rounded, color: Color(0xFF6D28D9), size: 20),
+            child: const Icon(Icons.system_update_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Pembaruan Aplikasi',
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF5B21B6),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Pembaruan Aplikasi',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Cek versi & perbaikan sistem',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.orange,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => AppUpdateDialog.handleManualUpdateCheck(context),
-            icon: const Icon(Icons.refresh_rounded, size: 13),
-            label: const Text('Cek Update', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: Text(
+              'Cek Update',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -906,13 +1023,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(6),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         children: [
@@ -923,7 +1034,11 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 width: 56,
                 height: 56,
                 decoration: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  gradient: LinearGradient(
+                    colors: [AppColors.orange, AppColors.orangeDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -947,6 +1062,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
                         color: AppColors.textPrimaryLight,
                       ),
                     ),
@@ -962,15 +1078,14 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary.withAlpha(25),
-                  foregroundColor: AppColors.primary,
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(color: AppColors.primary.withAlpha(80)),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -980,18 +1095,18 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 label: Text(
                   'Edit Profile',
                   style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 14),
 
-          // Stats row - 4 Pastel Metric Cards (Image 3 & 5 style)
+          // Stats row - Variasi Gradasi Orange & Biru Dongker
           Row(
             children: [
               Expanded(
@@ -999,9 +1114,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   emoji: '🌟',
                   value: '${student.totalPoints}',
                   label: 'Total Poin',
-                  bg: const Color(0xFFFFFBEB),
-                  border: const Color(0xFFFDE68A),
-                  textColor: const Color(0xFFB45309),
+                  bg: const Color(0xFFFFF7ED), // Soft Orange Tint
+                  border: const Color(0xFFFED7AA),
+                  textColor: const Color(0xFFC2410C),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1010,9 +1125,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   emoji: '🔥',
                   value: '$monthlyPoints',
                   label: 'Bulan Ini',
-                  bg: const Color(0xFFFFF1F2),
-                  border: const Color(0xFFFECDD3),
-                  textColor: const Color(0xFFBE123C),
+                  bg: const Color(0xFFFFFBEB), // Amber Orange Tint
+                  border: const Color(0xFFFDE68A),
+                  textColor: const Color(0xFFD97706),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1021,9 +1136,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   emoji: '🏅',
                   value: '$earnedBadgesCount/$totalBadgesCount',
                   label: 'Lencana',
-                  bg: const Color(0xFFF5F3FF),
-                  border: const Color(0xFFDDD6FE),
-                  textColor: const Color(0xFF6D28D9),
+                  bg: const Color(0xFFF0F4F8), // Soft Navy Tint
+                  border: const Color(0xFFCBD5E1),
+                  textColor: const Color(0xFF1E3A8A),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1032,9 +1147,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   emoji: '🏆',
                   value: '#$rankNumber',
                   label: 'Peringkat',
-                  bg: const Color(0xFFF0FDF4),
-                  border: const Color(0xFFBBF7D0),
-                  textColor: const Color(0xFF047857),
+                  bg: const Color(0xFFE2E8F0), // Solid Navy Slate Tint
+                  border: const Color(0xFF94A3B8),
+                  textColor: const Color(0xFF0F172A),
                 ),
               ),
             ],
@@ -1089,73 +1204,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildLeaderboardPreviewCard({
-    required String userClass,
-    required int rankNumber,
-    required int monthlyPoints,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFF59E0B).withAlpha(30),
-            const Color(0xFFD97706).withAlpha(15),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF59E0B).withAlpha(60)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Peringkat Kelas $userClass Bulan Ini',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF92400E),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Kamu di posisi #$rankNumber dengan $monthlyPoints poin. Reset tiap tanggal 1.',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFFB45309)),
-                ),
-              ],
-            ),
-          ),
-          if (onTap != null)
-            ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-              child: const Text('Buka', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-        ],
-      ),
-    );
-  }
+
 }
 
 // ─── Badge Card Widget (Mobile Precision) ───
@@ -1189,17 +1238,16 @@ class _BadgeCard extends StatelessWidget {
           boxShadow: badge.isEarned
               ? [
                   BoxShadow(
-                    color: earnedColor.withAlpha(40),
-                    blurRadius: 16,
-                    spreadRadius: -2,
+                    color: earnedColor.withAlpha(25),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ]
               : [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(6),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                  const BoxShadow(
+                    color: Color(0x080F172A),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
                 ],
         ),

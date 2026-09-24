@@ -271,79 +271,197 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF071540),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Pusat Notifikasi',
-              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(102),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF040D1F), // Darkest Navy
+                Color(0xFF071540), // Deep Navy
+                Color(0xFF0D2B6E), // Structural Navy
+                Color(0xFF1E3A8A), // Medium Navy
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Text(
-              user?.isSiswa == true
-                  ? 'Pemberitahuan Kelas ${user?.className ?? user?.classId ?? "-"}'
-                  : 'Semua Pemberitahuan Pembelajaran',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bolt_rounded, color: Color(0xFFFBBF24)),
-            tooltip: 'Uji Pop-up Notifikasi',
-            onPressed: () => _showTestNotificationSheet(context),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x280A1931),
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+            ],
           ),
-          if (unreadCount > 0 && user != null)
-            TextButton.icon(
-              onPressed: () => fb.markAllNotificationsAsRead(user.id),
-              icon: const Icon(Icons.done_all_rounded, color: Color(0xFF38BDF8), size: 16),
-              label: const Text(
-                'Tandai Dibaca',
-                style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Row(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(7.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withAlpha(40)),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Pusat Notifikasi',
+                          style: GoogleFonts.outfit(
+                            fontSize: 17.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user?.isSiswa == true
+                                    ? 'Kelas ${user?.className ?? user?.classId ?? "-"}'
+                                    : 'Semua Notifikasi',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withAlpha(190),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (unreadCount > 0) ...[
+                              Text(
+                                ' • ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white.withAlpha(140),
+                                ),
+                              ),
+                              Text(
+                                '$unreadCount Baru',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFFCA5A5),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Uji Pop-up Notifikasi Action
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                    icon: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(20),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withAlpha(35)),
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: Color(0xFFFBBF24), size: 18),
+                    ),
+                    tooltip: 'Uji Pop-up Notifikasi',
+                    onPressed: () => _showTestNotificationSheet(context),
+                  ),
+                  if (unreadCount > 0 && user != null) ...[
+                    const SizedBox(width: 6),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => fb.markAllNotificationsAsRead(user.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white.withAlpha(45)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.done_all_rounded, color: Colors.white, size: 13.5),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Tandai Dibaca',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          const SizedBox(width: 8),
-        ],
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // Filter Chips Header
+          // Filter Chips Bar (Clean Modern Scrollable)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            color: const Color(0xFFF8FAFC),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
-                  _buildFilterChip('Semua (${allNotifs.length})', 'all'),
+                  _buildFilterChip('Semua', 'all', Icons.all_inclusive_rounded, allNotifs.length),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    '📚 Materi (${allNotifs.where((n) => n.type == "material").length})',
+                    'Materi',
                     'material',
+                    Icons.auto_stories_rounded,
+                    allNotifs.where((n) => n.type == "material").length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    '📝 Kuis (${allNotifs.where((n) => n.type == "exam").length})',
+                    'Kuis',
                     'exam',
+                    Icons.quiz_rounded,
+                    allNotifs.where((n) => n.type == "exam").length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    '💬 Chat (${allNotifs.where((n) => n.type == "chat").length})',
+                    'Chat',
                     'chat',
+                    Icons.forum_rounded,
+                    allNotifs.where((n) => n.type == "chat").length,
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    '📋 Tugas (${allNotifs.where((n) => n.type == "assignment_submit" || n.type == "assignment_grade").length})',
+                    'Tugas',
                     'assignment',
+                    Icons.assignment_rounded,
+                    allNotifs.where((n) => n.type == "assignment_submit" || n.type == "assignment_grade").length,
                   ),
                 ],
               ),
@@ -360,233 +478,286 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(22),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0D2B6E).withAlpha(15),
+                              color: const Color(0xFF0D2B6E).withAlpha(12),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.notifications_off_outlined, size: 48, color: Color(0xFF0D2B6E)),
+                            child: const Icon(Icons.notifications_none_rounded, size: 48, color: Color(0xFF0D2B6E)),
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'Belum Ada Notifikasi',
-                            style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             user?.isSiswa == true
-                                ? 'Notifikasi materi baru, kuis kelas, dan pesan chat dari guru akan muncul di sini secara otomatis.'
-                                : 'Notifikasi penerbitan materi, kuis, dan pesan chat akan tercatat di sini.',
+                                ? 'Pemberitahuan materi baru, kuis kelas, dan pesan diskusi akan muncul di sini.'
+                                : 'Penerbitan materi, kuis, dan pesan diskusi akan tercatat di sini.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: const Color(0xFF64748B),
+                              height: 1.45,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                    physics: const BouncingScrollPhysics(),
                     itemCount: filteredNotifs.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (ctx, i) {
                       final notif = filteredNotifs[i];
                       final isUnread = user != null && !notif.readByUserIds.contains(user.id);
                       final isExam = notif.type == 'exam';
                       final isChat = notif.type == 'chat';
-                      final isAssignmentSubmit = notif.type == 'assignment_submit';
-                      final isAssignmentGrade = notif.type == 'assignment_grade';
+                      final isAssignment = notif.type == 'assignment_submit' || notif.type == 'assignment_grade';
 
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => _onNotificationTap(context, fb, notif),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: isUnread ? Colors.white : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isUnread
-                                  ? (isExam
-                                      ? const Color(0xFFFED7AA)
-                                      : isChat
-                                          ? const Color(0xFFA7F3D0)
-                                          : isAssignmentSubmit
-                                              ? const Color(0xFFFDE68A)
-                                              : isAssignmentGrade
-                                                  ? const Color(0xFFBBF7D0)
-                                                  : const Color(0xFFBAE6FD))
-                                  : const Color(0xFFE2E8F0),
-                              width: isUnread ? 1.5 : 1.0,
-                            ),
-                            boxShadow: [
-                              if (isUnread)
+                      // Theme colors based on category
+                      final iconBg = isExam
+                          ? const Color(0xFFFFF7ED)
+                          : isChat
+                              ? const Color(0xFFECFDF5)
+                              : isAssignment
+                                  ? const Color(0xFFF5F3FF)
+                                  : const Color(0xFFEFF6FF);
+
+                      final iconBorder = isExam
+                          ? const Color(0xFFFED7AA)
+                          : isChat
+                              ? const Color(0xFFA7F3D0)
+                              : isAssignment
+                                  ? const Color(0xFFDDD6FE)
+                                  : const Color(0xFFBFDBFE);
+
+                      final iconColor = isExam
+                          ? const Color(0xFFEA580C)
+                          : isChat
+                              ? const Color(0xFF059669)
+                              : isAssignment
+                                  ? const Color(0xFF7C3AED)
+                                  : const Color(0xFF2563EB);
+
+                      final iconData = isExam
+                          ? Icons.quiz_rounded
+                          : isChat
+                              ? Icons.forum_rounded
+                              : isAssignment
+                                  ? Icons.assignment_rounded
+                                  : Icons.auto_stories_rounded;
+
+                      final categoryLabel = isChat
+                          ? 'Pesan Diskusi'
+                          : isExam
+                              ? 'Kuis Kelas'
+                              : isAssignment
+                                  ? 'Tugas'
+                                  : (notif.targetClassIds.isNotEmpty
+                                      ? 'Materi: ${notif.targetClassIds.join(", ")}'
+                                      : 'Materi Baru');
+
+                      final actionLabel = isChat
+                          ? 'Balas Diskusi'
+                          : isExam
+                              ? 'Buka Kuis'
+                              : isAssignment
+                                  ? 'Buka Tugas'
+                                  : 'Buka Materi';
+
+                      final cleanTitle = _cleanEmojiTitle(notif.title);
+
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _onNotificationTap(context, fb, notif),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isUnread ? iconColor.withAlpha(70) : const Color(0xFFE2E8F0),
+                                width: isUnread ? 1.5 : 1.0,
+                              ),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: (isExam
-                                          ? const Color(0xFFEA580C)
-                                          : isChat
-                                              ? const Color(0xFF10B981)
-                                              : isAssignmentSubmit || isAssignmentGrade
-                                                  ? const Color(0xFFF59E0B)
-                                                  : const Color(0xFF0284C7))
-                                      .withAlpha(20),
-                                  blurRadius: 10,
+                                  color: isUnread ? iconColor.withAlpha(18) : const Color(0x080F172A),
+                                  blurRadius: isUnread ? 16 : 8,
                                   offset: const Offset(0, 3),
                                 ),
-                            ],
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Type Icon
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: isExam
-                                      ? const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)])
-                                      : isChat
-                                          ? const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)])
-                                          : isAssignmentSubmit
-                                              ? const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)])
-                                              : isAssignmentGrade
-                                                  ? const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)])
-                                                  : const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF0D2B6E)]),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  isExam
-                                      ? Icons.quiz_rounded
-                                      : isChat
-                                          ? Icons.chat_bubble_rounded
-                                          : isAssignmentSubmit
-                                              ? Icons.upload_file_rounded
-                                              : isAssignmentGrade
-                                                  ? Icons.grade_rounded
-                                                  : Icons.menu_book_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-
-                              // Notification Content
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(19),
+                              child: Stack(
+                                children: [
+                                  if (isUnread)
+                                    Positioned(
+                                      left: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      width: 4,
+                                      child: Container(
+                                        color: iconColor,
+                                      ),
+                                    ),
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(isUnread ? 16 : 14, 14, 14, 14),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Target Class or Chat Badge
+                                        // Type Icon Squircle Container
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          width: 44,
+                                          height: 44,
                                           decoration: BoxDecoration(
-                                            color: isExam
-                                                ? const Color(0xFFFFF7ED)
-                                                : isChat
-                                                    ? const Color(0xFFECFDF5)
-                                                    : const Color(0xFFF0F9FF),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: isExam
-                                                  ? const Color(0xFFFDBA74)
-                                                  : isChat
-                                                      ? const Color(0xFF6EE7B7)
-                                                      : const Color(0xFF7DD3FC),
-                                            ),
+                                            color: iconBg,
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(color: iconBorder, width: 1.2),
                                           ),
-                                          child: Text(
-                                            isChat
-                                                ? 'Pesan Diskusi'
-                                                : notif.targetClassIds.isNotEmpty
-                                                    ? 'Kelas: ${notif.targetClassIds.join(", ")}'
-                                                    : 'Semua Kelas',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: isExam
-                                                  ? const Color(0xFFC2410C)
-                                                  : isChat
-                                                      ? const Color(0xFF047857)
-                                                      : const Color(0xFF0369A1),
-                                            ),
+                                          child: Icon(
+                                            iconData,
+                                            color: iconColor,
+                                            size: 21,
                                           ),
                                         ),
-                                        const Spacer(),
-                                        Text(
-                                          _formatTimeAgo(notif.createdAt),
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                        ),
-                                        if (isUnread) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              color: isExam
-                                                  ? const Color(0xFFEA580C)
-                                                  : isChat
-                                                      ? const Color(0xFF10B981)
-                                                      : const Color(0xFF0284C7),
-                                              shape: BoxShape.circle,
-                                            ),
+                                        const SizedBox(width: 13),
+
+                                        // Notification Content
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // Top metadata row
+                                              Row(
+                                                children: [
+                                                  // Category Tag Capsule
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                                    decoration: BoxDecoration(
+                                                      color: iconBg,
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(color: iconBorder),
+                                                    ),
+                                                    child: Text(
+                                                      categoryLabel,
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 10.5,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: iconColor,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const Spacer(),
+                                                  Icon(
+                                                    Icons.schedule_rounded,
+                                                    size: 12,
+                                                    color: const Color(0xFF94A3B8),
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    _formatTimeAgo(notif.createdAt),
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: const Color(0xFF94A3B8),
+                                                    ),
+                                                  ),
+                                                  if (isUnread) ...[
+                                                    const SizedBox(width: 6),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFEF4444),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        'BARU',
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 8.5,
+                                                          fontWeight: FontWeight.w900,
+                                                          color: Colors.white,
+                                                          letterSpacing: 0.3,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+
+                                              // Notification Title
+                                              Text(
+                                                cleanTitle,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 14.5,
+                                                  fontWeight: isUnread ? FontWeight.w800 : FontWeight.w600,
+                                                  color: const Color(0xFF0F172A),
+                                                  letterSpacing: -0.2,
+                                                ),
+                                              ),
+
+                                              if (notif.body.trim().isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  notif.body.trim(),
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    color: const Color(0xFF64748B),
+                                                    height: 1.45,
+                                                  ),
+                                                ),
+                                              ],
+
+                                              const SizedBox(height: 10),
+
+                                              // Action Micro-Pill Button
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                                                decoration: BoxDecoration(
+                                                  color: iconColor.withAlpha(16),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: iconColor.withAlpha(45)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      actionLabel,
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: iconColor,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Icon(
+                                                      Icons.arrow_forward_rounded,
+                                                      size: 12,
+                                                      color: iconColor,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                        ),
                                       ],
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      notif.title,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 14.5,
-                                        fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                                        color: const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      notif.body,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade700,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Text(
-                                          isChat
-                                              ? 'Balas pesan'
-                                              : isExam
-                                                  ? 'Buka kuis'
-                                                  : 'Buka materi',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isExam
-                                                ? const Color(0xFFEA580C)
-                                                : isChat
-                                                    ? const Color(0xFF059669)
-                                                    : const Color(0xFF0284C7),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.arrow_forward_rounded,
-                                          size: 12,
-                                          color: isExam
-                                              ? const Color(0xFFEA580C)
-                                              : isChat
-                                                  ? const Color(0xFF059669)
-                                                  : const Color(0xFF0284C7),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       );
@@ -598,26 +769,89 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
+  String _cleanEmojiTitle(String text) {
+    return text
+        .replaceAll(RegExp(r'[\u{1F300}-\u{1FAFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}]', unicode: true), '')
+        .trim();
+  }
+
+  Widget _buildFilterChip(String label, String value, IconData icon, int count) {
     final isSelected = _filter == value;
-    return GestureDetector(
-      onTap: () => setState(() => _filter = value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0D2B6E) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF475569),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _filter = value),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [Color(0xFF0F2552), Color(0xFF1E3A8A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isSelected ? null : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.2 : 1.0,
+            ),
+            boxShadow: [
+              if (isSelected)
+                BoxShadow(
+                  color: const Color(0xFF0F2552).withAlpha(45),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                )
+              else
+                const BoxShadow(
+                  color: Color(0x060F172A),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? Colors.white : const Color(0xFF64748B),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withAlpha(40) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+

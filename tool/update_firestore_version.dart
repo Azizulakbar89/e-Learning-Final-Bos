@@ -41,15 +41,15 @@ void main() async {
   final payload = {
     'fields': {
       'latest_version': {'stringValue': version},
-      'version_code': {'integerValue': '33'},
+      'version_code': {'integerValue': '35'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.4.9/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.5.1/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Perbaikan submit form SidikMu (PHP requestSubmit & hidden flag) dan penyempurnaan deteksi tabel nilai siswa.'
+            '✨ Versi $version: Filter Bank Soal Guru, Fitur Edit/Hapus Soal, Monitoring Chat Lengkap untuk Admin, dan Peningkatan Desain Frontend Bento UI.'
       },
       'force_update': {'booleanValue': false}
     }

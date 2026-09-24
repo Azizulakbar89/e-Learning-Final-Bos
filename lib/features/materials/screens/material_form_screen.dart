@@ -416,37 +416,6 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
             CurvedHeaderCard(
               title: widget.existingMaterial != null ? 'Edit Materi' : 'Tambah Materi',
               subtitle: 'Penyusunan Konten & Sumber Belajar Siswa',
-              actions: [
-                _isUploadingPpt
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 14),
-                        child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                      )
-                    : FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFF97316),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _save,
-                        icon: Icon(
-                          widget.existingMaterial != null
-                              ? Icons.check_circle_rounded
-                              : Icons.publish_rounded,
-                          size: 16,
-                        ),
-                        label: Text(
-                          widget.existingMaterial != null
-                              ? 'Simpan'
-                              : 'Terbitkan',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-              ],
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -870,11 +839,16 @@ class _MaterialFormScreenState extends State<MaterialFormScreen> {
                   elevation: 3,
                 ),
                 icon: _isUploadingPpt
-                    ? const SizedBox(width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.publish_rounded),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Icon(widget.existingMaterial != null ? Icons.save_rounded : Icons.publish_rounded),
                 label: Text(
-                  _isUploadingPpt ? 'Mengupload...' : 'Terbitkan Materi',
+                  _isUploadingPpt
+                      ? 'Mengupload...'
+                      : (widget.existingMaterial != null ? 'Simpan Perubahan Materi' : 'Terbitkan Materi'),
                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),

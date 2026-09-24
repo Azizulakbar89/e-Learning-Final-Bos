@@ -29,6 +29,9 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   int _selectedFilterIndex = 0; // 0: Semua, 1: Diskusi Kelas, 2: Konsultasi Siswa
+  String _selectedClassFilter = 'Semua Kelas';
+  int _currentPage = 1;
+  static const int _pageSize = 5;
 
   @override
   void initState() {
@@ -638,37 +641,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Future<void> _openOrCreateStudentStreak(BuildContext context, FirebaseService fb, UserModel student) async {
-    final currentUser = fb.currentUser;
-    if (currentUser == null) return;
-
-    final existing = fb.streaks.where((s) =>
-        s.participantIds.contains(student.id) &&
-        s.participantIds.contains(currentUser.id) &&
-        s.type == StreakType.teacher).firstOrNull;
-
-    if (existing != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatConversationScreen(streak: existing)));
-      return;
-    }
-
-    final newStreak = StreakModel(
-      id: const Uuid().v4(),
-      type: StreakType.teacher,
-      title: '${student.fullName} (${student.className ?? student.classId ?? ""})',
-      participantIds: [currentUser.id, student.id],
-      participantNames: [currentUser.fullName, student.fullName],
-      streakCount: 0,
-      lastInteractionAt: DateTime.now(),
-      expiresAt: DateTime.now().add(const Duration(hours: 24)),
-    );
-
-    await fb.createStreak(newStreak);
-
-    if (context.mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatConversationScreen(streak: newStreak)));
-    }
-  }
 
   Future<void> _openOrCreateClassGroup(BuildContext context, FirebaseService fb, String className) async {
     final currentUser = fb.currentUser;
@@ -709,7 +681,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final isSelected = _selectedFilterIndex == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedFilterIndex = index),
+        onTap: () => setState(() {
+          _selectedFilterIndex = index;
+          _currentPage = 1;
+        }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -762,6 +737,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     // 1. Ambil semua streak dari database yang relevan dengan user ini
     final List<StreakModel> userStreaks = fb.streaks.where((s) {
       if (currentUser == null) return true;
+      if (currentUser.isAdmin) return true; // Admin dapat melihat seluruh obrolan dan grup
 
       // Logika khusus Guru: Guru bisa chat dengan siswa siapapun tanpa batasan!
       if (isTeacher) {
@@ -853,12 +829,30 @@ class _ChatListScreenState extends State<ChatListScreen> {
     userStreaks.removeWhere((s) => fb.deletedStreakIds.contains(s.id));
 
     // 3. Filter berdasarkan tab (Streak non-chat ditampilkan di banner khusus)
-    final List<StreakModel> displayStreaks = userStreaks.where((s) {
+    final List<StreakModel> baseStreaks = userStreaks.where((s) {
       if (s.type == StreakType.study) return false;
       if (_selectedFilterIndex == 1) return s.type == StreakType.group;
       if (_selectedFilterIndex == 2) return s.type == StreakType.teacher || s.type == StreakType.peer;
       return true;
     }).toList();
+
+    final List<StreakModel> displayStreaks = baseStreaks.where((s) {
+      if (isTeacher && _selectedClassFilter != 'Semua Kelas') {
+        final target = _selectedClassFilter.toLowerCase();
+        return s.title.toLowerCase().contains(target) ||
+            s.participantNames.any((p) => p.toLowerCase().contains(target));
+      }
+      return true;
+    }).toList();
+
+    final int totalItems = displayStreaks.length;
+    final int totalPages = totalItems > 0 ? ((totalItems / _pageSize).ceil()) : 1;
+    final int effectivePage = _currentPage.clamp(1, totalPages);
+    final int startIndex = (effectivePage - 1) * _pageSize;
+    final int endIndex = (startIndex + _pageSize > totalItems) ? totalItems : (startIndex + _pageSize);
+    final List<StreakModel> pagedStreaks = (startIndex < totalItems)
+        ? displayStreaks.sublist(startIndex, endIndex)
+        : <StreakModel>[];
 
     final mainContent = Column(
       children: [
@@ -907,366 +901,483 @@ class _ChatListScreenState extends State<ChatListScreen> {
             subtitle: '${userStreaks.length} Obrolan Aktif • Ruang Konsultasi & Diskusi 🔥',
           ),
 
-            // ── SHORTCUT CHAT SISWA & KELAS (JIKA GURU) ──
-            if (isTeacher && teacherClasses.isNotEmpty)
-              Container(
-                height: 46,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final cls in teacherClasses)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ActionChip(
-                          avatar: const Icon(Icons.forum_rounded, size: 15, color: AppColors.primary),
-                          label: Text('Diskusi Kelas $cls', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                          backgroundColor: AppColors.primary.withAlpha(20),
-                          side: BorderSide(color: AppColors.primary.withAlpha(60)),
-                          onPressed: () => _openOrCreateClassGroup(context, fb, cls),
-                        ),
-                      ),
-                    for (final cls in teacherClasses)
-                      for (final std in fb.getClassStudents(cls).take(5))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ActionChip(
-                            avatar: const Icon(Icons.person_outline_rounded, size: 15, color: Color(0xFF059669)),
-                            label: Text('Chat ${std.fullName}', style: const TextStyle(fontSize: 11.5)),
-                            backgroundColor: const Color(0xFF059669).withAlpha(15),
-                            side: const BorderSide(color: Color(0xFF059669)),
-                            onPressed: () => _openOrCreateStudentStreak(context, fb, std),
-                          ),
-                        ),
-                  ],
-                ),
+        // ── DROPDOWN PEMILIH DISKUSI KELAS (JIKA GURU) ──
+        if (isTeacher && teacherClasses.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(8),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-
-            // ── STREAK BELAJAR MANDIRI (NON-CHAT) BANNER UNTUK SISWA ──
-            if (!isTeacher)
-              _buildStudyStreakBanner(context, fb, currentUser),
-
-            // ── TAB FILTER SEGMENTED BUTTONS ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
-                  _buildFilterChip(0, 'Semua (${userStreaks.length})', Icons.all_inbox_rounded),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(1, 'Grup Kelas', Icons.groups_rounded),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(2, isTeacher ? 'Siswa' : 'Guru / Teman', Icons.school_rounded),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.forum_rounded, size: 18, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: teacherClasses.contains(_selectedClassFilter) || _selectedClassFilter == 'Semua Kelas'
+                            ? _selectedClassFilter
+                            : 'Semua Kelas',
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                        style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'Semua Kelas',
+                            child: Text('Semua Diskusi Kelas'),
+                          ),
+                          for (final cls in teacherClasses)
+                            DropdownMenuItem(
+                              value: cls,
+                              child: Text('Diskusi Kelas $cls'),
+                            ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _selectedClassFilter = val;
+                              _currentPage = 1;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  if (_selectedClassFilter != 'Semua Kelas') ...[
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      onPressed: () => _openOrCreateClassGroup(context, fb, _selectedClassFilter),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                      label: const Text('Buka', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
+          ),
 
-            // ── BODY: LIST OR GAMIFIED EMPTY STATE ──
-            Expanded(
-              child: displayStreaks.isEmpty
-                  ? SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 24),
-                          Container(
-                            width: 90,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFF7A00), Color(0xFFFF0055)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFFF5722).withAlpha(80),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Text('🔥', style: TextStyle(fontSize: 42)),
-                            ),
+        // ── TAB FILTER SEGMENTED BUTTONS ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              _buildFilterChip(0, 'Semua (${userStreaks.length})', Icons.all_inbox_rounded),
+              const SizedBox(width: 8),
+              _buildFilterChip(1, 'Grup Kelas', Icons.groups_rounded),
+              const SizedBox(width: 8),
+              _buildFilterChip(2, isTeacher ? 'Siswa' : 'Guru / Teman', Icons.school_rounded),
+            ],
+          ),
+        ),
+
+        // ── BODY: LIST OR GAMIFIED EMPTY STATE ──
+        Expanded(
+          child: displayStreaks.isEmpty
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 24),
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF7A00), Color(0xFFFF0055)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          const SizedBox(height: 20),
-                          Text(
-                            isTeacher
-                                ? 'Belum Ada Pesan Masuk'
-                                : 'Belum Ada Streak Aktif',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1E293B),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5722).withAlpha(80),
+                              blurRadius: 24,
+                              offset: const Offset(0, 6),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            isTeacher
-                                ? 'Obrolan dari siswa atau grup kelas akan muncul di sini saat ada pesan masuk atau saat Anda mengirimkan pesan baru.'
-                                : 'Mulai obrolan dan streak belajar bersama guru atau teman kelasmu! Kirim pesan minimal sekali dalam 24 jam agar apimu tetap berkobar.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(10),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              children: [
-                                _buildFeatureRow(
-                                  icon: Icons.local_fire_department_rounded,
-                                  color: const Color(0xFFFF5722),
-                                  title: 'Api Streak Harian',
-                                  subtitle: 'Kirim pesan setiap hari untuk menambah angka streak.',
-                                ),
-                                const Divider(height: 20),
-                                _buildFeatureRow(
-                                  icon: Icons.timer_outlined,
-                                  color: const Color(0xFFEAB308),
-                                  title: 'Batas 24 Jam',
-                                  subtitle: 'Peringatan otomatis muncul bila streak hampir hangus.',
-                                ),
-                                const Divider(height: 20),
-                                _buildFeatureRow(
-                                  icon: Icons.emoji_events_outlined,
-                                  color: const Color(0xFF8B5CF6),
-                                  title: 'Bonus XP & Gamifikasi',
-                                  subtitle: 'Dapatkan poin bonus untuk keaktifan belajar!',
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                        ],
+                          ],
+                        ),
+                        child: const Center(
+                          child: Text('🔥', style: TextStyle(fontSize: 42)),
+                        ),
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                      itemCount: displayStreaks.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final s = displayStreaks[index];
-                        final lastMsg = fb.chatMessages.where((c) => c.streakId == s.id).toList()
-                          ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
-                        final latestSnippet = lastMsg.isNotEmpty
-                            ? lastMsg.last.message
-                            : 'Belum ada pesan obrolan.';
+                      const SizedBox(height: 20),
+                      Text(
+                        isTeacher
+                            ? 'Belum Ada Pesan Masuk'
+                            : 'Belum Ada Streak Aktif',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isTeacher
+                            ? 'Obrolan dari siswa atau grup kelas akan muncul di sini saat ada pesan masuk atau saat Anda mengirimkan pesan baru.'
+                            : 'Mulai obrolan dan streak belajar bersama guru atau teman kelasmu! Kirim pesan minimal sekali dalam 24 jam agar apimu tetap berkobar.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(10),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _buildFeatureRow(
+                              icon: Icons.local_fire_department_rounded,
+                              color: const Color(0xFFFF5722),
+                              title: 'Api Streak Harian',
+                              subtitle: 'Kirim pesan setiap hari untuk menambah angka streak.',
+                            ),
+                            const Divider(height: 20),
+                            _buildFeatureRow(
+                              icon: Icons.timer_outlined,
+                              color: const Color(0xFFEAB308),
+                              title: 'Batas 24 Jam',
+                              subtitle: 'Peringatan otomatis muncul bila streak hampir hangus.',
+                            ),
+                            const Divider(height: 20),
+                            _buildFeatureRow(
+                              icon: Icons.emoji_events_outlined,
+                              color: const Color(0xFF8B5CF6),
+                              title: 'Bonus XP & Gamifikasi',
+                              subtitle: 'Dapatkan poin bonus untuk keaktifan belajar!',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.separated(
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, totalPages > 1 ? 8 : (widget.isEmbedded ? 90 : 16)),
+                        itemCount: pagedStreaks.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final s = pagedStreaks[index];
+                          final lastMsg = fb.chatMessages.where((c) => c.streakId == s.id).toList()
+                            ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+                          final latestSnippet = lastMsg.isNotEmpty
+                              ? lastMsg.last.message
+                              : 'Belum ada pesan obrolan.';
 
-                        final isGroup = s.type == StreakType.group;
-                        final chatTitle = s.getDisplayName(
-                          currentUserId: currentUser?.id,
-                          currentUserName: currentUser?.fullName,
-                        );
-                        final avatarColor = isGroup ? AppColors.primary : const Color(0xFF059669);
+                          final isGroup = s.type == StreakType.group;
+                          final chatTitle = s.getDisplayName(
+                            currentUserId: currentUser?.id,
+                            currentUserName: currentUser?.fullName,
+                          );
+                          final avatarColor = isGroup ? AppColors.primary : const Color(0xFF059669);
 
-                        return Card(
-                          elevation: 1.5,
-                          shadowColor: Colors.black.withAlpha(20),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: s.isExpiringSoon ? Colors.red.shade300 : const Color(0xFFE2E8F0),
-                              width: s.isExpiringSoon ? 1.8 : 1,
+                          return Card(
+                            elevation: 1.5,
+                            shadowColor: Colors.black.withAlpha(20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: s.isExpiringSoon ? Colors.red.shade300 : const Color(0xFFE2E8F0),
+                                width: s.isExpiringSoon ? 1.8 : 1,
+                              ),
                             ),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            onLongPress: isGroup ? () => _confirmDeleteGroupFromList(context, fb, s) : null,
-                            leading: Stack(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: avatarColor.withAlpha(25),
-                                  child: isGroup
-                                      ? Icon(Icons.groups_rounded, color: avatarColor, size: 22)
-                                      : Text(
-                                          chatTitle.isNotEmpty ? chatTitle[0].toUpperCase() : 'S',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.w800,
-                                            color: avatarColor,
-                                            fontSize: 18,
-                                          ),
-                                        ),
-                                ),
-                                if (s.isExpiringSoon)
-                                  const Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: CircleAvatar(
-                                      radius: 8,
-                                      backgroundColor: Colors.red,
-                                      child: Icon(Icons.priority_high_rounded, size: 10, color: Colors.white),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    chatTitle,
-                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (s.isExpiringSoon)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.red.shade200),
-                                    ),
-                                    child: const Text(
-                                      'Hampir Hangus!',
-                                      style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 3),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: isGroup ? Colors.indigo.shade50 : const Color(0xFFECFDF5),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        isGroup ? 'Grup Kelas' : (isTeacher ? 'Siswa' : s.type.label),
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: isGroup ? Colors.indigo.shade700 : const Color(0xFF047857),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  latestSnippet,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (s.streakCount > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      gradient: AppColors.flameGradient,
-                                      borderRadius: BorderRadius.circular(16),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFFFF5722).withAlpha(60),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Text('🔥', style: TextStyle(fontSize: 13)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${s.streakCount}',
-                                          style: GoogleFonts.outfit(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                else if (lastMsg.isNotEmpty)
-                                  Text(
-                                    AppDateFormatter.formatShortDateTime(lastMsg.last.sentAt),
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 11,
-                                      color: const Color(0xFF94A3B8),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                if (isGroup) ...[
-                                  const SizedBox(width: 4),
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert_rounded, size: 20, color: Colors.black45),
-                                    padding: EdgeInsets.zero,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    onSelected: (value) {
-                                      if (value == 'delete') {
-                                        _confirmDeleteGroupFromList(context, fb, s);
-                                      }
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete_outline_rounded, color: AppColors.rose, size: 18),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Hapus Grup',
-                                              style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.w600, fontSize: 13),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              onLongPress: isGroup ? () => _confirmDeleteGroupFromList(context, fb, s) : null,
+                              leading: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: avatarColor.withAlpha(25),
+                                    child: isGroup
+                                        ? Icon(Icons.groups_rounded, color: avatarColor, size: 22)
+                                        : Text(
+                                            chatTitle.isNotEmpty ? chatTitle[0].toUpperCase() : 'S',
+                                            style: GoogleFonts.outfit(
+                                              fontWeight: FontWeight.w800,
+                                              color: avatarColor,
+                                              fontSize: 18,
                                             ),
-                                          ],
+                                          ),
+                                  ),
+                                  if (s.isExpiringSoon)
+                                    const Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: CircleAvatar(
+                                        radius: 8,
+                                        backgroundColor: Colors.red,
+                                        child: Icon(Icons.priority_high_rounded, size: 10, color: Colors.white),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      chatTitle,
+                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (s.isExpiringSoon)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.red.shade200),
+                                      ),
+                                      child: const Text(
+                                        'Hampir Hangus!',
+                                        style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: isGroup ? Colors.indigo.shade50 : const Color(0xFFECFDF5),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          isGroup ? 'Grup Kelas' : (isTeacher ? 'Siswa' : s.type.label),
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            color: isGroup ? Colors.indigo.shade700 : const Color(0xFF047857),
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ],
-                            ),
-                            onTap: () async {
-                              // Ensure streak is in Firestore
-                              if (!fb.streaks.any((item) => item.id == s.id)) {
-                                await fb.createStreak(s.copyWith(streakCount: 0));
-                              }
-                              if (context.mounted) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatConversationScreen(streak: s),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    latestSnippet,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                                   ),
-                                );
-                              }
-                            },
-                          ),
-                        );
-                      },
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (s.streakCount > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        gradient: AppColors.flameGradient,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF5722).withAlpha(60),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Text('🔥', style: TextStyle(fontSize: 13)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${s.streakCount}',
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else if (lastMsg.isNotEmpty)
+                                    Text(
+                                      AppDateFormatter.formatShortDateTime(lastMsg.last.sentAt),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        color: const Color(0xFF94A3B8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  if (isGroup) ...[
+                                    const SizedBox(width: 4),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert_rounded, size: 20, color: Colors.black45),
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      onSelected: (value) {
+                                        if (value == 'delete') {
+                                          _confirmDeleteGroupFromList(context, fb, s);
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => [
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete_outline_rounded, color: AppColors.rose, size: 18),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Hapus Grup',
+                                                style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.w600, fontSize: 13),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              onTap: () async {
+                                // Ensure streak is in Firestore
+                                if (!fb.streaks.any((item) => item.id == s.id)) {
+                                  await fb.createStreak(s.copyWith(streakCount: 0));
+                                }
+                                if (context.mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatConversationScreen(streak: s),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
                     ),
-            ),
-          ],
-        );
+                    // Kontrol Pagination
+                    if (totalPages > 1)
+                      Container(
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, widget.isEmbedded ? 88 : 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: const Border(
+                            top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(6),
+                              blurRadius: 6,
+                              offset: const Offset(0, -2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: effectivePage > 1
+                                  ? () => setState(() => _currentPage--)
+                                  : null,
+                              icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                              label: const Text('Sebelumnya', style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '$effectivePage dari $totalPages ($totalItems)',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: effectivePage < totalPages
+                                  ? () => setState(() => _currentPage++)
+                                  : null,
+                              icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                              label: const Text('Berikutnya', style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
 
     if (widget.isEmbedded) {
       return Container(
@@ -1334,126 +1445,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildStudyStreakBanner(BuildContext context, FirebaseService fb, UserModel? user) {
-    final studyStreak = fb.getStudyStreak(user?.id);
-    final streakCount = (studyStreak != null && !studyStreak.isDead) ? studyStreak.streakCount : 0;
-    final isActive = studyStreak != null && !studyStreak.isDead && streakCount > 0;
-    final hoursLeft = studyStreak != null && !studyStreak.isDead
-        ? studyStreak.expiresAt.difference(DateTime.now()).inHours
-        : 0;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isActive
-              ? [const Color(0xFF7C2D12), const Color(0xFFC2410C), const Color(0xFFEA580C)]
-              : [const Color(0xFF1E293B), const Color(0xFF334155)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFEA580C).withAlpha(80),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(50),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(isActive ? '🔥' : '❄️', style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 4),
-                    Text(
-                      isActive ? 'Streak Belajar Aktif' : 'Streak Belajar Padam',
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                isActive ? '$streakCount Hari' : '0 Hari',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isActive
-                ? 'Api belajar Anda menyala! Aktif selama $streakCount hari berturut-turut (sisa: $hoursLeft jam).'
-                : 'Streak belajar padam (tidak belajar/chat selama 1 hari). Buka materi, kerjakan tugas, kuis, atau kirim chat hari ini untuk menyalakan api kembali!',
-            style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3),
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            children: [
-              _ActivityMiniChip(icon: Icons.menu_book_rounded, label: 'Materi'),
-              SizedBox(width: 6),
-              _ActivityMiniChip(icon: Icons.assignment_turned_in_rounded, label: 'Tugas'),
-              SizedBox(width: 6),
-              _ActivityMiniChip(icon: Icons.quiz_rounded, label: 'Kuis/Ujian'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityMiniChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _ActivityMiniChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(35),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 12),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
     );
   }
 }

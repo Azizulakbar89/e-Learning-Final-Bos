@@ -23,8 +23,6 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
     final userClass = currentUser?.className ?? currentUser?.classId ?? 'X-RPL-1';
     final leaderboard = fb.getClassLeaderboard(userClass);
 
-    final currentStudentRank = leaderboard.indexWhere((s) => s.id == currentUser?.id);
-    final myMonthlyPoints = currentUser != null ? fb.getStudentMonthlyPoints(currentUser) : 0;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -33,154 +31,135 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
         child: Column(
           children: [
             UniversalAppHeader(
-              bottomContent: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              bottomContent: Row(
                 children: [
-                  // Row Info Peringkat
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(35),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.emoji_events_rounded,
-                            color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Peringkat Kelas',
-                              style: GoogleFonts.outfit(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'Papan Skor Prestasi • Reset Tiap Bulan',
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withAlpha(35),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withAlpha(50)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 13),
-                            SizedBox(width: 4),
-                            Text(
-                              'Top Siswa',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(25),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withAlpha(40)),
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Sub-row: Reset notification and my rank pill
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(25),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.refresh_rounded, color: Colors.white, size: 12),
-                            SizedBox(width: 4),
-                            Text(
-                              'Reset Tanggal 1 Tiap Bulan',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (currentStudentRank != -1)
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Posisi: #${currentStudentRank + 1} ($myMonthlyPoints Poin)',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFFD97706),
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Peringkat Kelas $userClass',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: Colors.white,
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 1),
+                        const Text(
+                          'Papan Skor & Akumulasi Prestasi Belajar',
+                          style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 130),
                 children: [
-                  // Info Banner
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Peringkat dihitung berdasarkan akumulasi poin belajar bulan ini. Tingkatkan quiz & tugasmu!',
-                            style: TextStyle(
-                              color: Colors.amber.shade900,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                  // Banner Ringkas Pembuka Pop-up Acuan Poin
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _showPointGuideDialog(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: AppColors.cardShadow,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFED7AA)),
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 16,
+                              color: Color(0xFFEA580C),
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Cara Mendapatkan Poin Belajar',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                const Text(
+                                  'Ketuk untuk melihat panduan & reward poin',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.orange.withAlpha(15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.orange.withAlpha(45)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Panduan',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.orange,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 12,
+                                  color: AppColors.orange,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // Top 3 Podium
                   if (leaderboard.isNotEmpty) ...[
@@ -469,6 +448,204 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showPointGuideDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        backgroundColor: Colors.white,
+        elevation: 16,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFED7AA)),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 20,
+                        color: Color(0xFFEA580C),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Panduan Perolehan Poin',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const Text(
+                            'Acuan aktivitas belajar siswa',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Kumpulkan poin dari aktivitas belajar harian untuk meningkatkan posisi peringkat kelasmu:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF475569),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      _pointGuideRow(
+                        emoji: '📝',
+                        title: 'Quiz & Ujian Online',
+                        reward: '+10 s/d +50 Poin (Nilai 100: +20 Bonus)',
+                        color: const Color(0xFFC2410C),
+                      ),
+                      const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                      _pointGuideRow(
+                        emoji: '📋',
+                        title: 'Pengumpulan Tugas Kelas',
+                        reward: '+50 Poin per tugas selesai',
+                        color: const Color(0xFFD97706),
+                      ),
+                      const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                      _pointGuideRow(
+                        emoji: '📖',
+                        title: 'Tuntas Baca Modul Materi',
+                        reward: '+20 Poin per materi 100%',
+                        color: const Color(0xFF1E3A8A),
+                      ),
+                      const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                      _pointGuideRow(
+                        emoji: '🔥',
+                        title: 'Konsistensi Belajar & Chat',
+                        reward: 'Streak Harian & Lencana',
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.stars_rounded, size: 16, color: Color(0xFFEA580C)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tiap 500 Poin dapat ditukarkan menjadi +1 Nilai Bonus pada Mapel!',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFC2410C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text(
+                      'Tutup',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pointGuideRow({
+    required String emoji,
+    required String title,
+    required String reward,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 13)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF334155),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withAlpha(12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withAlpha(35)),
+          ),
+          child: Text(
+            reward,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ),
       ],

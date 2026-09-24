@@ -57,27 +57,27 @@ class UniversalAppHeader extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF040D1F), // Darkest Navy
-            Color(0xFF071540), // Deep Navy
-            Color(0xFF0D2B6E), // Primary Navy
-            Color(0xFF1A4DB5), // Medium Navy
+            Color(0xFF060F1E), // Darkest Navy
+            Color(0xFF0A1931), // Deep Navy
+            Color(0xFF0F2552), // Primary Navy
+            Color(0xFF1E3A8A), // Medium Navy
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: const Color(0xFF0D2B6E).withAlpha(100),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: const Color(0xFFF97316).withAlpha(30),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Color(0x280A1931),
+            blurRadius: 20,
+            offset: Offset(0, 6),
+            spreadRadius: 0,
           ),
         ],
+        border: Border.all(
+          color: Colors.white.withAlpha(24),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -92,9 +92,9 @@ class UniversalAppHeader extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(30),
+                  color: Colors.white.withAlpha(24),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white24),
+                  border: Border.all(color: Colors.white.withAlpha(35)),
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
               ),
@@ -102,26 +102,25 @@ class UniversalAppHeader extends StatelessWidget {
             const SizedBox(width: 10),
           ],
 
-          // Avatar with neon gradient glow ring
+          // Avatar with calibrated orange gradient accent ring
           Container(
             width: 50,
             height: 50,
-            padding: const EdgeInsets.all(3.0),
+            padding: const EdgeInsets.all(2.5),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
                 colors: [
-                  Color(0xFFF97316), // Orange
-                  Color(0xFF38BDF8), // Sky Blue
-                  Color(0xFF1A4DB5), // Navy
+                  Color(0xFFFB923C), // Soft Warm Orange
+                  Color(0xFFEA580C), // Deep Rich Orange
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFF97316).withAlpha(90),
-                  blurRadius: 10,
+                  color: const Color(0xFFEA580C).withAlpha(50),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -129,7 +128,7 @@ class UniversalAppHeader extends StatelessWidget {
             child: Container(
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF071540),
+                color: Color(0xFF0A1931),
               ),
               child: Center(
                 child: Text(
