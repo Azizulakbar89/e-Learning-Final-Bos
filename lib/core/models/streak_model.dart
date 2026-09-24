@@ -75,8 +75,25 @@ class StreakModel {
     return diff.inHours <= 4 && diff.inSeconds > 0 && !isDead;
   }
 
-  bool get isDead => DateTime.now().isAfter(expiresAt);
+  /// Streak mati jika waktu saat ini melewati expiresAt atau jika tidak ada interaksi selama 1 hari
+  bool get isDead {
+    final now = DateTime.now();
+    if (now.isAfter(expiresAt)) return true;
+    final today = DateTime(now.year, now.month, now.day);
+    final lastDate = DateTime(
+      lastInteractionAt.year,
+      lastInteractionAt.month,
+      lastInteractionAt.day,
+    );
+    // Jika selisih hari kalender > 1 (melewati 1 hari tanpa belajar atau chat), streak mati
+    if (today.difference(lastDate).inDays > 1) return true;
+    return false;
+  }
+
   bool get isExpired => isDead;
+
+  /// Jumlah streak yang tampil (0 jika mati/padam)
+  int get displayStreakCount => isDead ? 0 : streakCount;
 
   /// Mendapatkan nama tampilan obrolan yang tepat (nama lawan bicara untuk 1-on-1, nama grup untuk grup)
   String getDisplayName({

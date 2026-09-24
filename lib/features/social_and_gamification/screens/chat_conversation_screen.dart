@@ -234,12 +234,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  void _restoreStreak(FirebaseService fb, String streakId) {
-    fb.restoreStreak(streakId: streakId);
-    AppSnackBar.success(
-      context,
-      'Streak berhasil dipulihkan! Api belajar menyala kembali 🔥',
-    );
+  void _onStreakBadgeTapped(StreakModel streak) {
+    if (streak.isDead) {
+      AppSnackBar.info(
+        context,
+        'Streak sedang padam. Kirim pesan sekarang untuk menyalakan kembali api streak Anda 🔥',
+      );
+    }
   }
 
   /// Tampilkan bottom sheet pengaturan grup (edit anggota + hapus grup)
@@ -565,7 +566,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 const SizedBox(width: 6),
                 GestureDetector(
-                  onTap: isDead ? () => _restoreStreak(fb, liveStreak.id) : null,
+                  onTap: () => _onStreakBadgeTapped(liveStreak),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
@@ -605,7 +606,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Expanded(
               child: Column(
                 children: [
-                  // Streak Status Bar (Real-time & Unlimited Restoration)
+                  // Streak Status Bar
                   Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: isDead
@@ -626,7 +627,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 Expanded(
                   child: Text(
                     isDead
-                        ? 'Streak padam (> 24 jam tidak chat). Pulihkan api belajar Anda tanpa batas!'
+                        ? 'Streak padam (tidak ada chat selama 1 hari). Kirim pesan sekarang untuk menyalakan api hari ke-1 🔥'
                         : (liveStreak.isExpiringSoon
                             ? 'PERINGATAN: Streak padam dalam $hoursLeft jam! Kirim chat sekarang 🔥'
                             : 'Streak aktif (${liveStreak.streakCount} hari). Sisa waktu: $hoursLeft jam.'),
@@ -639,17 +640,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     ),
                   ),
                 ),
-                if (isDead)
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: const Color(0xFFFF5722),
-                    ),
-                    onPressed: () => _restoreStreak(fb, liveStreak.id),
-                    icon: const Icon(Icons.replay_rounded, size: 15),
-                    label: const Text('Pulihkan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
-                  ),
               ],
             ),
           ),

@@ -1339,7 +1339,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Widget _buildStudyStreakBanner(BuildContext context, FirebaseService fb, UserModel? user) {
     final studyStreak = fb.getStudyStreak(user?.id);
-    final streakCount = studyStreak?.streakCount ?? 0;
+    final streakCount = (studyStreak != null && !studyStreak.isDead) ? studyStreak.streakCount : 0;
     final isActive = studyStreak != null && !studyStreak.isDead && streakCount > 0;
     final hoursLeft = studyStreak != null && !studyStreak.isDead
         ? studyStreak.expiresAt.difference(DateTime.now()).inHours
@@ -1382,7 +1382,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(isActive ? '🔥' : '💤', style: const TextStyle(fontSize: 14)),
+                    Text(isActive ? '🔥' : '❄️', style: const TextStyle(fontSize: 14)),
                     const SizedBox(width: 4),
                     Text(
                       isActive ? 'Streak Belajar Aktif' : 'Streak Belajar Padam',
@@ -1397,7 +1397,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
               const Spacer(),
               Text(
-                '$streakCount Hari',
+                isActive ? '$streakCount Hari' : '0 Hari',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
@@ -1410,7 +1410,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           Text(
             isActive
                 ? 'Api belajar Anda menyala! Aktif selama $streakCount hari berturut-turut (sisa: $hoursLeft jam).'
-                : 'Streak belajar padam. Selesaikan materi, tugas, atau kuis hari ini untuk menyalakannya kembali!',
+                : 'Streak belajar padam (tidak belajar/chat selama 1 hari). Buka materi, kerjakan tugas, kuis, atau kirim chat hari ini untuk menyalakan api kembali!',
             style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3),
           ),
           const SizedBox(height: 8),

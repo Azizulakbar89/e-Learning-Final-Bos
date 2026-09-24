@@ -41,11 +41,11 @@ void main() async {
   final payload = {
     'fields': {
       'latest_version': {'stringValue': version},
-      'version_code': {'integerValue': '32'},
+      'version_code': {'integerValue': '33'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.4.8/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.4.9/app-release.apk'
       },
       'release_notes': {
         'stringValue':

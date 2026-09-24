@@ -480,6 +480,7 @@ class FirebaseService extends ChangeNotifier {
                   debugPrint('[Firestore] Note parsing streak ${doc.id}: $e');
                 }
               }
+              checkAndExpireStreaks();
               notifyListeners();
             }, onError: (e) => debugPrint('[Firestore] Student streaks note: $e')),
         );
@@ -667,6 +668,7 @@ class FirebaseService extends ChangeNotifier {
             for (final doc in snap.docs) {
               _streaks.add(StreakModel.fromMap(doc.data(), id: doc.id));
             }
+            checkAndExpireStreaks();
             notifyListeners();
           }, onError: (e) => debugPrint('[Firestore] Streaks note: $e')),
         );
@@ -1313,6 +1315,7 @@ class FirebaseService extends ChangeNotifier {
           notifyListeners();
         }
       }
+      checkAndExpireStreaks();
     } catch (e) {
       debugPrint('[Firestore] Note ensuring user streaks: $e');
     }
@@ -3819,11 +3822,26 @@ class FirebaseService extends ChangeNotifier {
     }
   }
 
+  /// Memeriksa dan mematikan streak yang tidak memiliki aktivitas selama 1 hari
+  void checkAndExpireStreaks() {
+    for (int i = 0; i < _streaks.length; i++) {
+      final s = _streaks[i];
+      if (s.isDead && s.streakCount > 0) {
+        _streaks[i] = s.copyWith(streakCount: 0);
+        unawaited(
+          db.collection('streaks').doc(s.id).update({'streak_count': 0}).catchError((_) {}),
+        );
+      }
+    }
+  }
+
   /// Mendapatkan jumlah streak efektif tertinggi milik user yang sedang aktif.
   /// Guru & Admin selalu bernilai 0 karena streak dikhususkan untuk siswa.
   int getEffectiveStreakCount(String? userId) {
     if (userId == null || userId.isEmpty) return 0;
     if (_isTeacherOrAdmin(userId)) return 0; // Guru dan Admin tidak memiliki streak!
+
+    checkAndExpireStreaks();
 
     final userStreaks = _streaks.where((s) => s.participantIds.contains(userId)).toList();
     if (userStreaks.isEmpty) return 0;
@@ -3845,6 +3863,8 @@ class FirebaseService extends ChangeNotifier {
     if (userId == null || userId.isEmpty) return false;
     if (_isTeacherOrAdmin(userId)) return false; // Guru dan Admin tidak memiliki streak!
 
+    checkAndExpireStreaks();
+
     return _streaks.any((s) => s.participantIds.contains(userId) && !s.isDead && s.streakCount > 0);
   }
 
@@ -3853,6 +3873,8 @@ class FirebaseService extends ChangeNotifier {
   StreakModel? getStudyStreak(String? studentId) {
     if (studentId == null || studentId.isEmpty) return null;
     if (_isTeacherOrAdmin(studentId)) return null; // Guru dan Admin tidak memiliki streak!
+
+    checkAndExpireStreaks();
 
     return _streaks
         .where((s) =>
@@ -3962,7 +3984,7 @@ class FirebaseService extends ChangeNotifier {
     return redeems.fold(0.0, (acc, r) => acc + r.bonusGrade);
   }
 
-  /// Record activity in Code Playground and award initial daily points
+  /// Record activity in Code Playground (Poin dinonaktifkan total agar tidak dispam)
   Future<void> recordCodePlaygroundActivity({
     required String studentId,
     required String language,
@@ -3970,24 +3992,7 @@ class FirebaseService extends ChangeNotifier {
     if (studentId.isEmpty) return;
     final list = _studentCodeRuns.putIfAbsent(studentId, () => []);
     list.add(language.toLowerCase());
-
-    // Daily coding reward: award +15 points once per day
-    final now = DateTime.now();
-    final alreadyAwardedToday = _pointTransactions.any((t) =>
-        t.studentId == studentId &&
-        !t.isDebit &&
-        t.reason.contains('Code Playground') &&
-        t.createdAt.year == now.year &&
-        t.createdAt.month == now.month &&
-        t.createdAt.day == now.day);
-
-    if (!alreadyAwardedToday) {
-      await addPoints(
-        studentId: studentId,
-        points: 15,
-        reason: 'Eksplorasi Praktikum IDE: ${language.toUpperCase()} 💻',
-      );
-    }
+    // Poin di IDE Compiler dinonaktifkan permanen sesuai kebijakan agar tidak disalahgunakan untuk spam poin.
     notifyListeners();
   }
 
