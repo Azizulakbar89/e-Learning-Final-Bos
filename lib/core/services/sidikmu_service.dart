@@ -357,15 +357,22 @@ class SidikmuService {
 
     function selectAndTriggerChange(selectEl, opt) {
       if (!selectEl || !opt) return false;
+      opt.selected = true;
+      selectEl.selectedIndex = opt.index;
       selectEl.value = opt.value;
       selectEl.dispatchEvent(new Event('input', { bubbles: true }));
       selectEl.dispatchEvent(new Event('change', { bubbles: true }));
       selectEl.dispatchEvent(new Event('blur', { bubbles: true }));
 
-      var $ = window.jQuery || window.$;
-      if ($) {
+      // Trigger inline onchange handler yang umum di PHP/CodeIgniter SidikMu
+      if (typeof selectEl.onchange === 'function') {
+        try { selectEl.onchange(); } catch(e) {}
+      }
+
+      var jq = window.jQuery || window.$;
+      if (jq) {
         try {
-          $(selectEl).val(opt.value).trigger('input').trigger('change').trigger('change.select2');
+          jq(selectEl).val(opt.value).trigger('input').trigger('change').trigger('change.select2');
         } catch(e) {}
       }
       return true;
@@ -373,7 +380,7 @@ class SidikmuService {
 
     function findAndClickSubmitButton() {
       var allButtons = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, .btn'));
-      var targetKeywords = ['proses selanjutnya', 'proses', 'tampilkan', 'filter', 'cari', 'lihat', 'lanjutkan', 'submit'];
+      var targetKeywords = ['proses selanjutnya', 'proses', 'tampilkan', 'filter', 'cari', 'lihat', 'lanjutkan', 'submit', 'buka'];
 
       var btn = null;
       for (var k = 0; k < targetKeywords.length; k++) {
@@ -392,10 +399,19 @@ class SidikmuService {
         }
       }
 
+      if (!btn) {
+        // Fallback: Tombol apapun di bawah dropdown terakhir
+        var selects = document.querySelectorAll('select');
+        if (selects.length > 0) {
+          var lastSel = selects[selects.length - 1];
+          var parent = lastSel.closest('form') || lastSel.closest('.card') || document.body;
+          btn = parent.querySelector('button, input[type="submit"], a.btn');
+        }
+      }
+
       if (btn) {
         var form = btn.closest('form') || document.querySelector('form');
         if (form) {
-          // Pastikan parameter submit terkirim ke backend PHP
           var submitName = btn.getAttribute('name') || 'submit';
           var submitVal = btn.getAttribute('value') || '1';
           if (!form.querySelector('input[type="hidden"][name="' + submitName + '"]')) {
@@ -410,10 +426,11 @@ class SidikmuService {
         btn.scrollIntoView({ behavior: 'instant', block: 'center' });
         btn.focus();
         btn.click();
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-        var \$ = window.jQuery || window.\$;
-        if (\$) {
-          try { \$(btn).trigger('click'); } catch(e) {}
+        var jq = window.jQuery || window.$;
+        if (jq) {
+          try { jq(btn).trigger('click'); } catch(e) {}
         }
 
         if (form) {
@@ -1126,10 +1143,10 @@ class SidikmuService {
             input.dispatchEvent(new Event('change', { bubbles: true }));
             input.dispatchEvent(new Event('blur', { bubbles: true }));
             input.dispatchEvent(new Event('keyup', { bubbles: true }));
-            var \$ = window.jQuery || window.\$;
-            if (\$) {
+            var jq = window.jQuery;
+            if (jq) {
               try {
-                \$(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
+                jq(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
               } catch(e) {}
             }
             filled++;
