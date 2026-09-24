@@ -41,15 +41,15 @@ void main() async {
   final payload = {
     'fields': {
       'latest_version': {'stringValue': version},
-      'version_code': {'integerValue': '$versionCode'},
+      'version_code': {'integerValue': '30'},
       'min_supported_version_code': {'integerValue': '1'},
       'apk_url': {
         'stringValue':
-            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v$version/app-release.apk'
+            'https://github.com/Azizulakbar89/e-Learning-Final-Bos/releases/download/v1.4.6/app-release.apk'
       },
       'release_notes': {
         'stringValue':
-            '✨ Versi $version: Perbaikan pencocokan otomatis Kelas, CP, TP SidikMu berbasis kesamaan/substring, perbaikan tombol proses formulir, serta fleksibilitas pemilihan Tahun Ajaran & Semester.'
+            '✨ Versi $version: Nilai siswa yang NIS-nya tidak terdaftar di e-Learning otomatis diisi 0 di SidikMu sesuai aturan sekolah. Otomasi sinkronisasi tuntas untuk seluruh siswa.'
       },
       'force_update': {'booleanValue': false}
     }

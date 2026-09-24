@@ -1069,10 +1069,10 @@ class SidikmuService {
             var studentFullName = (cells.length > 2 ? cells[2].innerText : (matchedNis ? names[matchedNis] : '')) || '';
             studentFullName = studentFullName.trim();
             var inps = Array.from(row.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="radio"])'));
-            var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input');
+            var input = inps.length > 0 ? inps[inps.length - 1] : row.querySelector('input[type="text"], input[type="number"], input');
             if (!input) return;
 
-            // Jika nilai tidak diisi / kosong, maka buat 0 saja sesuai instruksi pengguna
+            // Aturan pengguna: "jika nis di e-learning tidak ada maka di sidikmu diisi dengan nilai 0 saja"
             var scoreVal = matchedNis ? getScoreForNis(matchedNis) : null;
             var isProvided = (scoreVal !== null && scoreVal !== undefined && String(scoreVal).trim() !== '');
             var scoreStr = '0';
@@ -1081,7 +1081,12 @@ class SidikmuService {
               scoreStr = (!isNaN(num) && num % 1 === 0) ? num.toFixed(0) : String(scoreVal);
             } else {
               scoreStr = '0';
-              emptyList.push({ nis: matchedNis || '', name: studentFullName });
+              var isNotFound = !matchedNis || getScoreForNis(matchedNis) === undefined;
+              emptyList.push({
+                nis: matchedNis || '',
+                name: studentFullName,
+                reason: isNotFound ? 'NIS tidak ada di e-Learning (Diisi Nilai 0)' : 'Belum Mengumpulkan (Diisi Nilai 0)'
+              });
             }
 
             input.removeAttribute('disabled');
@@ -1093,9 +1098,10 @@ class SidikmuService {
             input.dispatchEvent(new Event('change', { bubbles: true }));
             input.dispatchEvent(new Event('blur', { bubbles: true }));
             input.dispatchEvent(new Event('keyup', { bubbles: true }));
-            if (window.jQuery) {
+            var \$ = window.jQuery || window.\$;
+            if (\$) {
               try {
-                window.jQuery(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
+                \$(input).val(scoreStr).trigger('input').trigger('change').trigger('blur').trigger('keyup');
               } catch(e) {}
             }
             filled++;
@@ -1131,28 +1137,23 @@ class SidikmuService {
 
       if (filledCount == 0) {
         return SidikmuSyncResult.error(
-          'Tidak ada nilai siswa yang tersimpan (0 dari $totalRows siswa). '
-          'Pastikan sudah ada tugas atau jawaban siswa yang telah diberi nilai pada halaman tugas e-Learning sebelum melakukan sinkronisasi.',
+          'Tidak ada kolom input nilai siswa yang ditemukan di tabel SidikMu (0 dari $totalRows baris).',
         );
       }
 
       final emptyOrZeroList = <SidikmuUnsyncedItem>[];
       for (final item in rawEmpty) {
-        if (item is Map) {
-          emptyOrZeroList.add(SidikmuUnsyncedItem(
-            nis: item['nis']?.toString() ?? '',
-            studentName: item['name']?.toString() ?? '',
-            reason: 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)',
-            score: 0.0,
-          ));
-        } else {
-          emptyOrZeroList.add(SidikmuUnsyncedItem(
-            nis: item?.toString() ?? '',
-            studentName: '',
-            reason: 'Nilai Otomatis Diisi 0 (Belum Mengumpulkan)',
-            score: 0.0,
-          ));
-        }
+        final nis = item is Map ? item['nis']?.toString() ?? '' : '';
+        final name = item is Map ? item['name']?.toString() ?? '' : '';
+        final reason = item is Map && item['reason'] != null
+            ? item['reason'].toString()
+            : 'Tidak ada di e-Learning (Diisi Nilai 0)';
+        emptyOrZeroList.add(SidikmuUnsyncedItem(
+          nis: nis,
+          studentName: name,
+          reason: reason,
+          score: 0.0,
+        ));
       }
       for (final item in rawZero) {
         if (item is Map) {
