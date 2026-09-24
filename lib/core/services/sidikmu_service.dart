@@ -393,32 +393,50 @@ class SidikmuService {
       }
 
       if (btn) {
+        var form = btn.closest('form') || document.querySelector('form');
+        if (form) {
+          // Pastikan parameter submit terkirim ke backend PHP
+          var submitName = btn.getAttribute('name') || 'submit';
+          var submitVal = btn.getAttribute('value') || '1';
+          if (!form.querySelector('input[type="hidden"][name="' + submitName + '"]')) {
+            var h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = submitName;
+            h.value = submitVal;
+            form.appendChild(h);
+          }
+        }
+
         btn.scrollIntoView({ behavior: 'instant', block: 'center' });
         btn.focus();
         btn.click();
-        var $ = window.jQuery || window.$;
-        if ($) {
-          try { $(btn).trigger('click'); } catch(e) {}
+
+        var \$ = window.jQuery || window.\$;
+        if (\$) {
+          try { \$(btn).trigger('click'); } catch(e) {}
         }
-        var form = btn.closest('form');
+
         if (form) {
-          try { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); } catch(e) {}
+          try {
+            if (typeof form.requestSubmit === 'function') {
+              form.requestSubmit(btn);
+            } else {
+              form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+          } catch(e) {}
         }
         return { success: true, text: btn.innerText || btn.value || 'button' };
       }
-      return { success: false };
+      return { success: false, error: 'Tombol submit tidak ditemukan' };
     }
   ''';
 
   /// Helper JavaScript untuk mendeteksi tabel nilai siswa yang sebenarnya
   static const String _kFindStudentGradeTableJs = r'''
     function findStudentGradeTable() {
-      var tables = Array.from(document.querySelectorAll('table'));
+      var tables = Array.from(document.querySelectorAll('table, .table'));
       for (var i = 0; i < tables.length; i++) {
         var tbl = tables[i];
-        // Abaikan tabel formulir filter yang memiliki dropdown select
-        if (tbl.querySelectorAll('select').length >= 2) continue;
-
         var rows = Array.from(tbl.querySelectorAll('tbody tr, tr')).filter(function(r) {
           if (r.querySelector('th')) return false;
           var cells = r.querySelectorAll('td');
@@ -431,6 +449,16 @@ class SidikmuService {
           return { table: tbl, rows: rows, count: rows.length };
         }
       }
+
+      // Fallback jika baris siswa terdeteksi dari input nilai langsung
+      var allScoreInputs = Array.from(document.querySelectorAll('input[type="number"], input[name*="nilai"], input[name*="score"]'));
+      if (allScoreInputs.length >= 1) {
+        var dummyRows = allScoreInputs.map(function(inp) {
+          return inp.closest('tr, .row, li, div') || inp.parentElement;
+        });
+        return { table: document.body, rows: dummyRows, count: dummyRows.length };
+      }
+
       return null;
     }
   ''';
